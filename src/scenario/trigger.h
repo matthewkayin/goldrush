@@ -10,18 +10,19 @@
 // Condition
 
 enum TriggerConditionType {
-    TRIGGER_CONDITION_ACQUIRED_ENTITIES,
+    TRIGGER_CONDITION_ENTITY_COUNT,
     TRIGGER_CONDITION_COUNT
 };
 
-struct TriggerConditionAcquiredEntities {
-    uint32_t entity_count[ENTITY_TYPE_COUNT];
+struct TriggerConditionEntityCount {
+    EntityType entity_type;
+    uint32_t entity_count;
 };
 
 struct TriggerCondition {
     TriggerConditionType type;
     union {
-        TriggerConditionAcquiredEntities acquired_entities;
+        TriggerConditionEntityCount entity_count;
     };
 };
 
@@ -50,7 +51,7 @@ struct TriggerEffect {
 struct Trigger {
     bool is_active;
     char name[TRIGGER_NAME_MAX_LENGTH];
-    TriggerCondition condition;
+    std::vector<TriggerCondition> conditions;
     std::vector<TriggerEffect> effects;
 };
 

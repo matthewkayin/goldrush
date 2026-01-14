@@ -22,14 +22,17 @@ enum EditorActionType {
     EDITOR_ACTION_DECORATE_BULK,
     EDITOR_ACTION_ADD_ENTITY,
     EDITOR_ACTION_EDIT_ENTITY,
-    EDITOR_ACTION_DELETE_ENTITY,
+    EDITOR_ACTION_REMOVE_ENTITY,
     EDITOR_ACTION_ADD_SQUAD,
     EDITOR_ACTION_EDIT_SQUAD,
-    EDITOR_ACTION_DELETE_SQUAD,
+    EDITOR_ACTION_REMOVE_SQUAD,
     EDITOR_ACTION_SET_PLAYER_SPAWN,
     EDITOR_ACTION_ADD_TRIGGER,
-    EDITOR_ACTION_DELETE_TRIGGER,
-    EDITOR_ACTION_RENAME_TRIGGER
+    EDITOR_ACTION_REMOVE_TRIGGER,
+    EDITOR_ACTION_RENAME_TRIGGER,
+    EDITOR_ACTION_ADD_TRIGGER_CONDITION,
+    EDITOR_ACTION_EDIT_TRIGGER_CONDITION,
+    EDITOR_ACTION_REMOVE_TRIGGER_CONDITION,
 };
 
 struct EditorActionBrushStroke {
@@ -66,7 +69,7 @@ struct EditorActionEditEntity {
     ScenarioEntity new_value;
 };
 
-struct EditorActionDeleteEntity {
+struct EditorActionRemoveEntity {
     uint32_t index;
     ScenarioEntity value;
 };
@@ -77,7 +80,7 @@ struct EditorActionEditSquad {
     ScenarioSquad new_value;
 };
 
-struct EditorActionDeleteSquad {
+struct EditorActionRemoveSquad {
     uint32_t index;
     ScenarioSquad value;
 };
@@ -87,7 +90,7 @@ struct EditorActionSetPlayerSpawn {
     ivec2 new_value;
 };
 
-struct EditorActionDeleteTrigger {
+struct EditorActionRemoveTrigger {
     uint32_t index;
     Trigger value;
 };
@@ -98,6 +101,23 @@ struct EditorActionRenameTrigger {
     char new_name[TRIGGER_NAME_MAX_LENGTH];
 };
 
+struct EditorActionAddTriggerCondition {
+    uint32_t trigger_index;
+};
+
+struct EditorActionRemoveTriggerCondition {
+    uint32_t trigger_index;
+    uint32_t condition_index;
+    TriggerCondition value;
+};
+
+struct EditorActionEditTriggerCondition {
+    uint32_t trigger_index;
+    uint32_t condition_index;
+    TriggerCondition previous_value;
+    TriggerCondition new_value;
+};
+
 struct EditorAction {
     EditorActionType type;
     std::variant<
@@ -106,12 +126,15 @@ struct EditorAction {
         EditorActionDecorateBulk,
         EditorActionAddEntity,
         EditorActionEditEntity,
-        EditorActionDeleteEntity,
+        EditorActionRemoveEntity,
         EditorActionEditSquad,
-        EditorActionDeleteSquad,
+        EditorActionRemoveSquad,
         EditorActionSetPlayerSpawn,
-        EditorActionDeleteTrigger,
-        EditorActionRenameTrigger> data;
+        EditorActionRemoveTrigger,
+        EditorActionRenameTrigger,
+        EditorActionAddTriggerCondition,
+        EditorActionRemoveTriggerCondition,
+        EditorActionEditTriggerCondition> data;
 };
 
 // Action

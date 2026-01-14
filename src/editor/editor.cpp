@@ -8,8 +8,8 @@
 #include "editor/menu_players.h"
 #include "editor/menu_edit_squad.h"
 #include "editor/menu_allowed_tech.h"
-#include "editor/menu_edit_trigger.h"
-#include "editor/ui.h"
+#include "editor/menu_triggers.h"
+#include "editor/menu.h"
 #include "editor/action.h"
 #include "core/logger.h"
 #include "core/input.h"
@@ -95,6 +95,30 @@ struct EditorClipboard {
     std::vector<uint8_t> values;
 };
 
+enum EditorMenuType {
+    EDITOR_MENU_TYPE_NONE,
+    EDITOR_MENU_TYPE_NEW,
+    EDITOR_MENU_TYPE_FILE_SAVE,
+    EDITOR_MENU_TYPE_FILE_OPEN,
+    EDITOR_MENU_TYPE_PLAYERS,
+    EDITOR_MENU_TYPE_TRIGGERS,
+    EDITOR_MENU_TYPE_EDIT_SQUAD,
+    EDITOR_MENU_TYPE_ALLOWED_TECH
+};
+
+struct EditorMenu {
+    EditorMenuType type;
+    EditorMenuMode mode;
+    std::variant<
+        EditorMenuNew,
+        EditorMenuFile,
+        EditorMenuPlayers,
+        EditorMenuTriggers,
+        EditorMenuEditSquad,
+        EditorMenuAllowedTech
+    > menu;
+};
+
 struct EditorState {
     Scenario* scenario;
     std::string scenario_path;
@@ -107,12 +131,7 @@ struct EditorState {
     std::vector<EditorAction> actions;
 
     // Menus
-    EditorMenuNew menu_new;
-    EditorMenuFile menu_file;
-    EditorMenuPlayers menu_players;
-    EditorMenuEditSquad menu_edit_squad;
-    EditorMenuAllowedTech menu_allowed_tech;
-    EditorMenuEditTrigger menu_edit_trigger;
+    EditorMenu menu;
 
     // Tools
     EditorTool tool;
@@ -212,11 +231,8 @@ void editor_init() {
 
     state.action_head = 0;
 
-    state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
-    state.menu_players.mode = EDITOR_MENU_PLAYERS_CLOSED;
-    state.menu_edit_squad.mode = EDITOR_MENU_EDIT_SQUAD_CLOSED;
-    state.menu_allowed_tech.mode = EDITOR_MENU_ALLOWED_TECH_MODE_CLOSED;
-    state.menu_edit_trigger.mode = EDITOR_MENU_EDIT_TRIGGER_CLOSED;
+    state.menu.type = EDITOR_MENU_TYPE_NONE;
+    state.menu.mode = EDITOR_MENU_MODE_CLOSED;
 
     state.camera_offset = ivec2(0, 0);
     state.is_minimap_dragging = false;
@@ -388,12 +404,16 @@ void editor_update() {
                             state.tool_value = state.scenario->squads.size() - 1;
                         }
                         if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, state.scenario->squads.empty(), false)) {
-                            state.menu_edit_squad = editor_menu_edit_squad_open(state.scenario->squads[state.tool_value], state.scenario);
+                            state.menu = (EditorMenu) {
+                                .type = EDITOR_MENU_TYPE_EDIT_SQUAD,
+                                .mode = EDITOR_MENU_MODE_OPEN,
+                                .menu = editor_menu_edit_squad_open(state.scenario->squads[state.tool_value], state.scenario)
+                            };
                         }
                         if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, state.scenario->squads.empty(), false)) {
                             editor_do_action((EditorAction) {
-                                .type = EDITOR_ACTION_DELETE_SQUAD,
-                                .data = (EditorActionDeleteSquad) {
+                                .type = EDITOR_ACTION_REMOVE_SQUAD,
+                                .data = (EditorActionRemoveSquad) {
                                     .index = state.tool_value,
                                     .value = state.scenario->squads[state.tool_value]
                                 }
@@ -432,6 +452,7 @@ void editor_update() {
                 case EDITOR_TOOL_PLAYER_SPAWN:
                     break;
                 case EDITOR_TOOL_TRIGGERS: {
+                    // Trigger selection dropdown
                     ui_begin_row(state.ui, ivec2(0, 0), 2);
                         std::vector<std::string> trigger_dropdown_items;
                         for (uint32_t trigger_index = 0; trigger_index < state.scenario->triggers.size(); trigger_index++) {
@@ -445,12 +466,16 @@ void editor_update() {
                             state.tool_value = state.scenario->triggers.size() - 1;
                         }
                         if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, state.scenario->triggers.empty(), false)) {
-                            state.menu_edit_trigger = editor_menu_edit_trigger_open(state.scenario->triggers[state.tool_value]);
+                            state.menu = (EditorMenu) {
+                                .type = EDITOR_MENU_TYPE_TRIGGERS,
+                                .mode = EDITOR_MENU_MODE_OPEN,
+                                .menu = editor_menu_triggers_open(state.scenario->triggers[state.tool_value])
+                            };
                         }
                         if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, state.scenario->triggers.empty(), false)) {
                             editor_do_action((EditorAction) {
-                                .type = EDITOR_ACTION_DELETE_TRIGGER,
-                                .data = (EditorActionDeleteTrigger) {
+                                .type = EDITOR_ACTION_REMOVE_TRIGGER,
+                                .data = (EditorActionRemoveTrigger) {
                                     .index = state.tool_value,
                                     .value = state.scenario->triggers[state.tool_value]
                                 }
@@ -458,6 +483,47 @@ void editor_update() {
                             state.tool_value = 0;
                         }
                     ui_end_container(state.ui);
+
+                    // Trigger conditions
+                    if (!state.scenario->triggers.empty()) {
+                        const Trigger& trigger = state.scenario->triggers[state.tool_value];
+
+                        ui_text(state.ui, FONT_HACK_GOLD, "Conditions");
+
+                        std::vector<std::string> condition_type_items;
+                        for (uint32_t condition_type = 0; condition_type < TRIGGER_CONDITION_COUNT; condition_type++) {
+                            condition_type_items.push_back(trigger_condition_type_str((TriggerConditionType)condition_type));
+                        }
+
+                        for (uint32_t condition_index = 0; condition_index < trigger.conditions.size(); condition_index++) {
+                            const TriggerCondition& condition = trigger.conditions[condition_index];
+
+                            ui_begin_row(state.ui, ivec2(0, 0), 4);
+                                uint32_t condition_type = condition.type;
+                                ui_dropdown(state.ui, UI_DROPDOWN_MINI, &condition_type, condition_type_items, false);
+
+                                if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, false, false)) {
+                                    editor_do_action((EditorAction) {
+                                        .type = EDITOR_ACTION_REMOVE_TRIGGER_CONDITION,
+                                        .data = (EditorActionRemoveTriggerCondition) {
+                                            .trigger_index = state.tool_value,
+                                            .condition_index = condition_index,
+                                            .value = condition
+                                        }
+                                    });
+                                }
+                            ui_end_container(state.ui);
+                        }
+
+                        if (ui_slim_button(state.ui, "+ Condition")) {
+                            editor_do_action((EditorAction) {
+                                .type = EDITOR_ACTION_ADD_TRIGGER_CONDITION,
+                                .data = (EditorActionAddTriggerCondition) {
+                                    .trigger_index = state.tool_value
+                                }
+                            });
+                        }
+                    }
 
                     break;
                 }
@@ -511,105 +577,108 @@ void editor_update() {
 
     // Menus
     if (editor_is_in_menu()) {
-        // Menu new
-        if (state.menu_new.mode == EDITOR_MENU_NEW_OPEN) {
-            editor_menu_new_update(state.menu_new, state.ui);
-            if (state.menu_new.mode == EDITOR_MENU_NEW_CREATE) {
-                editor_free_current_document();
+        switch (state.menu.type) {
+            case EDITOR_MENU_TYPE_NEW: {
+                EditorMenuNew& menu = std::get<EditorMenuNew>(state.menu.menu);
+                editor_menu_new_update(menu, state.ui, state.menu.mode);
 
-                MapType map_type = (MapType)state.menu_new.map_type;
-                MapSize map_size = (MapSize)state.menu_new.map_size;
-                if (state.menu_new.use_noise_gen_params) {
-                    NoiseGenParams params = editor_menu_new_create_noise_gen_params(state.menu_new);
-                    state.scenario = scenario_init_generated(map_type, params);
-                } else {
-                    state.scenario = scenario_init_blank(map_type, map_size);
-                }
-                state.scenario_path = "";
-                state.scenario_is_saved = false;
-                state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
-            }
-        }
+                if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
+                    editor_free_current_document();
 
-        // Menu file
-        if (state.menu_file.mode != EDITOR_MENU_FILE_CLOSED) {
-            editor_menu_file_update(state.menu_file, state.ui);
-            if (state.menu_file.mode == EDITOR_MENU_FILE_SAVE_FINISHED) {
-                editor_save(state.menu_file.path.c_str());
-                state.menu_file.mode = EDITOR_MENU_FILE_CLOSED;
-            }
-            if (state.menu_file.mode == EDITOR_MENU_FILE_OPEN_FINISHED) {
-                editor_open(state.menu_file.path.c_str());
-                state.menu_file.mode = EDITOR_MENU_FILE_CLOSED;
-            }
-        }
-
-        // Menu players
-        if (state.menu_players.mode == EDITOR_MENU_PLAYERS_OPEN) {
-            editor_menu_players_update(state.menu_players, state.ui, state.scenario);
-        }
-
-        // Menu edit squad
-        if (state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_OPEN) {
-            editor_menu_edit_squad_update(state.menu_edit_squad, state.ui);
-            if (state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_SAVE) {
-                const ScenarioSquad previous_squad = state.scenario->squads[state.tool_value];
-                ScenarioSquad edited_squad = previous_squad;
-                strncpy(edited_squad.name, state.menu_edit_squad.squad_name.c_str(), MAX_USERNAME_LENGTH);
-                edited_squad.player_id = state.menu_edit_squad.squad_player + 1;
-                edited_squad.type = (ScenarioSquadType)state.menu_edit_squad.squad_type;
-                if (edited_squad.player_id != previous_squad.player_id) {
-                    edited_squad.entity_count = 0;
+                    MapType map_type = (MapType)menu.map_type;
+                    MapSize map_size = (MapSize)menu.map_size;
+                    if (menu.use_noise_gen_params) {
+                        NoiseGenParams params = editor_menu_new_create_noise_gen_params(menu);
+                        state.scenario = scenario_init_generated(map_type, params);
+                    } else {
+                        state.scenario = scenario_init_blank(map_type, map_size);
+                    }
+                    state.scenario_path = "";
+                    state.scenario_is_saved = false;
                 }
 
-                if (!scenario_squads_are_equal(edited_squad, previous_squad)) {
+                break;
+            }
+            case EDITOR_MENU_TYPE_FILE_SAVE:
+            case EDITOR_MENU_TYPE_FILE_OPEN: {
+                EditorMenuFile& menu = std::get<EditorMenuFile>(state.menu.menu);
+                editor_menu_file_update(menu, state.ui, state.menu.mode);
+
+                if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
+                    if (state.menu.type == EDITOR_MENU_FILE_TYPE_SAVE) {
+                        editor_save(menu.path.c_str());
+                    } else if (state.menu.type == EDITOR_MENU_FILE_TYPE_OPEN) {
+                        editor_open(menu.path.c_str());
+                    }
+                }
+
+                break;
+            }
+            case EDITOR_MENU_TYPE_PLAYERS: {
+                EditorMenuPlayers& menu = std::get<EditorMenuPlayers>(state.menu.menu);
+                editor_menu_players_update(menu, state.ui, state.menu.mode, state.scenario);
+
+                // No submit handle here because the players menu just edits 
+                // the scenario directly for better or worse
+
+                break;
+            }
+            case EDITOR_MENU_TYPE_EDIT_SQUAD: {
+                EditorMenuEditSquad& menu = std::get<EditorMenuEditSquad>(state.menu.menu);
+                editor_menu_edit_squad_update(menu, state.ui, state.menu.mode);
+
+                if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
+                    const ScenarioSquad previous_squad = state.scenario->squads[state.tool_value];
+                    ScenarioSquad edited_squad = previous_squad;
+                    strncpy(edited_squad.name, menu.squad_name.c_str(), MAX_USERNAME_LENGTH);
+                    edited_squad.player_id = menu.squad_player + 1;
+                    edited_squad.type = (ScenarioSquadType)menu.squad_type;
+                    if (edited_squad.player_id != previous_squad.player_id) {
+                        edited_squad.entity_count = 0;
+                    }
+
+                    if (!scenario_squads_are_equal(edited_squad, previous_squad)) {
+                        editor_do_action((EditorAction) {
+                            .type = EDITOR_ACTION_EDIT_SQUAD,
+                            .data = (EditorActionEditSquad) {
+                                .index = state.tool_value,
+                                .previous_value = previous_squad,
+                                .new_value = edited_squad
+                            }
+                        });
+                    }
+                }
+
+                break;
+            }
+            case EDITOR_MENU_TYPE_TRIGGERS: {
+                EditorMenuTriggers& menu = std::get<EditorMenuTriggers>(state.menu.menu);
+                editor_menu_triggers_update(menu, state.ui, state.menu.mode);
+
+                if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
+                    EditorActionRenameTrigger rename_trigger;
+                    rename_trigger.index = state.tool_value;
+                    strncpy(rename_trigger.previous_name, state.scenario->triggers[state.tool_value].name, TRIGGER_NAME_MAX_LENGTH);
+                    strncpy(rename_trigger.new_name, menu.trigger_name.c_str(), TRIGGER_NAME_MAX_LENGTH);
                     editor_do_action((EditorAction) {
-                        .type = EDITOR_ACTION_EDIT_SQUAD,
-                        .data = (EditorActionEditSquad) {
-                            .index = state.tool_value,
-                            .previous_value = previous_squad,
-                            .new_value = edited_squad
-                        }
+                        .type = EDITOR_ACTION_RENAME_TRIGGER,
+                        .data = rename_trigger
                     });
                 }
 
-                state.menu_edit_squad.mode = EDITOR_MENU_EDIT_SQUAD_CLOSED;
+                break;
             }
         }
 
-        // Menu allowed tech
-        if (state.menu_allowed_tech.mode == EDITOR_MENU_ALLOWED_TECH_MODE_OPEN) {
-            editor_menu_allowed_tech_update(state.menu_allowed_tech, state.ui);
-            if (state.menu_allowed_tech.mode == EDITOR_MENU_ALLOWED_TECH_MODE_SAVE) {
-                memcpy(state.scenario->allowed_entities, state.menu_allowed_tech.allowed_entities, sizeof(state.scenario->allowed_entities));
-                state.scenario->allowed_upgrades = 0;
-                for (uint32_t upgrade_index = 0; upgrade_index < UPGRADE_COUNT; upgrade_index++) {
-                    if (state.menu_allowed_tech.allowed_upgrades[upgrade_index]) {
-                        uint32_t flag = 1U << upgrade_index;
-                        state.scenario->allowed_upgrades |= flag;
-                    }
-                }
-                state.menu_allowed_tech.mode = EDITOR_MENU_ALLOWED_TECH_MODE_CLOSED;
-            }
+        // Close menu
+        if (state.menu.mode != EDITOR_MENU_MODE_OPEN) {
+            state.menu = (EditorMenu) {
+                .type = EDITOR_MENU_TYPE_NONE,
+                .mode = EDITOR_MENU_MODE_CLOSED
+            };
         }
 
-        // Menu edit trigger
-        if (state.menu_edit_trigger.mode == EDITOR_MENU_EDIT_TRIGGER_OPEN) {
-            editor_menu_edit_trigger_update(state.menu_edit_trigger, state.ui);
-            if (state.menu_edit_trigger.mode == EDITOR_MENU_EDIT_TRIGGER_SAVE) {
-                EditorActionRenameTrigger rename_trigger;
-                rename_trigger.index = state.tool_value;
-                strncpy(rename_trigger.previous_name, state.scenario->triggers[state.tool_value].name, TRIGGER_NAME_MAX_LENGTH);
-                strncpy(rename_trigger.new_name, state.menu_edit_trigger.trigger_name.c_str(), TRIGGER_NAME_MAX_LENGTH);
-                editor_do_action((EditorAction) {
-                    .type = EDITOR_ACTION_RENAME_TRIGGER,
-                    .data = rename_trigger
-                });
-
-                state.menu_edit_trigger.mode = EDITOR_MENU_EDIT_TRIGGER_CLOSED;
-            }
-        }
-
+        // Prevents click-through on menu close
         return;
     }
 
@@ -884,12 +953,7 @@ void editor_update() {
 }
 
 bool editor_is_in_menu() {
-    return state.menu_new.mode == EDITOR_MENU_NEW_OPEN ||
-        state.menu_file.mode != EDITOR_MENU_FILE_CLOSED ||
-        state.menu_players.mode == EDITOR_MENU_PLAYERS_OPEN ||
-        state.menu_edit_trigger.mode == EDITOR_MENU_EDIT_TRIGGER_OPEN ||
-        state.menu_allowed_tech.mode == EDITOR_MENU_ALLOWED_TECH_MODE_OPEN ||
-        state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_OPEN;
+    return state.menu.type != EDITOR_MENU_TYPE_NONE;
 }
 
 bool editor_is_toolbar_open() {
@@ -917,17 +981,33 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
 
     if (column == "File") {
         if (action == "New") {
-            state.menu_new = editor_menu_new_open();
+            state.menu = (EditorMenu) {
+                .type = EDITOR_MENU_TYPE_NEW,
+                .mode = EDITOR_MENU_MODE_OPEN,
+                .menu = editor_menu_new_open()
+            };
         } else if (action == "Save") {
             if (state.scenario_path == "") {
-                state.menu_file = editor_menu_file_save_open(state.scenario_path.c_str());
+                state.menu = (EditorMenu) {
+                    .type = EDITOR_MENU_TYPE_FILE_SAVE,
+                    .mode = EDITOR_MENU_MODE_OPEN,
+                    .menu = editor_menu_file_save_open(state.scenario_path.c_str())
+                };
             } else {
                 editor_save(state.scenario_path.c_str());
             }
         } else if (action == "Save As") {
-            state.menu_file = editor_menu_file_save_open(state.scenario_path.c_str());
+            state.menu = (EditorMenu) {
+                .type = EDITOR_MENU_TYPE_FILE_SAVE,
+                .mode = EDITOR_MENU_MODE_OPEN,
+                .menu = editor_menu_file_save_open(state.scenario_path.c_str())
+            };
         } else if (action == "Open") {
-            state.menu_file = editor_menu_file_open_open();
+            state.menu = (EditorMenu) {
+                .type = EDITOR_MENU_TYPE_FILE_OPEN,
+                .mode = EDITOR_MENU_MODE_OPEN,
+                .menu = editor_menu_file_open_open()
+            };
         }
     } else if (column == "Edit") {
         if (action == "Undo") {
@@ -951,9 +1031,17 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
             state.is_pasting = true;
             log_debug("begin pasting");
         } else if (action == "Players") {
-            state.menu_players = editor_menu_players_open(state.scenario);
+            state.menu = (EditorMenu) {
+                .type = EDITOR_MENU_TYPE_PLAYERS,
+                .mode = EDITOR_MENU_MODE_OPEN,
+                .menu = editor_menu_players_open(state.scenario)
+            };
         } else if (action == "Allowed Tech") {
-            state.menu_allowed_tech = editor_menu_allowed_tech_open(state.scenario);
+            state.menu = (EditorMenu) {
+                .type = EDITOR_MENU_TYPE_ALLOWED_TECH,
+                .mode = EDITOR_MENU_MODE_OPEN,
+                .menu = editor_menu_allowed_tech_open(state.scenario)
+            };
         }
     } else if (column == "Tool") {
         for (uint32_t index = 1; index < TOOLBAR_OPTIONS[2].size(); index++) {
@@ -1501,8 +1589,8 @@ void editor_validate_tool_value() {
 
 void editor_tool_edit_entity_delete_entity(uint32_t entity_index) {
     editor_do_action((EditorAction) {
-        .type = EDITOR_ACTION_DELETE_ENTITY,
-        .data = (EditorActionDeleteEntity) {
+        .type = EDITOR_ACTION_REMOVE_ENTITY,
+        .data = (EditorActionRemoveEntity) {
             .index = entity_index,
             .value = state.scenario->entities[entity_index]
         }

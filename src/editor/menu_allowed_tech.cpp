@@ -13,7 +13,6 @@ static const int ICON_ROW_SIZE = 8;
 
 EditorMenuAllowedTech editor_menu_allowed_tech_open(const Scenario* scenario) {
     EditorMenuAllowedTech menu;
-    menu.mode = EDITOR_MENU_ALLOWED_TECH_MODE_OPEN;
     memcpy(menu.allowed_entities, scenario->allowed_entities, sizeof(menu.allowed_entities));
     for (uint32_t upgrade_index = 0; upgrade_index < UPGRADE_COUNT; upgrade_index++) {
         uint32_t flag = 1U << upgrade_index;
@@ -23,14 +22,8 @@ EditorMenuAllowedTech editor_menu_allowed_tech_open(const Scenario* scenario) {
     return menu;
 }
 
-void editor_menu_allowed_tech_update(EditorMenuAllowedTech& menu, UI& ui) {
-    ui.input_enabled = true;
-    ui_frame_rect(ui, MENU_RECT);
-
-    // Header
-    ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, "Edit Allowed Tech");
-    ui_element_position(ui, ivec2(MENU_RECT.x + (MENU_RECT.w / 2) - (header_text_size.x / 2), MENU_RECT.y + 6));
-    ui_text(ui, FONT_HACK_GOLD, "Edit Allowed Tech");
+void editor_menu_allowed_tech_update(EditorMenuAllowedTech& menu, UI& ui, EditorMenuMode& mode) {
+    editor_menu_header(ui, MENU_RECT, "Edit Allowed Tech");
 
     ui_begin_column(ui, ivec2(MENU_RECT.x + 8, MENU_RECT.y + 30), 4);
         const uint32_t TECH_COUNT = ENTITY_TYPE_COUNT + UPGRADE_COUNT;
@@ -61,16 +54,7 @@ void editor_menu_allowed_tech_update(EditorMenuAllowedTech& menu, UI& ui) {
         }
     ui_end_container(ui);
 
-    // Buttons
-    ui_element_position(ui, ui_button_position_frame_bottom_left(MENU_RECT));
-    if (ui_button(ui, "Back")) {
-        menu.mode = EDITOR_MENU_ALLOWED_TECH_MODE_CLOSED;
-    }
-
-    ui_element_position(ui, ui_button_position_frame_bottom_right(MENU_RECT, "Save"));
-    if (ui_button(ui, "Save")) {
-        menu.mode = EDITOR_MENU_ALLOWED_TECH_MODE_SAVE;
-    }
+    editor_menu_back_save_buttons(ui, MENU_RECT, mode);
 }
 
 #endif

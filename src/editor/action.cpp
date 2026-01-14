@@ -75,8 +75,8 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
                 : action_data.previous_value;
             break;
         }
-        case EDITOR_ACTION_DELETE_ENTITY: {
-            const EditorActionDeleteEntity& action_data = std::get<EditorActionDeleteEntity>(action.data);
+        case EDITOR_ACTION_REMOVE_ENTITY: {
+            const EditorActionRemoveEntity& action_data = std::get<EditorActionRemoveEntity>(action.data);
 
             if (mode == EDITOR_ACTION_MODE_DO) {
                 scenario->entities[action_data.index] = scenario->entities[scenario->entity_count - 1];
@@ -107,8 +107,8 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
                 : action_data.previous_value;
             break;
         }
-        case EDITOR_ACTION_DELETE_SQUAD: {
-            const EditorActionDeleteSquad& action_data = std::get<EditorActionDeleteSquad>(action.data);
+        case EDITOR_ACTION_REMOVE_SQUAD: {
+            const EditorActionRemoveSquad& action_data = std::get<EditorActionRemoveSquad>(action.data);
 
             if (mode == EDITOR_ACTION_MODE_DO) {
                 scenario->squads[action_data.index] = scenario->squads.back();
@@ -130,8 +130,6 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
         case EDITOR_ACTION_ADD_TRIGGER: {
             if (mode == EDITOR_ACTION_MODE_DO) {
                 Trigger trigger;
-                trigger.condition.type = TRIGGER_CONDITION_ACQUIRED_ENTITIES;
-                memset(&trigger.condition.acquired_entities, 0, sizeof(trigger.condition.acquired_entities));
                 trigger.is_active = true;
                 sprintf(trigger.name, "Trigger %u", (uint32_t)scenario->triggers.size() + 1U);
                 log_debug("created trigger %s", trigger.name);
@@ -143,8 +141,8 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
 
             break;
         }
-        case EDITOR_ACTION_DELETE_TRIGGER: {
-            const EditorActionDeleteTrigger& action_data = std::get<EditorActionDeleteTrigger>(action.data);
+        case EDITOR_ACTION_REMOVE_TRIGGER: {
+            const EditorActionRemoveTrigger& action_data = std::get<EditorActionRemoveTrigger>(action.data);
 
             if (mode == EDITOR_ACTION_MODE_DO) {
                 scenario->triggers[action_data.index] = scenario->triggers.back();
@@ -163,6 +161,49 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
                 ? action_data.new_name
                 : action_data.previous_name;
             strncpy(scenario->triggers[action_data.index].name, name_ptr, TRIGGER_NAME_MAX_LENGTH);
+            break;
+        }
+        case EDITOR_ACTION_ADD_TRIGGER_CONDITION: {
+            const EditorActionAddTriggerCondition& action_data = std::get<EditorActionAddTriggerCondition>(action.data);
+
+            TriggerCondition new_condition = (TriggerCondition) {
+                .type = TRIGGER_CONDITION_ENTITY_COUNT,
+                .entity_count = (TriggerConditionEntityCount) {
+                    .entity_type = ENTITY_MINER,
+                    .entity_count = 1
+                }
+            };
+
+            if (mode == EDITOR_ACTION_MODE_DO) {
+                scenario->triggers[action_data.trigger_index].conditions.push_back(new_condition);
+            } else {
+                scenario->triggers[action_data.trigger_index].conditions.pop_back();
+            }
+
+            break;
+        }
+        case EDITOR_ACTION_REMOVE_TRIGGER_CONDITION: {
+            const EditorActionRemoveTriggerCondition& action_data = std::get<EditorActionRemoveTriggerCondition>(action.data);
+
+            if (mode == EDITOR_ACTION_MODE_DO) {
+                scenario->triggers[action_data.trigger_index].conditions[action_data.condition_index] = scenario->triggers[action_data.trigger_index].conditions.back();
+                scenario->triggers[action_data.trigger_index].conditions.pop_back();
+            } else {
+                scenario->triggers[action_data.trigger_index].conditions.push_back(scenario->triggers[action_data.trigger_index].conditions[action_data.condition_index]);
+                scenario->triggers[action_data.trigger_index].conditions[action_data.condition_index] = action_data.value;
+            }
+
+            break;
+        }
+        case EDITOR_ACTION_EDIT_TRIGGER_CONDITION: {
+            const EditorActionEditTriggerCondition& action_data = std::get<EditorActionEditTriggerCondition>(action.data);
+
+            scenario->triggers[action_data.trigger_index]
+                .conditions[action_data.condition_index] = 
+                mode == EDITOR_ACTION_MODE_DO
+                    ? action_data.new_value
+                    : action_data.previous_value;
+
             break;
         }
     }

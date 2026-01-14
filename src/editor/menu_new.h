@@ -6,15 +6,9 @@
 
 #include "core/ui.h"
 #include "scenario/scenario.h"
-
-enum EditorMenuNewMode {
-    EDITOR_MENU_NEW_CLOSED,
-    EDITOR_MENU_NEW_OPEN,
-    EDITOR_MENU_NEW_CREATE
-};
+#include "editor/menu.h"
 
 struct EditorMenuNew {
-    EditorMenuNewMode mode;
     uint32_t map_type;
     uint32_t map_size;
     uint32_t use_noise_gen_params;
@@ -25,7 +19,7 @@ struct EditorMenuNew {
 };
 
 EditorMenuNew editor_menu_new_open();
-void editor_menu_new_update(EditorMenuNew& menu, UI& ui);
+void editor_menu_new_update(EditorMenuNew& menu, UI& ui, EditorMenuMode& mode);
 NoiseGenParams editor_menu_new_create_noise_gen_params(const EditorMenuNew& menu);
 
 #endif

@@ -1,4 +1,4 @@
-#include "ui.h"
+#include "menu.h"
 
 #ifdef GOLD_DEBUG
 
@@ -33,6 +33,28 @@ bool editor_menu_slider(UI& ui, const char* prompt, uint32_t* value, const UiSli
     ui_end_container(ui);
 
     return slider_value_changed;
+}
+
+void editor_menu_header(UI& ui, Rect rect, const char* header_text) {
+    ui.input_enabled = true;
+    ui_frame_rect(ui, rect);
+
+    // Header
+    ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, header_text);
+    ui_element_position(ui, ivec2(rect.x + (rect.w / 2) - (header_text_size.x / 2), rect.y + 6));
+    ui_text(ui, FONT_HACK_GOLD, header_text);
+}
+
+void editor_menu_back_save_buttons(UI& ui, Rect rect, EditorMenuMode& mode) {
+    ui_element_position(ui, ui_button_position_frame_bottom_left(rect));
+    if (ui_button(ui, "Back")) {
+        mode = EDITOR_MENU_MODE_CLOSED;
+    }
+
+    ui_element_position(ui, ui_button_position_frame_bottom_right(rect, "Save"));
+    if (ui_button(ui, "Save")) {
+        mode = EDITOR_MENU_MODE_SUBMIT;
+    }
 }
 
 #endif

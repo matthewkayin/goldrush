@@ -2,8 +2,6 @@
 
 #ifdef GOLD_DEBUG
 
-#include "editor/ui.h"
-
 static const Rect MENU_NEW_RECT = (Rect) {
     .x = (SCREEN_WIDTH / 2) - (300 / 2),
     .y = 48,
@@ -15,7 +13,6 @@ void editor_menu_new_set_map_type(EditorMenuNew& menu, MapType map_type);
 
 EditorMenuNew editor_menu_new_open() {
     EditorMenuNew menu;
-    menu.mode = EDITOR_MENU_NEW_OPEN;
     editor_menu_new_set_map_type(menu, MAP_TYPE_TOMBSTONE);
     menu.map_size = MAP_SIZE_SMALL;
     menu.use_noise_gen_params = 0;
@@ -23,13 +20,8 @@ EditorMenuNew editor_menu_new_open() {
     return menu;
 }
 
-void editor_menu_new_update(EditorMenuNew& menu, UI& ui) {
-    ui.input_enabled = true;
-    ui_frame_rect(ui, MENU_NEW_RECT);
-
-    ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, "New Map");
-    ui_element_position(ui, ivec2(MENU_NEW_RECT.x + (MENU_NEW_RECT.w / 2) - (header_text_size.x / 2), MENU_NEW_RECT.y + 6));
-    ui_text(ui, FONT_HACK_GOLD, "New Map");
+void editor_menu_new_update(EditorMenuNew& menu, UI& ui, EditorMenuMode& mode) {
+    editor_menu_header(ui, MENU_NEW_RECT, "New Map");
 
     ui_begin_column(ui, ivec2(MENU_NEW_RECT.x + 8, MENU_NEW_RECT.y + 30), 4);
         // Map type
@@ -61,14 +53,7 @@ void editor_menu_new_update(EditorMenuNew& menu, UI& ui) {
         }
     ui_end_container(ui);
 
-    ui_element_position(ui, ui_button_position_frame_bottom_left(MENU_NEW_RECT));
-    if (ui_button(ui, "Back")) {
-        menu.mode = EDITOR_MENU_NEW_CLOSED;
-    }
-    ui_element_position(ui, ui_button_position_frame_bottom_right(MENU_NEW_RECT, "Create"));
-    if (ui_button(ui, "Create")) {
-        menu.mode = EDITOR_MENU_NEW_CREATE;
-    }
+    editor_menu_back_save_buttons(ui, MENU_NEW_RECT, mode);
 }
 
 void editor_menu_new_set_map_type(EditorMenuNew& menu, MapType map_type) {

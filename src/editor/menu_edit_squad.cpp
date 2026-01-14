@@ -2,8 +2,6 @@
 
 #ifdef GOLD_DEBUG
 
-#include "editor/ui.h"
-
 static const Rect MENU_RECT = (Rect) {
     .x = (SCREEN_WIDTH / 2) - (300 / 2),
     .y = 64,
@@ -13,7 +11,6 @@ static const Rect MENU_RECT = (Rect) {
 
 EditorMenuEditSquad editor_menu_edit_squad_open(const ScenarioSquad& squad, const Scenario* scenario) {
     EditorMenuEditSquad menu;
-    menu.mode = EDITOR_MENU_EDIT_SQUAD_OPEN;
     menu.squad_name = std::string(squad.name);
     menu.squad_player = squad.player_id - 1;
     menu.squad_type = squad.type;
@@ -31,14 +28,8 @@ EditorMenuEditSquad editor_menu_edit_squad_open(const ScenarioSquad& squad, cons
     return menu;
 }
 
-void editor_menu_edit_squad_update(EditorMenuEditSquad& menu, UI& ui) {
-    ui.input_enabled = true;
-    ui_frame_rect(ui, MENU_RECT);
-    
-    // Header
-    ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, "Edit Squad");
-    ui_element_position(ui, ivec2(MENU_RECT.x + (MENU_RECT.w / 2) - (header_text_size.x / 2), MENU_RECT.y + 6));
-    ui_text(ui, FONT_HACK_GOLD, "Edit Squad");
+void editor_menu_edit_squad_update(EditorMenuEditSquad& menu, UI& ui, EditorMenuMode& mode) {
+    editor_menu_header(ui, MENU_RECT, "Edit Squad");
 
     ui_begin_column(ui, ivec2(MENU_RECT.x + 8, MENU_RECT.y + 30), 4);
         // Name
@@ -51,16 +42,7 @@ void editor_menu_edit_squad_update(EditorMenuEditSquad& menu, UI& ui) {
         editor_menu_dropdown(ui, "Type:", &menu.squad_type, menu.squad_type_items, MENU_RECT);
     ui_end_container(ui);
 
-    // Buttons
-    ui_element_position(ui, ui_button_position_frame_bottom_left(MENU_RECT));
-    if (ui_button(ui, "Back")) {
-        menu.mode = EDITOR_MENU_EDIT_SQUAD_CLOSED;
-    }
-
-    ui_element_position(ui, ui_button_position_frame_bottom_right(MENU_RECT, "Save"));
-    if (ui_button(ui, "Save")) {
-        menu.mode = EDITOR_MENU_EDIT_SQUAD_SAVE;
-    }
+    editor_menu_back_save_buttons(ui, MENU_RECT, mode);
 }
 
 #endif
