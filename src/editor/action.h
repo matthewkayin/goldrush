@@ -33,6 +33,9 @@ enum EditorActionType {
     EDITOR_ACTION_ADD_TRIGGER_CONDITION,
     EDITOR_ACTION_EDIT_TRIGGER_CONDITION,
     EDITOR_ACTION_REMOVE_TRIGGER_CONDITION,
+    EDITOR_ACTION_ADD_TRIGGER_EFFECT,
+    EDITOR_ACTION_REMOVE_TRIGGER_EFFECT,
+    EDITOR_ACTION_EDIT_TRIGGER_EFFECT,
 };
 
 struct EditorActionBrushStroke {
@@ -118,6 +121,23 @@ struct EditorActionEditTriggerCondition {
     TriggerCondition new_value;
 };
 
+struct EditorActionAddTriggerEffect {
+    uint32_t trigger_index;
+};
+
+struct EditorActionRemoveTriggerEffect {
+    uint32_t trigger_index;
+    uint32_t effect_index;
+    TriggerEffect value;
+};
+
+struct EditorActionEditTriggerEffect {
+    uint32_t trigger_index;
+    uint32_t effect_index;
+    TriggerEffect previous_value;
+    TriggerEffect new_value;
+};
+
 struct EditorAction {
     EditorActionType type;
     std::variant<
@@ -134,7 +154,10 @@ struct EditorAction {
         EditorActionRenameTrigger,
         EditorActionAddTriggerCondition,
         EditorActionRemoveTriggerCondition,
-        EditorActionEditTriggerCondition> data;
+        EditorActionEditTriggerCondition,
+        EditorActionAddTriggerEffect,
+        EditorActionRemoveTriggerEffect,
+        EditorActionEditTriggerEffect> data;
 };
 
 // Action

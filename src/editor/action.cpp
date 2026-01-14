@@ -111,11 +111,9 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
             const EditorActionRemoveSquad& action_data = std::get<EditorActionRemoveSquad>(action.data);
 
             if (mode == EDITOR_ACTION_MODE_DO) {
-                scenario->squads[action_data.index] = scenario->squads.back();
-                scenario->squads.pop_back();
+                scenario->squads.erase(scenario->squads.begin() + action_data.index);
             } else if (mode == EDITOR_ACTION_MODE_UNDO) {
-                scenario->squads.push_back(scenario->squads[action_data.index]);
-                scenario->squads[action_data.index] = action_data.value;
+                scenario->squads.insert(scenario->squads.begin() + action_data.index, action_data.value);
             }
             break;
         }
@@ -132,7 +130,6 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
                 Trigger trigger;
                 trigger.is_active = true;
                 sprintf(trigger.name, "Trigger %u", (uint32_t)scenario->triggers.size() + 1U);
-                log_debug("created trigger %s", trigger.name);
 
                 scenario->triggers.push_back(trigger);
             } else {
@@ -145,11 +142,9 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
             const EditorActionRemoveTrigger& action_data = std::get<EditorActionRemoveTrigger>(action.data);
 
             if (mode == EDITOR_ACTION_MODE_DO) {
-                scenario->triggers[action_data.index] = scenario->triggers.back();
-                scenario->triggers.pop_back();
+                scenario->triggers.erase(scenario->triggers.begin() + action_data.index);
             } else if (mode == EDITOR_ACTION_MODE_UNDO) {
-                scenario->triggers.push_back(scenario->triggers[action_data.index]);
-                scenario->triggers[action_data.index] = action_data.value;
+                scenario->triggers.insert(scenario->triggers.begin() + action_data.index, action_data.value);
             }
 
             break;
@@ -166,15 +161,15 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
         case EDITOR_ACTION_ADD_TRIGGER_CONDITION: {
             const EditorActionAddTriggerCondition& action_data = std::get<EditorActionAddTriggerCondition>(action.data);
 
-            TriggerCondition new_condition = (TriggerCondition) {
-                .type = TRIGGER_CONDITION_TYPE_ENTITY_COUNT,
-                .entity_count = (TriggerConditionEntityCount) {
-                    .entity_type = ENTITY_MINER,
-                    .entity_count = 1
-                }
-            };
-
             if (mode == EDITOR_ACTION_MODE_DO) {
+                TriggerCondition new_condition = (TriggerCondition) {
+                    .type = TRIGGER_CONDITION_TYPE_ENTITY_COUNT,
+                    .entity_count = (TriggerConditionEntityCount) {
+                        .entity_type = ENTITY_MINER,
+                        .entity_count = 1
+                    }
+                };
+
                 scenario->triggers[action_data.trigger_index].conditions.push_back(new_condition);
             } else {
                 scenario->triggers[action_data.trigger_index].conditions.pop_back();
@@ -186,11 +181,9 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
             const EditorActionRemoveTriggerCondition& action_data = std::get<EditorActionRemoveTriggerCondition>(action.data);
 
             if (mode == EDITOR_ACTION_MODE_DO) {
-                scenario->triggers[action_data.trigger_index].conditions[action_data.condition_index] = scenario->triggers[action_data.trigger_index].conditions.back();
-                scenario->triggers[action_data.trigger_index].conditions.pop_back();
+                scenario->triggers[action_data.trigger_index].conditions.erase(scenario->triggers[action_data.trigger_index].conditions.begin() + action_data.condition_index);
             } else {
-                scenario->triggers[action_data.trigger_index].conditions.push_back(scenario->triggers[action_data.trigger_index].conditions[action_data.condition_index]);
-                scenario->triggers[action_data.trigger_index].conditions[action_data.condition_index] = action_data.value;
+                scenario->triggers[action_data.trigger_index].conditions.insert(scenario->triggers[action_data.trigger_index].conditions.begin() + action_data.condition_index, action_data.value);
             }
 
             break;
@@ -200,6 +193,42 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
 
             scenario->triggers[action_data.trigger_index]
                 .conditions[action_data.condition_index] = 
+                mode == EDITOR_ACTION_MODE_DO
+                    ? action_data.new_value
+                    : action_data.previous_value;
+
+            break;
+        }
+        case EDITOR_ACTION_ADD_TRIGGER_EFFECT: {
+            const EditorActionAddTriggerEffect& action_data = std::get<EditorActionAddTriggerEffect>(action.data);
+
+            if (mode == EDITOR_ACTION_MODE_DO) {
+                TriggerEffect new_effect;
+                new_effect.type = TRIGGER_EFFECT_TYPE_HINT;
+                sprintf(new_effect.hint.message, "hello friends");
+
+                scenario->triggers[action_data.trigger_index].effects.push_back(new_effect);
+            } else {
+                scenario->triggers[action_data.trigger_index].effects.pop_back();
+            }
+
+            break;
+        }
+        case EDITOR_ACTION_REMOVE_TRIGGER_EFFECT: {
+            const EditorActionRemoveTriggerEffect& action_data = std::get<EditorActionRemoveTriggerEffect>(action.data);
+
+            if (mode == EDITOR_ACTION_MODE_DO) {
+                scenario->triggers[action_data.trigger_index].effects.erase(scenario->triggers[action_data.trigger_index].effects.begin() + action_data.effect_index);
+            } else {
+                scenario->triggers[action_data.trigger_index].effects.insert(scenario->triggers[action_data.trigger_index].effects.begin() + action_data.effect_index, action_data.value);
+            }
+
+            break;
+        }
+        case EDITOR_ACTION_EDIT_TRIGGER_EFFECT: {
+            const EditorActionEditTriggerEffect& action_data = std::get<EditorActionEditTriggerEffect>(action.data);
+
+            scenario->triggers[action_data.trigger_index].effects[action_data.effect_index] = 
                 mode == EDITOR_ACTION_MODE_DO
                     ? action_data.new_value
                     : action_data.previous_value;

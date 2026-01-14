@@ -530,6 +530,41 @@ void editor_update() {
                                 }
                             });
                         }
+
+                        ui_text(state.ui, FONT_HACK_GOLD, "Effects");
+                        
+                        for (uint32_t effect_index = 0; effect_index < trigger.effects.size(); effect_index++) {
+                            const TriggerEffect& effect = trigger.effects[effect_index];
+
+                            ui_begin_row(state.ui, ivec2(0, 0), 4);
+                                char effect_str[128];
+                                ui_slim_button(state.ui, trigger_effect_type_str(effect.type), true);
+
+                                if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, false, false)) {
+
+                                }
+                                if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, false, false)) {
+                                    editor_do_action((EditorAction) {
+                                        .type = EDITOR_ACTION_REMOVE_TRIGGER_EFFECT,
+                                        .data = (EditorActionRemoveTriggerEffect) {
+                                            .trigger_index = state.tool_value,
+                                            .effect_index = effect_index,
+                                            .value = effect
+                                        }
+                                    });
+                                }
+
+                            ui_end_container(state.ui);
+                        }
+
+                        if (ui_slim_button(state.ui, "+ Effect")) {
+                            editor_do_action((EditorAction) {
+                                .type = EDITOR_ACTION_ADD_TRIGGER_EFFECT,
+                                .data = (EditorActionAddTriggerEffect) {
+                                    .trigger_index = state.tool_value
+                                }
+                            });
+                        }
                     }
 
                     break;

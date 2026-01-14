@@ -4,7 +4,7 @@
 #include <vector>
 
 #define TRIGGER_NAME_MAX_LENGTH 32
-#define TRIGGER_EFFECT_MESSAGE_MAX_LENGTH 64
+#define TRIGGER_EFFECT_HINT_MESSAGE_MAX_LENGTH 64
 #define TRIGGER_EFFECT_COUNT_MAX 16
 
 // Condition
@@ -29,22 +29,18 @@ struct TriggerCondition {
 // Effect
 
 enum TriggerEffectType {
-    TRIGGER_EFFECT_MESSAGE,
-    TRIGGER_EFFECT_COUNT
+    TRIGGER_EFFECT_TYPE_HINT,
+    TRIGGER_EFFECT_TYPE_COUNT
 };
 
-struct TriggerEffectMessage {
-    char message[TRIGGER_EFFECT_MESSAGE_MAX_LENGTH];
-    bool is_hint;
-    uint8_t padding = 0;
-    uint8_t padding1 = 0;
-    uint8_t padding2 = 0;
+struct TriggerEffectHint {
+    char message[TRIGGER_EFFECT_HINT_MESSAGE_MAX_LENGTH];
 };
 
 struct TriggerEffect {
     TriggerEffectType type;
     union {
-        TriggerEffectMessage message;
+        TriggerEffectHint hint;
     };
 };
 
