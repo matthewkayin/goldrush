@@ -76,6 +76,7 @@ static const std::unordered_map<InputAction, std::vector<std::string>> TOOLBAR_S
 static const uint32_t TOOL_ENTITY_ROW_SIZE = 4;
 static const uint32_t TOOL_ADD_ENTITY_VISIBLE_ROW_COUNT = 4;
 static const uint32_t TOOL_SQUADS_VISIBLE_ROW_COUNT = 3;
+static const uint32_t TOOL_TRIGGERS_VISIBLE_ROW_COUNT = 8;
 
 enum EditorTool {
     EDITOR_TOOL_BRUSH,
@@ -487,83 +488,101 @@ void editor_update() {
                         }
                     ui_end_container(state.ui);
 
+                    std::vector<std::function<void()>> scrollable_ui_funcs;
+
                     // Trigger conditions
                     if (!state.scenario->triggers.empty()) {
                         const Trigger& trigger = state.scenario->triggers[state.tool_value];
 
-                        ui_text(state.ui, FONT_HACK_GOLD, "Conditions");
+                        scrollable_ui_funcs.push_back([]() { 
+                            ui_text(state.ui, FONT_HACK_GOLD, "Conditions");
+                        });
 
                         for (uint32_t condition_index = 0; condition_index < trigger.conditions.size(); condition_index++) {
                             const TriggerCondition& condition = trigger.conditions[condition_index];
 
-                            ui_begin_row(state.ui, ivec2(0, 0), 4);
-                                char condition_str[128];
-                                trigger_condition_sprintf(condition_str, condition);
-                                ui_slim_button(state.ui, condition_str, true);
+                            scrollable_ui_funcs.push_back([condition, condition_index]() {
+                                ui_begin_row(state.ui, ivec2(0, 0), 4);
+                                    char condition_str[128];
+                                    trigger_condition_sprintf(condition_str, condition);
+                                    ui_slim_button(state.ui, condition_str, true);
 
-                                if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, false, false)) {
-                                    state.menu = (EditorMenu) {
-                                        .type = EDITOR_MENU_TYPE_TRIGGER_CONDITION,
-                                        .mode = EDITOR_MENU_MODE_OPEN,
-                                        .menu = editor_menu_trigger_condition_open(condition, condition_index)
-                                    };
-                                }
+                                    if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, false, false)) {
+                                        state.menu = (EditorMenu) {
+                                            .type = EDITOR_MENU_TYPE_TRIGGER_CONDITION,
+                                            .mode = EDITOR_MENU_MODE_OPEN,
+                                            .menu = editor_menu_trigger_condition_open(condition, condition_index)
+                                        };
+                                    }
 
-                                if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, false, false)) {
-                                    editor_do_action((EditorAction) {
-                                        .type = EDITOR_ACTION_REMOVE_TRIGGER_CONDITION,
-                                        .data = (EditorActionRemoveTriggerCondition) {
-                                            .trigger_index = state.tool_value,
-                                            .condition_index = condition_index,
-                                            .value = condition
-                                        }
-                                    });
-                                }
-                            ui_end_container(state.ui);
-                        }
-
-                        if (ui_slim_button(state.ui, "+ Condition")) {
-                            editor_do_action((EditorAction) {
-                                .type = EDITOR_ACTION_ADD_TRIGGER_CONDITION,
-                                .data = (EditorActionAddTriggerCondition) {
-                                    .trigger_index = state.tool_value
-                                }
+                                    if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, false, false)) {
+                                        editor_do_action((EditorAction) {
+                                            .type = EDITOR_ACTION_REMOVE_TRIGGER_CONDITION,
+                                            .data = (EditorActionRemoveTriggerCondition) {
+                                                .trigger_index = state.tool_value,
+                                                .condition_index = condition_index,
+                                                .value = condition
+                                            }
+                                        });
+                                    }
+                                ui_end_container(state.ui);
                             });
                         }
 
-                        ui_text(state.ui, FONT_HACK_GOLD, "Effects");
+                        scrollable_ui_funcs.push_back([]() {
+                            if (ui_slim_button(state.ui, "+ Condition")) {
+                                editor_do_action((EditorAction) {
+                                    .type = EDITOR_ACTION_ADD_TRIGGER_CONDITION,
+                                    .data = (EditorActionAddTriggerCondition) {
+                                        .trigger_index = state.tool_value
+                                    }
+                                });
+                            }
+                        });
+
+                        scrollable_ui_funcs.push_back([]() {
+                            ui_text(state.ui, FONT_HACK_GOLD, "Effects");
+                        });
                         
                         for (uint32_t effect_index = 0; effect_index < trigger.effects.size(); effect_index++) {
                             const TriggerEffect& effect = trigger.effects[effect_index];
 
-                            ui_begin_row(state.ui, ivec2(0, 0), 4);
-                                char effect_str[128];
-                                ui_slim_button(state.ui, trigger_effect_type_str(effect.type), true);
+                            scrollable_ui_funcs.push_back([effect, effect_index]() {
+                                ui_begin_row(state.ui, ivec2(0, 0), 4);
+                                    char effect_str[128];
+                                    ui_slim_button(state.ui, trigger_effect_type_str(effect.type), true);
 
-                                if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, false, false)) {
+                                    if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, false, false)) {
 
-                                }
-                                if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, false, false)) {
-                                    editor_do_action((EditorAction) {
-                                        .type = EDITOR_ACTION_REMOVE_TRIGGER_EFFECT,
-                                        .data = (EditorActionRemoveTriggerEffect) {
-                                            .trigger_index = state.tool_value,
-                                            .effect_index = effect_index,
-                                            .value = effect
-                                        }
-                                    });
-                                }
-
-                            ui_end_container(state.ui);
+                                    }
+                                    if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, false, false)) {
+                                        editor_do_action((EditorAction) {
+                                            .type = EDITOR_ACTION_REMOVE_TRIGGER_EFFECT,
+                                            .data = (EditorActionRemoveTriggerEffect) {
+                                                .trigger_index = state.tool_value,
+                                                .effect_index = effect_index,
+                                                .value = effect
+                                            }
+                                        });
+                                    }
+                                ui_end_container(state.ui);
+                            });
                         }
 
-                        if (ui_slim_button(state.ui, "+ Effect")) {
-                            editor_do_action((EditorAction) {
-                                .type = EDITOR_ACTION_ADD_TRIGGER_EFFECT,
-                                .data = (EditorActionAddTriggerEffect) {
-                                    .trigger_index = state.tool_value
-                                }
-                            });
+                        scrollable_ui_funcs.push_back([]() {
+                            if (ui_slim_button(state.ui, "+ Effect")) {
+                                editor_do_action((EditorAction) {
+                                    .type = EDITOR_ACTION_ADD_TRIGGER_EFFECT,
+                                    .data = (EditorActionAddTriggerEffect) {
+                                        .trigger_index = state.tool_value
+                                    }
+                                });
+                            }
+                        });
+
+                        // there are a max of 8 visible, use state.tool_scroll for this
+                        for (uint32_t index = state.tool_scroll; index < std::min(state.tool_scroll + TOOL_TRIGGERS_VISIBLE_ROW_COUNT, (uint32_t)scrollable_ui_funcs.size()); index++) {
+                            scrollable_ui_funcs[index]();
                         }
                     }
 
@@ -1615,13 +1634,17 @@ bool editor_tool_is_scroll_enabled() {
             state.is_minimap_dragging ||
             state.is_painting ||
             state.camera_drag_mouse_position.x != -1 ||
-            state.ui.element_selected != -1) {
+            state.ui.element_selected != -1 ||
+            !SIDEBAR_RECT.has_point(input_get_mouse_position())) {
         return false;
     }
-    if (state.tool == EDITOR_TOOL_ADD_ENTITY && SIDEBAR_RECT.has_point(input_get_mouse_position())) {
+    if (state.tool == EDITOR_TOOL_ADD_ENTITY) {
         return true;
     }
     if (state.tool == EDITOR_TOOL_SQUADS && !state.scenario->squads.empty()) {
+        return true;
+    }
+    if (state.tool == EDITOR_TOOL_TRIGGERS && !state.scenario->triggers.empty()) {
         return true;
     }
     return false;
@@ -1642,6 +1665,11 @@ int editor_tool_get_scroll_max() {
             count++;
         }
         return std::max(0, count - (int)TOOL_SQUADS_VISIBLE_ROW_COUNT);
+    }
+    if (state.tool == EDITOR_TOOL_TRIGGERS && !state.scenario->triggers.empty()) {
+        const Trigger& trigger = state.scenario->triggers[state.tool_value];
+        int count = 4 + (int)trigger.conditions.size() + (int)trigger.effects.size();
+        return std::max(0, count - ((int)TOOL_TRIGGERS_VISIBLE_ROW_COUNT - 1));
     }
     return 0;
 }
