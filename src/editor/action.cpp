@@ -70,9 +70,21 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
         case EDITOR_ACTION_EDIT_ENTITY: {
             const EditorActionEditEntity& action_data = std::get<EditorActionEditEntity>(action.data);
 
+            ivec2 previous_cell = scenario->entities[action_data.index].cell;
+            const EntityData& entity_data = entity_get_data(scenario->entities[action_data.index].type);
+            map_set_cell_rect(scenario->map, entity_data.cell_layer, previous_cell, entity_data.cell_size, (Cell) {
+                .type = CELL_EMPTY,
+                .id = ID_NULL
+            });
+
             scenario->entities[action_data.index] = mode == EDITOR_ACTION_MODE_DO
                 ? action_data.new_value
                 : action_data.previous_value;
+
+            map_set_cell_rect(scenario->map, entity_data.cell_layer, scenario->entities[action_data.index].cell, entity_data.cell_size, (Cell) {
+                .type = CELL_UNIT,
+                .id = (uint16_t)scenario->entity_count
+            });
             break;
         }
         case EDITOR_ACTION_REMOVE_ENTITY: {
@@ -205,7 +217,7 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
             if (mode == EDITOR_ACTION_MODE_DO) {
                 TriggerEffect new_effect;
                 new_effect.type = TRIGGER_EFFECT_TYPE_HINT;
-                sprintf(new_effect.hint.message, "hello friends");
+                sprintf(new_effect.hint.message, "");
 
                 scenario->triggers[action_data.trigger_index].effects.push_back(new_effect);
             } else {

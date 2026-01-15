@@ -10,6 +10,7 @@
 #include "editor/menu_allowed_tech.h"
 #include "editor/menu_rename_trigger.h"
 #include "editor/menu_trigger_condition.h"
+#include "editor/menu_trigger_effect.h"
 #include "editor/menu.h"
 #include "editor/action.h"
 #include "core/logger.h"
@@ -107,6 +108,7 @@ enum EditorMenuType {
     EDITOR_MENU_TYPE_EDIT_SQUAD,
     EDITOR_MENU_TYPE_ALLOWED_TECH,
     EDITOR_MENU_TYPE_TRIGGER_CONDITION,
+    EDITOR_MENU_TYPE_TRIGGER_EFFECT,
 };
 
 struct EditorMenu {
@@ -119,7 +121,8 @@ struct EditorMenu {
         EditorMenuRenameTrigger,
         EditorMenuEditSquad,
         EditorMenuAllowedTech,
-        EditorMenuTriggerCondition
+        EditorMenuTriggerCondition,
+        EditorMenuTriggerEffect
     > menu;
 };
 
@@ -553,7 +556,11 @@ void editor_update() {
                                     ui_slim_button(state.ui, trigger_effect_type_str(effect.type), true);
 
                                     if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, false, false)) {
-
+                                        state.menu = (EditorMenu) {
+                                            .type = EDITOR_MENU_TYPE_TRIGGER_EFFECT,
+                                            .mode = EDITOR_MENU_MODE_OPEN,
+                                            .menu = editor_menu_trigger_effect_open(effect, effect_index)
+                                        };
                                     }
                                     if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, false, false)) {
                                         editor_do_action((EditorAction) {
@@ -757,6 +764,24 @@ void editor_update() {
                             .condition_index = menu.condition_index,
                             .previous_value = state.scenario->triggers[state.tool_value].conditions[menu.condition_index],
                             .new_value = menu.condition
+                        }
+                    });
+                }
+
+                break;
+            }
+            case EDITOR_MENU_TYPE_TRIGGER_EFFECT: {
+                EditorMenuTriggerEffect& menu = std::get<EditorMenuTriggerEffect>(state.menu.menu);
+                editor_menu_trigger_effect_update(menu, state.ui, state.menu.mode);
+
+                if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
+                    editor_do_action((EditorAction) {
+                        .type = EDITOR_ACTION_EDIT_TRIGGER_EFFECT,
+                        .data = (EditorActionEditTriggerEffect) {
+                            .trigger_index = state.tool_value,
+                            .effect_index = menu.effect_index,
+                            .previous_value = state.scenario->triggers[state.tool_value].effects[menu.effect_index],
+                            .new_value = menu.effect
                         }
                     });
                 }

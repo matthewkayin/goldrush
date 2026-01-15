@@ -313,6 +313,19 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
     state->match_state.map = scenario->map;
     map_init_regions(state->match_state.map);
 
+    // Clear any cells that are of type unit, 
+    // they will be populated by the actual entities IDs
+    for (uint32_t layer = 0; layer < CELL_LAYER_COUNT; layer++) {
+        for (int index = 0; index < scenario->map.width * scenario->map.height; index++) {
+            if (state->match_state.map.cells[layer][index].type == CELL_UNIT) {
+                state->match_state.map.cells[layer][index] = (Cell) {
+                    .type = CELL_EMPTY,
+                    .id = ID_NULL
+                };
+            }
+        }
+    }
+
     // Create entities
     for (uint32_t entity_index = 0; entity_index < scenario->entity_count; entity_index++) {
         const ScenarioEntity& entity = scenario->entities[entity_index];
