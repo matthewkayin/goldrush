@@ -288,6 +288,8 @@ void editor_update() {
             sound_end_fire_loop();
             delete state.match_shell_state;
             state.match_shell_state = nullptr;
+            input_set_mouse_capture_enabled(false);
+            SDL_SetWindowMouseGrab(state.window, false);
         }
 
         return;
@@ -1102,6 +1104,8 @@ void editor_update() {
             }
             network_add_bot();
         }
+        input_set_mouse_capture_enabled(true);
+        SDL_SetWindowMouseGrab(state.window, true);
     }
 }
 
