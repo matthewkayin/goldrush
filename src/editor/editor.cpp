@@ -24,6 +24,8 @@
 #include "render/render.h"
 #include "render/ysort.h"
 #include "util/util.h"
+#include "shell/shell.h"
+#include "network/network.h"
 #include <algorithm>
 #include <vector>
 #include <string>
@@ -55,7 +57,7 @@ static const Rect CANVAS_RECT = (Rect) {
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save", "Save As" },
     { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players", "Objective", "Allowed Tech" },
-    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads", "Player Spawn", "Triggers" }
+    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads", "Player Spawn", "Triggers" },
 };
 
 static const std::unordered_map<InputAction, std::vector<std::string>> TOOLBAR_SHORTCUTS = {
@@ -131,6 +133,8 @@ struct EditorMenu {
 
 struct EditorState {
     SDL_Window* window;
+
+    MatchShellState* match_shell_state;
 
     Scenario* scenario;
     std::string scenario_path;
@@ -232,6 +236,7 @@ MinimapPixel editor_get_minimap_pixel_for_entity(const std::vector<uint32_t>& se
 
 void editor_init(SDL_Window* window) {
     state.window = window;
+    state.match_shell_state = nullptr;
 
     input_set_mouse_capture_enabled(false);
 
@@ -276,6 +281,18 @@ void editor_quit() {
 }
 
 void editor_update() {
+    if (state.match_shell_state != nullptr) {
+        match_shell_update(state.match_shell_state);
+        if (state.match_shell_state->mode == MATCH_SHELL_MODE_LEAVE_MATCH || 
+                state.match_shell_state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM) {
+            sound_end_fire_loop();
+            delete state.match_shell_state;
+            state.match_shell_state = nullptr;
+        }
+
+        return;
+    }
+
     std::string toolbar_column, toolbar_action;
     bool toolbar_was_clicked;
 
@@ -1070,6 +1087,22 @@ void editor_update() {
         editor_clipboard_paste(paste_cell);
         state.is_pasting = false;
     }
+
+    // Launch test run
+    if (editor_can_single_use_tool_be_used() &&
+            !input_is_action_pressed(INPUT_ACTION_LEFT_CLICK) &&
+            !input_is_action_pressed(INPUT_ACTION_RIGHT_CLICK) &&
+            input_is_action_just_pressed(INPUT_ACTION_F5)) {
+        network_set_backend(NETWORK_BACKEND_LAN);
+        network_open_lobby("Test Game", NETWORK_LOBBY_PRIVACY_SINGLEPLAYER);
+        state.match_shell_state = match_shell_init_from_scenario(state.scenario);
+        for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
+            if (!state.match_shell_state->match_state.players[player_id].active) {
+                continue;
+            }
+            network_add_bot();
+        }
+    }
 }
 
 bool editor_is_in_menu() {
@@ -1784,7 +1817,6 @@ std::vector<std::string> editor_get_player_name_dropdown_items() {
 }
 
 ivec2 editor_get_player_spawn_camera_offset(ivec2 cell) {
-    const int MATCH_SHELL_UI_HEIGHT = 86;
     ivec2 camera_offset = ivec2(
         (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2),
         (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / 2));
@@ -1855,6 +1887,11 @@ static void SDLCALL editor_open_callback(void* /*user_data*/, const char* const*
 }
 
 void editor_render() {
+    if (state.match_shell_state != nullptr) {
+        match_shell_render(state.match_shell_state);
+        return;
+    }
+
     std::vector<uint32_t> selection;
 
     if (state.scenario != NULL) {

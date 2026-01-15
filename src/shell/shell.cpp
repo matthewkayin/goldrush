@@ -196,6 +196,18 @@ MatchShellState* match_shell_base_init() {
     return state;
 }
 
+void match_shell_init_input_queues(MatchShellState* state) {
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (!state->match_state.players[player_id].active) {
+            continue;
+        }
+
+        for (uint8_t i = 0; i < TURN_OFFSET - 1; i++) {
+            state->inputs[player_id].push({ (MatchInput) { .type = MATCH_INPUT_NONE } });
+        }
+    }
+}
+
 MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
     MatchShellState* state = match_shell_base_init();
 
@@ -228,15 +240,7 @@ MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
     state->match_state = match_init(lcg_seed, map_type, noise, players);
 
     // Init input queues
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
-            continue;
-        }
-
-        for (uint8_t i = 0; i < TURN_OFFSET - 1; i++) {
-            state->inputs[player_id].push({ (MatchInput) { .type = MATCH_INPUT_NONE } });
-        }
-    }
+    match_shell_init_input_queues(state);
 
     // Init camera
     for (const Entity& entity : state->match_state.entities) {
@@ -335,7 +339,12 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
             continue;
         }
 
-        entity_create(state->match_state, entity.type, entity.cell, entity.player_id);
+        EntityId entity_id = entity_create(state->match_state, entity.type, entity.cell, entity.player_id);
+        if (entity_is_building(entity.type)) {
+            Entity& building = state->match_state.entities.get_by_id(entity_id);
+            building.mode = MODE_BUILDING_FINISHED;
+            building.health = entity_get_data(building.type).max_health;
+        }
     }
 
     // Bots
@@ -388,6 +397,9 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
             bot_squad.target_cell = squad_average_position / bot_squad.entities.size();
         }
     }
+
+    // Init input queues
+    match_shell_init_input_queues(state);
 
     // Triggers
     state->scenario_triggers = scenario->triggers;
