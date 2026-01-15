@@ -29,29 +29,38 @@ static const uint32_t FOG_REVEAL_DURATION = 60;
 static const fixed BLEED_SPEED_PERCENTAGE = fixed::from_int_and_raw_decimal(0, 192);
 static const uint32_t MATCH_LOW_GOLD_THRESHOLD = 1000;
 
-MatchState match_init(int32_t lcg_seed, MapType map_type, Noise* noise, MatchPlayer players[MAX_PLAYERS]) {
+MatchState match_base_init(int32_t lcg_seed, int map_width, int map_height, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
     #ifdef GOLD_RAND_SEED
         state.lcg_seed = GOLD_RAND_SEED;
     #endif
     state.lcg_seed = lcg_seed;
     log_info("Set random seed to %i", lcg_seed);
+
+    memcpy(state.players, players, sizeof(state.players));
+
+    state.fire_cells = std::vector<int>((size_t)(map_width * map_height), 0);
+
+    // Init fog and detection for each team
+    for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
+        state.fog[team] = std::vector<int>((size_t)(map_width * map_height), FOG_HIDDEN);
+        state.detection[team] = std::vector<int>((size_t)(map_width * map_height), 0);
+    }
+
+    return state;
+}
+
+MatchState match_init(int32_t lcg_seed, MapType map_type, Noise* noise, MatchPlayer players[MAX_PLAYERS]) {
+    MatchState state = match_base_init(lcg_seed, noise->width, noise->height, players);
+
+    // Init map
     std::vector<ivec2> map_spawn_points;
     std::vector<ivec2> goldmine_cells;
     map_init_generate(state.map, map_type, noise, &state.lcg_seed, map_spawn_points, goldmine_cells);
-    memcpy(state.players, players, sizeof(state.players));
-
-    state.fire_cells = std::vector<int>((size_t)(state.map.width * state.map.height), 0);
 
     // Generate goldmines
     for (ivec2 cell : goldmine_cells) {
         entity_goldmine_create(state, cell, MATCH_GOLDMINE_STARTING_GOLD);
-    }
-
-    // Init fog and detection for each team
-    for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
-        state.fog[team] = std::vector<int>((size_t)(state.map.width * state.map.height), FOG_HIDDEN);
-        state.detection[team] = std::vector<int>((size_t)(state.map.width * state.map.height), 0);
     }
 
     // Determine player spawns

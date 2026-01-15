@@ -208,7 +208,22 @@ bool scenario_save_file(const Scenario* scenario, const char* path) {
     // Triggers
     size_t triggers_size = scenario->triggers.size();
     fwrite(&triggers_size, 1, sizeof(size_t), file);
-    fwrite(&scenario->triggers[0], 1, scenario->triggers.size() * sizeof(Trigger), file);
+    for (size_t index = 0; index < triggers_size; index++) {
+        const Trigger& trigger = scenario->triggers[index];
+
+        fwrite(trigger.name, 1, sizeof(trigger.name), file);
+        fwrite(&trigger.is_active, 1, sizeof(bool), file);
+
+        // Conditions
+        size_t conditions_size = trigger.conditions.size();
+        fwrite(&conditions_size, 1, sizeof(size_t), file);
+        fwrite(&trigger.conditions[0], 1, conditions_size * sizeof(TriggerCondition), file);
+
+        // Effects
+        size_t effects_size = trigger.effects.size();
+        fwrite(&effects_size, 1, sizeof(size_t), file);
+        fwrite(&trigger.effects[0], 1, effects_size * sizeof(TriggerEffect), file);
+    }
 
     // Allowed entities
     fwrite(&scenario->allowed_entities, 1, sizeof(bool) * ENTITY_TYPE_COUNT, file);
@@ -296,7 +311,24 @@ Scenario* scenario_open_file(const char* path) {
     size_t triggers_size;
     fread(&triggers_size, 1, sizeof(size_t), file);
     scenario->triggers = std::vector<Trigger>(triggers_size);
-    fread(&scenario->triggers[0], 1, triggers_size * sizeof(Trigger), file);
+    for (size_t index = 0; index < triggers_size; index++) {
+        Trigger& trigger = scenario->triggers[index];
+
+        fread(trigger.name, 1, sizeof(trigger.name), file);
+        fread(&trigger.is_active, 1, sizeof(bool), file);
+
+        // Conditions
+        size_t conditions_size;
+        fread(&conditions_size, 1, sizeof(size_t), file);
+        trigger.conditions = std::vector<TriggerCondition>(conditions_size);
+        fread(&trigger.conditions[0], 1, conditions_size * sizeof(TriggerCondition), file);
+
+        // Effects
+        size_t effects_size;
+        fread(&effects_size, 1, sizeof(size_t), file);
+        trigger.effects = std::vector<TriggerEffect>(effects_size);
+        fread(&trigger.effects[0], 1, effects_size * sizeof(TriggerEffect), file);
+    }
 
     // Allowed tech
     fread(&scenario->allowed_entities, 1, sizeof(bool) * ENTITY_TYPE_COUNT, file);

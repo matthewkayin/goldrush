@@ -9,6 +9,8 @@
 #include "network/types.h"
 #include "bot/bot.h"
 #include "render/ysort.h"
+#include "shell/hotkey.h"
+#include "scenario/scenario.h"
 
 #define MATCH_SHELL_UI_HEIGHT 86
 #define MATCH_SHELL_CONTROL_GROUP_COUNT 10
@@ -144,6 +146,11 @@ struct MatchShellState {
     // Gold amounts
     uint32_t displayed_gold_amounts[MAX_PLAYERS];
 
+    // Scenario triggers
+    std::vector<Trigger> scenario_triggers;
+    bool scenario_allowed_entities[ENTITY_TYPE_COUNT];
+    uint32_t scenario_allowed_upgrades;
+
     // Replay file (write)
     FILE* replay_file;
 
@@ -193,6 +200,12 @@ void match_shell_handle_input(MatchShellState* state);
 void match_shell_order_move(MatchShellState* state);
 std::vector<EntityId> match_shell_find_idle_miners(const MatchShellState* state);
 bool match_shell_does_player_meet_hotkey_requirements(const MatchState& state, InputAction hotkey);
+bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyButtonInfo& info);
+
+// Triggers
+bool match_shell_is_trigger_condition_met(const MatchShellState* state, const TriggerCondition& condition);
+bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const std::vector<TriggerCondition>& conditions);
+void match_shell_do_trigger_effect(MatchShellState* state, const TriggerEffect& effect);
 
 // State queries
 bool match_shell_is_mouse_in_ui();

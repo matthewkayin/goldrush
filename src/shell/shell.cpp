@@ -218,9 +218,13 @@ MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
                                         : player_id;
         players[player_id].recolor_id = network_player.recolor_id;
     }
+
+    // Open replay file for writing
     MapType map_type = (MapType)network_get_match_setting((uint8_t)MATCH_SETTING_MAP_TYPE);
     state->replay_file = replay_file_open(lcg_seed, map_type, noise, players);
     state->replay_mode = false;
+
+    // Init match
     state->match_state = match_init(lcg_seed, map_type, noise, players);
 
     // Init input queues
@@ -257,6 +261,129 @@ MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
         BotUnitComp preferred_unit_comp = bot_roll_preferred_unit_comp(&bot_lcg_seed);
         state->bots[player_id] = bot_init(state->match_state, player_id, bot_config, opener, preferred_unit_comp);
     }
+
+    // Scenario variables, allow all entities and upgrades 
+    for (uint32_t entity_type_index = 0; entity_type_index < ENTITY_TYPE_COUNT; entity_type_index++) {
+        state->scenario_allowed_entities[entity_type_index] = true;
+    }
+    for (uint32_t upgrade_index = 0; upgrade_index < UPGRADE_COUNT; upgrade_index++) {
+        state->scenario_allowed_upgrades |= (1U << upgrade_index);
+    }
+
+    return state;
+}
+
+MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
+    MatchShellState* state = match_shell_base_init();
+
+    state->mode = MATCH_SHELL_MODE_NOT_STARTED;
+
+    // Check if this player is even active
+    // A player is active as long as there is at least one entity owned by that player
+    bool player_is_active[MAX_PLAYERS];
+    memset(player_is_active, 0, sizeof(player_is_active));
+    for (uint32_t entity_index = 0; entity_index < scenario->entity_count; entity_index++) {
+        if (scenario->entities[entity_index].player_id != PLAYER_NONE) {
+            player_is_active[scenario->entities[entity_index].player_id] = true;
+        }
+    }
+
+    // Populate player info
+    MatchPlayer players[MAX_PLAYERS];
+    memset(players, 0, sizeof(players));
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (!player_is_active[player_id]) {
+            continue;
+        }
+
+        players[player_id].active = true;
+        strcpy(players[player_id].name, scenario->players[player_id].name);
+        players[player_id].team = player_id;
+        players[player_id].recolor_id = player_id;
+        players[player_id].gold = scenario->players[player_id].starting_gold;
+        players[player_id].upgrades = 0;
+        players[player_id].upgrades_in_progress = 0;
+    }
+
+    // Init match state
+    int32_t lcg_seed = rand();
+    state->match_state = match_base_init(lcg_seed, scenario->map.width, scenario->map.height, players);
+
+    // Init map
+    state->match_state.map = scenario->map;
+    map_init_regions(state->match_state.map);
+
+    // Create entities
+    for (uint32_t entity_index = 0; entity_index < scenario->entity_count; entity_index++) {
+        const ScenarioEntity& entity = scenario->entities[entity_index];
+
+        if (entity.type == ENTITY_GOLDMINE) {
+            entity_goldmine_create(state->match_state, entity.cell, entity.gold_held);
+            continue;
+        }
+
+        entity_create(state->match_state, entity.type, entity.cell, entity.player_id);
+    }
+
+    // Bots
+    for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
+        if (!player_is_active[player_id]) {
+            continue;
+        }
+
+        // TODO: load from scenario file
+        BotConfig bot_config = bot_config_init_from_difficulty(DIFFICULTY_HARD);
+        int bot_lcg_seed = lcg_seed;
+        BotOpener opener = bot_roll_opener(&bot_lcg_seed, DIFFICULTY_HARD);
+        BotUnitComp preferred_unit_comp = bot_roll_preferred_unit_comp(&bot_lcg_seed);
+        state->bots[player_id] = bot_init(state->match_state, player_id, bot_config, opener, preferred_unit_comp);
+
+        // Squads
+        for (const ScenarioSquad& squad : scenario->squads) {
+            if (squad.player_id != player_id) {
+                continue;
+            }
+
+            BotSquad bot_squad;
+            switch (squad.type) {
+                case SCENARIO_SQUAD_TYPE_DEFEND: {
+                    bot_squad.type = BOT_SQUAD_TYPE_DEFEND;
+                    break;
+                }
+                case SCENARIO_SQUAD_TYPE_LANDMINES: {
+                    bot_squad.type = BOT_SQUAD_TYPE_LANDMINES;
+                    break;
+                }
+                case SCENARIO_SQUAD_TYPE_COUNT: {
+                    GOLD_ASSERT(false);
+                    break;
+                }
+            }
+
+            ivec2 squad_average_position = ivec2(0, 0);
+            for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entity_count; squad_entity_index++) {
+                uint32_t entity_index = squad.entities[squad_entity_index];
+
+                // Since we added entities from the scenario in-order,
+                // the entity index in scenario should match the entity index in the match state
+                bot_squad.entities.push_back(state->match_state.entities.get_id_of(entity_index));
+                squad_average_position += scenario->entities[entity_index].cell;
+            }
+
+            // TODO: allow us to set squad target pos?
+            GOLD_ASSERT(!bot_squad.entities.empty());
+            bot_squad.target_cell = squad_average_position / bot_squad.entities.size();
+        }
+    }
+
+    // Triggers
+    state->scenario_triggers = scenario->triggers;
+
+    // Allowed entities and upgrades
+    memcpy(state->scenario_allowed_entities, scenario->allowed_entities, sizeof(state->scenario_allowed_entities));
+    state->scenario_allowed_upgrades = scenario->allowed_upgrades;
+
+    state->match_state.is_fog_dirty = false;
 
     return state;
 }
@@ -1062,6 +1189,21 @@ void match_shell_update(MatchShellState* state) {
     }
     state->match_state.events.clear();
 
+    // Scenario triggers
+    for (uint32_t trigger_index = 0; trigger_index < state->scenario_triggers.size(); trigger_index++) {
+        Trigger& trigger = state->scenario_triggers[trigger_index];
+        if (!trigger.is_active) {
+            continue;
+        }
+
+        if (match_shell_are_trigger_conditions_met(state, trigger.conditions)) {
+            for (const TriggerEffect& effect : trigger.effects) {
+                match_shell_do_trigger_effect(state, effect);
+            }
+            trigger.is_active = false;
+        }
+    }
+
     // Update timers and animations
     if (animation_is_playing(state->move_animation)) {
         animation_update(state->move_animation);
@@ -1243,19 +1385,21 @@ void match_shell_update(MatchShellState* state) {
                 }
             }
         }
+        
+        // Conditionally clear hotkeys
         for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
             if (state->hotkey_group[hotkey_index] == INPUT_HOTKEY_NONE) {
                 continue;
             }
             const HotkeyButtonInfo& info = hotkey_get_button_info(state->hotkey_group[hotkey_index]);
-            if (info.type == HOTKEY_BUTTON_RESEARCH && !match_player_upgrade_is_available(state->match_state, network_get_player_id(), info.upgrade)) {
+            if (!match_shell_is_hotkey_available(state, info)) {
                 state->hotkey_group[hotkey_index] = INPUT_HOTKEY_NONE;
             }
         }
     }
 
     // Check win conditions
-    if (!state->replay_mode) {
+    if (!state->replay_mode && state->scenario_triggers.empty()) {
         bool player_has_buildings[MAX_PLAYERS];
         bool opposing_player_just_lost = false;
         memset(player_has_buildings, 0, sizeof(player_has_buildings));
@@ -1969,6 +2113,62 @@ bool match_shell_does_player_meet_hotkey_requirements(const MatchState& state, I
         case HOTKEY_REQUIRES_UPGRADE: {
             return match_player_has_upgrade(state, network_get_player_id(), hotkey_info.requirements.upgrade);
         }
+    }
+}
+
+bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyButtonInfo& info) {
+    if ((info.type == HOTKEY_BUTTON_TRAIN || info.type == HOTKEY_BUTTON_TRAIN) && !state->scenario_allowed_entities[info.entity_type]) {
+        return false;
+    }
+    if (info.type == HOTKEY_BUTTON_RESEARCH && 
+            (!match_player_upgrade_is_available(state->match_state, network_get_player_id(), info.upgrade) || 
+             (state->scenario_allowed_upgrades & info.upgrade) != info.upgrade)) {
+        return false;
+    }
+
+    return true;
+}
+
+// TRIGGERS
+
+bool match_shell_is_trigger_condition_met(const MatchShellState* state, const TriggerCondition& condition) {
+    switch (condition.type) {
+        case TRIGGER_CONDITION_TYPE_ENTITY_COUNT: {
+            uint32_t count = 0;
+            for (const Entity& entity : state->match_state.entities) {
+                if (entity.type != condition.entity_count.entity_type) {
+                    continue;
+                }
+                count++;
+            }
+
+            return count >= condition.entity_count.entity_count;
+            break;
+        }
+        case TRIGGER_CONDITION_TYPE_COUNT:
+            GOLD_ASSERT(false);
+            return false;
+    }
+}
+
+bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const std::vector<TriggerCondition>& conditions) {
+    for (const TriggerCondition& condition : conditions) {
+        if (!match_shell_is_trigger_condition_met(state, condition)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void match_shell_do_trigger_effect(MatchShellState* state, const TriggerEffect& effect) {
+    switch (effect.type) {
+        case TRIGGER_EFFECT_TYPE_HINT: {
+            match_shell_add_chat_message(state, PLAYER_NONE, effect.hint.message);
+            break;
+        }
+        case TRIGGER_EFFECT_TYPE_COUNT:
+            GOLD_ASSERT(false);
     }
 }
 

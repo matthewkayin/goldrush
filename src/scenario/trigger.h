@@ -25,6 +25,7 @@ struct TriggerCondition {
         TriggerConditionEntityCount entity_count;
     };
 };
+STATIC_ASSERT(sizeof(TriggerCondition) == 12ULL);
 
 // Effect
 
@@ -43,6 +44,7 @@ struct TriggerEffect {
         TriggerEffectHint hint;
     };
 };
+STATIC_ASSERT(sizeof(TriggerEffect) == 68ULL);
 
 struct Trigger {
     bool is_active;

@@ -299,6 +299,10 @@ void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, 
     // At the time of writing this, map sizes are 96, 128, and 160 and region size is 32
     GOLD_ASSERT(map.width % REGION_CHUNK_SIZE == 0);
 
+    map_init_regions(map);
+}
+
+void map_init_regions(Map& map) {
     // Create map regions
     int region_count = 0;
     map.regions = std::vector(map.width * map.height, REGION_UNASSIGNED);

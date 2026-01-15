@@ -580,7 +580,6 @@ void editor_update() {
                             }
                         });
 
-                        // there are a max of 8 visible, use state.tool_scroll for this
                         for (uint32_t index = state.tool_scroll; index < std::min(state.tool_scroll + TOOL_TRIGGERS_VISIBLE_ROW_COUNT, (uint32_t)scrollable_ui_funcs.size()); index++) {
                             scrollable_ui_funcs[index]();
                         }
