@@ -47,7 +47,7 @@ void editor_menu_trigger_effect_update(EditorMenuTriggerEffect& menu, UI& ui, Ed
             }
             case TRIGGER_EFFECT_TYPE_COUNT: {
                 GOLD_ASSERT(false);
-                false;
+                break;
             }
         }
     ui_end_container(ui);

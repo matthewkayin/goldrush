@@ -73,7 +73,7 @@ void game_update(GameState& state);
 void game_render(const GameState& state);
 
 #ifdef GOLD_DEBUG
-    GameState game_debug_init(LaunchMode launch_mode);
+    GameState game_debug_init(SDL_Window* window, LaunchMode launch_mode);
     void game_test_set_mode(GameState& state, GameMode mode);
     void game_test_update(GameState& state);
 #endif

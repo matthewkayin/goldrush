@@ -185,7 +185,7 @@ int gold_main(int argc, char** argv) {
         bool should_render_debug_info = false;
         uint64_t debug_playback_speed = 1;
 
-        GameState state = game_debug_init(launch_mode);
+        GameState state = game_debug_init(window, launch_mode);
 
         // Set game mode to menu
         if (launch_mode == LAUNCH_MODE_MAP_EDIT) {

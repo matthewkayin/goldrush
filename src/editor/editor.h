@@ -4,7 +4,9 @@
 
 #ifdef GOLD_DEBUG
 
-void editor_init();
+#include <SDL3/SDL.h>
+
+void editor_init(SDL_Window* window);
 void editor_quit();
 void editor_update();
 void editor_render();

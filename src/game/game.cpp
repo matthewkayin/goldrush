@@ -220,13 +220,13 @@ void game_render(const GameState& state) {
 
 #ifdef GOLD_DEBUG
 
-GameState game_debug_init(LaunchMode launch_mode) {
+GameState game_debug_init(SDL_Window* window, LaunchMode launch_mode) {
     GameState state = game_init();
     state.launch_mode = launch_mode;
 
     if (state.launch_mode == LAUNCH_MODE_MAP_EDIT) {
         log_info("Launching as map editor...");
-        editor_init();
+        editor_init(window);
     }
 
     return state;

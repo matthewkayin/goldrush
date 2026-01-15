@@ -23,6 +23,7 @@
 #include "core/options.h"
 #include "render/render.h"
 #include "render/ysort.h"
+#include "util/util.h"
 #include <algorithm>
 #include <vector>
 #include <string>
@@ -74,6 +75,10 @@ static const std::unordered_map<InputAction, std::vector<std::string>> TOOLBAR_S
     { INPUT_ACTION_EDITOR_TOOL_SQUADS, { "Tool", "Squads" }},
 };
 
+static const SDL_DialogFileFilter EDITOR_FILE_FILTERS[] = {
+    { "Scenario Files", "scn" }
+};
+
 static const uint32_t TOOL_ENTITY_ROW_SIZE = 4;
 static const uint32_t TOOL_ADD_ENTITY_VISIBLE_ROW_COUNT = 4;
 static const uint32_t TOOL_SQUADS_VISIBLE_ROW_COUNT = 3;
@@ -101,8 +106,7 @@ struct EditorClipboard {
 enum EditorMenuType {
     EDITOR_MENU_TYPE_NONE,
     EDITOR_MENU_TYPE_NEW,
-    EDITOR_MENU_TYPE_FILE_SAVE,
-    EDITOR_MENU_TYPE_FILE_OPEN,
+    EDITOR_MENU_TYPE_FILE,
     EDITOR_MENU_TYPE_PLAYERS,
     EDITOR_MENU_TYPE_RENAME_TRIGGER,
     EDITOR_MENU_TYPE_EDIT_SQUAD,
@@ -116,7 +120,6 @@ struct EditorMenu {
     EditorMenuMode mode;
     std::variant<
         EditorMenuNew,
-        EditorMenuFile,
         EditorMenuPlayers,
         EditorMenuRenameTrigger,
         EditorMenuEditSquad,
@@ -127,6 +130,8 @@ struct EditorMenu {
 };
 
 struct EditorState {
+    SDL_Window* window;
+
     Scenario* scenario;
     std::string scenario_path;
     bool scenario_is_saved;
@@ -212,8 +217,11 @@ uint32_t editor_get_entity_squad(uint32_t entity_index);
 void editor_remove_entity_from_squad(uint32_t squad_index, uint32_t entity_index);
 std::vector<std::string> editor_get_player_name_dropdown_items();
 ivec2 editor_get_player_spawn_camera_offset(ivec2 cell);
+
+std::string editor_get_scenario_folder_path();
+static void SDLCALL editor_save_callback(void* user_data, const char* const* filelist, int filter);
+static void SDLCALL editor_open_callback(void* user_data, const char* const* filelist, int filter);
 void editor_save(const char* path);
-void editor_open(const char* path);
 
 // Render
 ivec2 editor_entity_get_animation_frame(EntityType type);
@@ -222,7 +230,9 @@ RenderSpriteParams editor_create_entity_render_params(const ScenarioEntity& enti
 MinimapPixel editor_get_minimap_pixel_for_cell(ivec2 cell);
 MinimapPixel editor_get_minimap_pixel_for_entity(const std::vector<uint32_t>& selection, uint32_t entity_index);
 
-void editor_init() {
+void editor_init(SDL_Window* window) {
+    state.window = window;
+
     input_set_mouse_capture_enabled(false);
 
     if (option_get_value(OPTION_DISPLAY) != RENDER_DISPLAY_WINDOWED) {
@@ -666,21 +676,6 @@ void editor_update() {
 
                 break;
             }
-            case EDITOR_MENU_TYPE_FILE_SAVE:
-            case EDITOR_MENU_TYPE_FILE_OPEN: {
-                EditorMenuFile& menu = std::get<EditorMenuFile>(state.menu.menu);
-                editor_menu_file_update(menu, state.ui, state.menu.mode);
-
-                if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
-                    if (state.menu.type == EDITOR_MENU_TYPE_FILE_SAVE) {
-                        editor_save(menu.path.c_str());
-                    } else if (state.menu.type == EDITOR_MENU_TYPE_FILE_OPEN) {
-                        editor_open(menu.path.c_str());
-                    }
-                }
-
-                break;
-            }
             case EDITOR_MENU_TYPE_PLAYERS: {
                 EditorMenuPlayers& menu = std::get<EditorMenuPlayers>(state.menu.menu);
                 editor_menu_players_update(menu, state.ui, state.menu.mode, state.scenario);
@@ -788,6 +783,8 @@ void editor_update() {
 
                 break;
             }
+            case EDITOR_MENU_TYPE_FILE:
+                break;
             case EDITOR_MENU_TYPE_NONE:
                 GOLD_ASSERT(false);
                 break;
@@ -1111,26 +1108,18 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
             };
         } else if (action == "Save") {
             if (state.scenario_path == "") {
-                state.menu = (EditorMenu) {
-                    .type = EDITOR_MENU_TYPE_FILE_SAVE,
-                    .mode = EDITOR_MENU_MODE_OPEN,
-                    .menu = editor_menu_file_save_open(state.scenario_path.c_str())
-                };
+                state.menu.type = EDITOR_MENU_TYPE_FILE;
+                SDL_ShowSaveFileDialog(editor_save_callback, NULL, state.window, EDITOR_FILE_FILTERS, 1, editor_get_scenario_folder_path().c_str());
             } else {
                 editor_save(state.scenario_path.c_str());
             }
         } else if (action == "Save As") {
-            state.menu = (EditorMenu) {
-                .type = EDITOR_MENU_TYPE_FILE_SAVE,
-                .mode = EDITOR_MENU_MODE_OPEN,
-                .menu = editor_menu_file_save_open(state.scenario_path.c_str())
-            };
+            state.menu.type = EDITOR_MENU_TYPE_FILE;
+            SDL_ShowSaveFileDialog(editor_save_callback, NULL, state.window, EDITOR_FILE_FILTERS, 1, editor_get_scenario_folder_path().c_str());
         } else if (action == "Open") {
-            state.menu = (EditorMenu) {
-                .type = EDITOR_MENU_TYPE_FILE_OPEN,
-                .mode = EDITOR_MENU_MODE_OPEN,
-                .menu = editor_menu_file_open_open()
-            };
+            state.menu.type = EDITOR_MENU_TYPE_FILE;
+            log_debug("%s", editor_get_scenario_folder_path().c_str());
+            SDL_ShowOpenFileDialog(editor_open_callback, NULL, state.window, EDITOR_FILE_FILTERS, 1, editor_get_scenario_folder_path().c_str(), false);
         }
     } else if (column == "Edit") {
         if (action == "Undo") {
@@ -1805,23 +1794,63 @@ ivec2 editor_get_player_spawn_camera_offset(ivec2 cell) {
     return camera_offset;
 }
 
+std::string editor_get_scenario_folder_path() {
+    std::string base_path = SDL_GetBasePath();
+    // The substring is to remove the trailing "bin/"
+    #ifdef PLATFORM_WIN32
+        return base_path.substr(0, base_path.size() - 4) + "res\\scenario\\";
+    #else
+        return base_path.substr(0, base_path.size() - 4) + "res/scenario/";
+    #endif
+}
+
+static void SDLCALL editor_save_callback(void* /*user_data*/, const char* const* filelist, int /*filter*/) {
+    state.menu.type = EDITOR_MENU_TYPE_NONE;
+
+    if (!filelist) {
+        log_error("Error occured while saving files: %s", SDL_GetError());
+        return;
+    }
+
+    if (!*filelist) {
+        return;
+    }
+
+    editor_save(*filelist);
+}
+
 void editor_save(const char* path) {
-    bool success = scenario_save_file(state.scenario, path);
+    std::string full_path = std::string(path);
+    if (!string_ends_with(full_path, ".scn")) {
+        full_path += ".scn";
+    }
+    bool success = scenario_save_file(state.scenario, full_path.c_str());
     if (success) {
-        state.scenario_path = path;
+        state.scenario_path = full_path;
         state.scenario_is_saved = true;
     }
 }
 
-void editor_open(const char* path) {
-    Scenario* opened_scenario = scenario_open_file(path);
+static void SDLCALL editor_open_callback(void* /*user_data*/, const char* const* filelist, int /*filter*/) {
+    state.menu.type = EDITOR_MENU_TYPE_NONE;
+
+    if (!filelist) {
+        log_error("Error occured while opening files: %s", SDL_GetError());
+        return;
+    }
+
+    if (!*filelist) {
+        return;
+    }
+
+    Scenario* opened_scenario = scenario_open_file(*filelist);
     if (opened_scenario == NULL) {
         return;
     }
 
     editor_free_current_document();
     state.scenario = opened_scenario;
-    state.scenario_path = path;
+    state.scenario_path = std::string(*filelist);
     state.scenario_is_saved = true;
 }
 

@@ -167,10 +167,9 @@ void scenario_set_noise_map_value(Scenario* scenario, ivec2 cell, uint8_t value)
 }
 
 bool scenario_save_file(const Scenario* scenario, const char* path) {
-    std::string full_path = filesystem_get_resource_path() + "scenario/" + path;
-    FILE* file = fopen(full_path.c_str(), "wb");
+    FILE* file = fopen(path, "wb");
     if (file == NULL) {
-        log_error("Could not open editor file %s for writing.", full_path.c_str());
+        log_error("Could not open editor file %s for writing.", path);
         return false;
     }
 
@@ -232,15 +231,14 @@ bool scenario_save_file(const Scenario* scenario, const char* path) {
     fwrite(&scenario->allowed_upgrades, 1, sizeof(uint32_t), file);
 
     fclose(file);
-    log_info("Map file saved successfully.");
+    log_info("Map file %s saved successfully.", path);
     return true;
 }
 
 Scenario* scenario_open_file(const char* path) {
-    std::string full_path = filesystem_get_resource_path() + "scenario/" + path;
-    FILE* file = fopen(full_path.c_str(), "rb");
+    FILE* file = fopen(path, "rb");
     if (file == NULL) {
-        log_error("Could not open map file for reading with path %s.", full_path.c_str());
+        log_error("Could not open map file for reading with path %s.", path);
         return NULL;
     }
 
@@ -248,7 +246,7 @@ Scenario* scenario_open_file(const char* path) {
     uint32_t signature;
     fread(&signature, 1, sizeof(uint32_t), file);
     if (signature != MAP_FILE_SIGNATURE) {
-        log_error("File %s is not a valid map file.", full_path.c_str());
+        log_error("File %s is not a valid map file.", path);
         fclose(file);
         return NULL;
     }
@@ -337,7 +335,7 @@ Scenario* scenario_open_file(const char* path) {
     fread(&scenario->allowed_upgrades, 1, sizeof(uint32_t), file);
 
     fclose(file);
-    log_info("Loaded map file %s.", full_path.c_str());
+    log_info("Loaded map file %s.", path);
 
     return scenario;
 }
