@@ -52,6 +52,7 @@ STATIC_ASSERT(sizeof(int) == sizeof(int32_t));
 #define MAX_USERNAME_LENGTH 32
 #define SELECTION_LIMIT 20U
 #define HOTKEY_GROUP_SIZE 6
+#define MATCH_SHELL_UI_HEIGHT 86
 
 typedef uint16_t EntityId;
 const EntityId ID_MAX = 4096;

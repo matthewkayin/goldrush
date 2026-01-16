@@ -23,8 +23,6 @@
 #include "render/render.h"
 #include "render/ysort.h"
 #include "util/util.h"
-#include "shell/shell.h"
-#include "network/network.h"
 #include <algorithm>
 #include <vector>
 #include <string>
@@ -131,13 +129,12 @@ struct EditorMenu {
 struct EditorState {
     SDL_Window* window;
 
-    MatchShellState* match_shell_state;
-
     Scenario* scenario;
     std::string scenario_path;
     bool scenario_is_saved;
     UI ui;
     int ui_toolbar_id;
+    bool should_playtest;
 
     // Actions
     size_t action_head;
@@ -233,7 +230,7 @@ MinimapPixel editor_get_minimap_pixel_for_entity(const std::vector<uint32_t>& se
 
 void editor_init(SDL_Window* window) {
     state.window = window;
-    state.match_shell_state = nullptr;
+    state.should_playtest = false;
 
     input_set_mouse_capture_enabled(false);
 
@@ -278,20 +275,6 @@ void editor_quit() {
 }
 
 void editor_update() {
-    if (state.match_shell_state != nullptr) {
-        match_shell_update(state.match_shell_state);
-        if (state.match_shell_state->mode == MATCH_SHELL_MODE_LEAVE_MATCH || 
-                state.match_shell_state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM) {
-            sound_end_fire_loop();
-            delete state.match_shell_state;
-            state.match_shell_state = nullptr;
-            input_set_mouse_capture_enabled(false);
-            SDL_SetWindowMouseGrab(state.window, false);
-        }
-
-        return;
-    }
-
     std::string toolbar_column, toolbar_action;
     bool toolbar_was_clicked;
 
@@ -578,7 +561,6 @@ void editor_update() {
 
                             scrollable_ui_funcs.push_back([effect, effect_index]() {
                                 ui_begin_row(state.ui, ivec2(0, 0), 4);
-                                    char effect_str[128];
                                     ui_slim_button(state.ui, trigger_effect_type_str(effect.type), true);
 
                                     if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, false, false)) {
@@ -1075,17 +1057,10 @@ void editor_update() {
             !input_is_action_pressed(INPUT_ACTION_LEFT_CLICK) &&
             !input_is_action_pressed(INPUT_ACTION_RIGHT_CLICK) &&
             input_is_action_just_pressed(INPUT_ACTION_F5)) {
-        network_set_backend(NETWORK_BACKEND_LAN);
-        network_open_lobby("Test Game", NETWORK_LOBBY_PRIVACY_SINGLEPLAYER);
-        state.match_shell_state = match_shell_init_from_scenario(state.scenario);
-        for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
-            if (!state.match_shell_state->match_state.players[player_id].active) {
-                continue;
-            }
-            network_add_bot();
+        if (!state.scenario_path.empty() && !state.scenario_is_saved) {
+            editor_save(state.scenario_path.c_str());
         }
-        input_set_mouse_capture_enabled(true);
-        SDL_SetWindowMouseGrab(state.window, true);
+        editor_begin_playtest();
     }
 }
 
@@ -1864,12 +1839,27 @@ static void SDLCALL editor_open_callback(void* /*user_data*/, const char* const*
     state.scenario_is_saved = true;
 }
 
-void editor_render() {
-    if (state.match_shell_state != nullptr) {
-        match_shell_render(state.match_shell_state);
-        return;
-    }
+bool editor_requests_playtest() {
+    return state.should_playtest;
+}
 
+void editor_begin_playtest() {
+    input_set_mouse_capture_enabled(true);
+    SDL_SetWindowMouseGrab(state.window, true);
+    state.should_playtest = true;
+}
+
+void editor_end_playtest() {
+    input_set_mouse_capture_enabled(false);
+    SDL_SetWindowMouseGrab(state.window, false);
+    state.should_playtest = false;
+}
+
+const Scenario* editor_get_scenario() {
+    return state.scenario;
+}
+
+void editor_render() {
     std::vector<uint32_t> selection;
 
     if (state.scenario != NULL) {

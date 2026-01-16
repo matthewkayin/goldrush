@@ -12,7 +12,6 @@
 #include "shell/hotkey.h"
 #include "scenario/scenario.h"
 
-#define MATCH_SHELL_UI_HEIGHT 86
 #define MATCH_SHELL_CONTROL_GROUP_COUNT 10
 #define MATCH_SHELL_CONTROL_GROUP_NONE -1
 #define MATCH_SHELL_CAMERA_HOTKEY_COUNT 6

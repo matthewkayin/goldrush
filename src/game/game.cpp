@@ -36,18 +36,28 @@ bool game_is_running(const GameState& state) {
     return true;
 }
 
+bool game_mode_is_match_shell(GameMode mode) {
+    #ifdef GOLD_DEBUG
+        if (mode == GAME_MODE_MATCH_TEST_SCENARIO) {
+            return true;
+        }
+    #endif
+
+    return mode == GAME_MODE_MATCH || mode == GAME_MODE_REPLAY;
+}
+
 void game_set_mode(GameState& state, GameSetModeParams params) {
     if (params.mode == GAME_MODE_MENU) {
         state.menu_state = menu_init();
 
-        #ifdef GOLD_STEAM
-            if (params.menu.steam_invite_id != 0) {
-                network_set_backend(NETWORK_BACKEND_STEAM);
-                CSteamID steam_id;
-                steam_id.SetFromUint64(params.menu.steam_invite_id);
-                network_steam_accept_invite(steam_id);
-            }
-        #endif
+    #ifdef GOLD_STEAM
+        if (params.menu.steam_invite_id != 0) {
+            network_set_backend(NETWORK_BACKEND_STEAM);
+            CSteamID steam_id;
+            steam_id.SetFromUint64(params.menu.steam_invite_id);
+            network_steam_accept_invite(steam_id);
+        }
+    #endif
     }
     if (params.mode == GAME_MODE_MATCH) {
         state.match_shell_state = match_shell_init(params.match.lcg_seed, params.match.noise);
@@ -59,21 +69,37 @@ void game_set_mode(GameState& state, GameSetModeParams params) {
             return;
         }
     }
+#ifdef GOLD_DEBUG
+    if (params.mode == GAME_MODE_MATCH_TEST_SCENARIO) {
+        network_set_backend(NETWORK_BACKEND_LAN);
+        network_open_lobby("Test Game", NETWORK_LOBBY_PRIVACY_SINGLEPLAYER);
+        state.match_shell_state = match_shell_init_from_scenario(params.match_scenario.scenario);
+        for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
+            if (!state.match_shell_state->match_state.players[player_id].active) {
+                continue;
+            }
+            network_add_bot();
+        }
+    }
+    if (params.mode == GAME_MODE_MAP_EDIT && state.mode == GAME_MODE_MATCH_TEST_SCENARIO) {
+        editor_end_playtest();
+    }
+#endif
 
     if (state.mode == GAME_MODE_MENU) {
         delete state.menu_state;
         state.menu_state = nullptr;
     }
-    if (state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY) {
+    if (game_mode_is_match_shell(state.mode)) {
         sound_end_fire_loop();
         delete state.match_shell_state;
         state.match_shell_state = nullptr;
     }
-    #ifdef GOLD_DEBUG
-        if (state.mode == GAME_MODE_MAP_EDIT) {
-            editor_quit();
-        }
-    #endif
+#ifdef GOLD_DEBUG
+    if (state.mode == GAME_MODE_MAP_EDIT && params.mode == GAME_MODE_NONE) {
+        editor_quit();
+    }
+#endif
 
     state.mode = params.mode;
 
@@ -106,12 +132,12 @@ void game_handle_network_event(GameState& state, const NetworkEvent& event) {
             match_shell_handle_network_event(state.match_shell_state, event);
             break;
         }
-        case GAME_MODE_REPLAY:
-            break;
     #ifdef GOLD_DEBUG
         case GAME_MODE_MAP_EDIT:
-            break;
+        case GAME_MODE_MATCH_TEST_SCENARIO:
     #endif
+        case GAME_MODE_REPLAY:
+            break;
     }
 }
 
@@ -170,9 +196,21 @@ void game_update(GameState& state) {
 
             break;
         }
+    #ifdef GOLD_DEBUG
+        case GAME_MODE_MATCH_TEST_SCENARIO:
+    #endif
         case GAME_MODE_MATCH:
         case GAME_MODE_REPLAY: {
             match_shell_update(state.match_shell_state);
+
+        #ifdef GOLD_DEBUG
+            if (state.match_shell_state->mode == MATCH_SHELL_MODE_LEAVE_MATCH && state.mode == GAME_MODE_MATCH_TEST_SCENARIO) {
+                GameSetModeParams params;
+                params.mode = GAME_MODE_MAP_EDIT;
+                game_set_mode(state, params);
+                break;
+            }
+        #endif
 
             if (state.match_shell_state->mode == MATCH_SHELL_MODE_LEAVE_MATCH) {
                 GameSetModeParams params;
@@ -188,6 +226,12 @@ void game_update(GameState& state) {
     #ifdef GOLD_DEBUG
         case GAME_MODE_MAP_EDIT: {
             editor_update();
+            if (editor_requests_playtest()) {
+                GameSetModeParams params;
+                params.mode = GAME_MODE_MATCH_TEST_SCENARIO;
+                params.match_scenario.scenario = editor_get_scenario();
+                game_set_mode(state, params);
+            }
             break;
         }
     #endif
@@ -204,6 +248,9 @@ void game_render(const GameState& state) {
             menu_render(state.menu_state);
             break;
         }
+    #ifdef GOLD_DEBUG
+        case GAME_MODE_MATCH_TEST_SCENARIO:
+    #endif
         case GAME_MODE_MATCH:
         case GAME_MODE_REPLAY: {
             match_shell_render(state.match_shell_state);

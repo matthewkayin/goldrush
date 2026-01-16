@@ -13,7 +13,8 @@ enum GameMode {
     GAME_MODE_MATCH,
     GAME_MODE_REPLAY,
     #ifdef GOLD_DEBUG
-        GAME_MODE_MAP_EDIT
+        GAME_MODE_MAP_EDIT,
+        GAME_MODE_MATCH_TEST_SCENARIO
     #endif
 };
 
@@ -32,6 +33,10 @@ struct GameSetModeReplayParams {
     char filename[FILENAME_MAX_LENGTH + 1];
 };
 
+struct GameSetModeMatchScenarioParams {
+    const Scenario* scenario;
+};
+
 struct GameSetModeParams {
     GameMode mode;
     union {
@@ -39,6 +44,7 @@ struct GameSetModeParams {
             GameSetModeMenuParams menu;
         #endif
         GameSetModeMatchParams match;
+        GameSetModeMatchScenarioParams match_scenario;
         GameSetModeReplayParams replay;
     };
 };
