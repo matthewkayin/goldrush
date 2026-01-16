@@ -8,9 +8,15 @@
 #include "scenario/scenario.h"
 #include "editor/menu.h"
 
+enum EditorMenuPlayersMode {
+    EDITOR_MENU_PLAYERS_MODE_PLAYERS,
+    EDITOR_MENU_PLAYERS_MODE_TECH
+};
+
 struct EditorMenuPlayers {
-    uint32_t starting_gold[MAX_PLAYERS];
-    std::string player_names[MAX_PLAYERS - 1];
+    EditorMenuPlayersMode mode;
+    uint32_t selected_player_id;
+    std::string player_name_string;
 };
 
 EditorMenuPlayers editor_menu_players_open(const Scenario* scenario);

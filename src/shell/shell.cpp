@@ -347,6 +347,10 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
         }
     }
 
+    // Allowed entities and upgrades
+    memcpy(state->scenario_allowed_entities, scenario->player_allowed_entities, sizeof(state->scenario_allowed_entities));
+    state->scenario_allowed_upgrades = scenario->player_allowed_upgrades;
+
     // Bots
     for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
         if (!player_is_active[player_id]) {
@@ -354,7 +358,7 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
         }
 
         // TODO: load from scenario file
-        BotConfig bot_config = bot_config_init_from_difficulty(DIFFICULTY_HARD);
+        BotConfig bot_config = scenario->bot_config[player_id - 1];
         int bot_lcg_seed = lcg_seed;
         BotOpener opener = bot_roll_opener(&bot_lcg_seed, DIFFICULTY_HARD);
         BotUnitComp preferred_unit_comp = bot_roll_preferred_unit_comp(&bot_lcg_seed);
@@ -403,10 +407,6 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
 
     // Triggers
     state->scenario_triggers = scenario->triggers;
-
-    // Allowed entities and upgrades
-    memcpy(state->scenario_allowed_entities, scenario->allowed_entities, sizeof(state->scenario_allowed_entities));
-    state->scenario_allowed_upgrades = scenario->allowed_upgrades;
 
     state->match_state.is_fog_dirty = false;
 

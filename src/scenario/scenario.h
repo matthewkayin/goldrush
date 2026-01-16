@@ -6,6 +6,7 @@
 #include "match/state.h"
 #include "match/map.h"
 #include "match/upgrade.h"
+#include "bot/config.h"
 
 #define SCENARIO_SQUAD_MAX_ENTITIES SELECTION_LIMIT
 
@@ -42,14 +43,15 @@ struct Scenario {
     ivec2 player_spawn;
     ScenarioPlayer players[MAX_PLAYERS];
 
+    bool player_allowed_entities[ENTITY_TYPE_COUNT];
+    uint32_t player_allowed_upgrades;
+    BotConfig bot_config[MAX_PLAYERS - 1];
+
     uint32_t entity_count;
     ScenarioEntity entities[MATCH_MAX_ENTITIES];
 
     std::vector<ScenarioSquad> squads;
     std::vector<Trigger> triggers;
-
-    bool allowed_entities[ENTITY_TYPE_COUNT];
-    uint32_t allowed_upgrades;
 };
 
 Scenario* scenario_init_blank(MapType map_type, MapSize map_size);

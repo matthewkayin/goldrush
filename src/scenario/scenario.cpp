@@ -22,11 +22,16 @@ Scenario* scenario_base_init() {
     }
 
     for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
-        scenario->allowed_entities[entity_type] = true;
+        scenario->player_allowed_entities[entity_type] = true;
     }
 
     for (uint32_t upgrade_index = 0; upgrade_index < UPGRADE_COUNT; upgrade_index++) {
-        scenario->allowed_upgrades |= 1U << upgrade_index;
+        scenario->player_allowed_upgrades |= 1U << upgrade_index;
+    }
+
+    // Init bot configs
+    for (uint32_t bot_index = 0; bot_index < MAX_PLAYERS - 1; bot_index++) {
+        scenario->bot_config[bot_index] = bot_config_init_from_difficulty(DIFFICULTY_HARD);
     }
 
     return scenario;
@@ -195,6 +200,15 @@ bool scenario_save_file(const Scenario* scenario, const char* path) {
     // Players
     fwrite(scenario->players, 1, sizeof(scenario->players), file);
 
+    // Player allowed entities
+    fwrite(&scenario->player_allowed_entities, 1, sizeof(bool) * ENTITY_TYPE_COUNT, file);
+
+    // Player allowed upgrades
+    fwrite(&scenario->player_allowed_upgrades, 1, sizeof(uint32_t), file);
+
+    // Bot config
+    fwrite(scenario->bot_config, 1, sizeof(scenario->bot_config), file);
+
     // Entities
     fwrite(&scenario->entity_count, 1, sizeof(uint32_t), file);
     fwrite(scenario->entities, 1, scenario->entity_count * sizeof(ScenarioEntity), file);
@@ -223,12 +237,6 @@ bool scenario_save_file(const Scenario* scenario, const char* path) {
         fwrite(&effects_size, 1, sizeof(size_t), file);
         fwrite(&trigger.effects[0], 1, effects_size * sizeof(TriggerEffect), file);
     }
-
-    // Allowed entities
-    fwrite(&scenario->allowed_entities, 1, sizeof(bool) * ENTITY_TYPE_COUNT, file);
-
-    // Allowed upgrades
-    fwrite(&scenario->allowed_upgrades, 1, sizeof(uint32_t), file);
 
     fclose(file);
     log_info("Map file %s saved successfully.", path);
@@ -295,6 +303,15 @@ Scenario* scenario_open_file(const char* path) {
     // Players
     fread(scenario->players, 1, sizeof(scenario->players), file);
 
+    // Allowed tech
+    fread(&scenario->player_allowed_entities, 1, sizeof(bool) * ENTITY_TYPE_COUNT, file);
+
+    // Allowed upgrades
+    fread(&scenario->player_allowed_upgrades, 1, sizeof(uint32_t), file);
+
+    // Bot config
+    fread(scenario->bot_config, 1, sizeof(scenario->bot_config), file);
+
     // Entities
     fread(&scenario->entity_count, 1, sizeof(uint32_t), file);
     fread(scenario->entities, 1, scenario->entity_count * sizeof(ScenarioEntity), file);
@@ -327,12 +344,6 @@ Scenario* scenario_open_file(const char* path) {
         trigger.effects = std::vector<TriggerEffect>(effects_size);
         fread(&trigger.effects[0], 1, effects_size * sizeof(TriggerEffect), file);
     }
-
-    // Allowed tech
-    fread(&scenario->allowed_entities, 1, sizeof(bool) * ENTITY_TYPE_COUNT, file);
-
-    // Allowed upgrades
-    fread(&scenario->allowed_upgrades, 1, sizeof(uint32_t), file);
 
     fclose(file);
     log_info("Loaded map file %s.", path);

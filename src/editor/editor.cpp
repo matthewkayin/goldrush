@@ -7,7 +7,6 @@
 #include "editor/menu_file.h"
 #include "editor/menu_players.h"
 #include "editor/menu_edit_squad.h"
-#include "editor/menu_allowed_tech.h"
 #include "editor/menu_rename_trigger.h"
 #include "editor/menu_trigger_condition.h"
 #include "editor/menu_trigger_effect.h"
@@ -56,7 +55,7 @@ static const Rect CANVAS_RECT = (Rect) {
 
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save", "Save As" },
-    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players", "Objective", "Allowed Tech" },
+    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players" },
     { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads", "Player Spawn", "Triggers" },
 };
 
@@ -112,7 +111,6 @@ enum EditorMenuType {
     EDITOR_MENU_TYPE_PLAYERS,
     EDITOR_MENU_TYPE_RENAME_TRIGGER,
     EDITOR_MENU_TYPE_EDIT_SQUAD,
-    EDITOR_MENU_TYPE_ALLOWED_TECH,
     EDITOR_MENU_TYPE_TRIGGER_CONDITION,
     EDITOR_MENU_TYPE_TRIGGER_EFFECT,
 };
@@ -125,7 +123,6 @@ struct EditorMenu {
         EditorMenuPlayers,
         EditorMenuRenameTrigger,
         EditorMenuEditSquad,
-        EditorMenuAllowedTech,
         EditorMenuTriggerCondition,
         EditorMenuTriggerEffect
     > menu;
@@ -749,23 +746,6 @@ void editor_update() {
 
                 break;
             }
-            case EDITOR_MENU_TYPE_ALLOWED_TECH: {
-                EditorMenuAllowedTech& menu = std::get<EditorMenuAllowedTech>(state.menu.menu);
-                editor_menu_allowed_tech_update(menu, state.ui, state.menu.mode);
-
-                if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
-                    memcpy(state.scenario->allowed_entities, menu.allowed_entities, sizeof(menu.allowed_entities));
-                    state.scenario->allowed_upgrades = 0;
-                    for (uint32_t upgrade_index = 0; upgrade_index < UPGRADE_COUNT; upgrade_index++) {
-                        if (menu.allowed_upgrades[upgrade_index]) {
-                            uint32_t upgrade = 1U << upgrade_index;
-                            state.scenario->allowed_upgrades |= upgrade;
-                        }
-                    }
-                }
-
-                break;
-            }
             case EDITOR_MENU_TYPE_TRIGGER_CONDITION: {
                 EditorMenuTriggerCondition& menu = std::get<EditorMenuTriggerCondition>(state.menu.menu);
                 editor_menu_trigger_condition_update(menu, state.ui, state.menu.mode);
@@ -1185,13 +1165,7 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
                 .mode = EDITOR_MENU_MODE_OPEN,
                 .menu = editor_menu_players_open(state.scenario)
             };
-        } else if (action == "Allowed Tech") {
-            state.menu = (EditorMenu) {
-                .type = EDITOR_MENU_TYPE_ALLOWED_TECH,
-                .mode = EDITOR_MENU_MODE_OPEN,
-                .menu = editor_menu_allowed_tech_open(state.scenario)
-            };
-        }
+        } 
     } else if (column == "Tool") {
         for (uint32_t index = 1; index < TOOLBAR_OPTIONS[2].size(); index++) {
             if (action == TOOLBAR_OPTIONS[2][index]) {

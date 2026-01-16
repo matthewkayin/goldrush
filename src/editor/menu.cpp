@@ -35,6 +35,22 @@ bool editor_menu_slider(UI& ui, const char* prompt, uint32_t* value, const UiSli
     return slider_value_changed;
 }
 
+bool editor_menu_prompt_and_button(UI& ui, const char* prompt, const char* button, Rect rect) {
+    const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
+
+    bool button_pressed = false;
+    ui_element_size(ui, ivec2(0, dropdown_sprite_info.frame_height));
+    ui_begin_row(ui, ivec2(0, 0), 0);
+        ui_element_position(ui, ivec2(0, 3));
+        ui_text(ui, FONT_HACK_GOLD, prompt);
+
+        ui_element_position(ui, ivec2(rect.w - 16 - dropdown_sprite_info.frame_width, 0));
+        button_pressed = ui_slim_button(ui, button);
+    ui_end_container(ui);
+
+    return button_pressed;
+}
+
 void editor_menu_header(UI& ui, Rect rect, const char* header_text) {
     ui.input_enabled = true;
     ui_frame_rect(ui, rect);
