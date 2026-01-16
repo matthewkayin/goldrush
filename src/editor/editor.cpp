@@ -777,6 +777,9 @@ void editor_update() {
                 .type = EDITOR_MENU_TYPE_NONE,
                 .mode = EDITOR_MENU_MODE_CLOSED
             };
+            if (input_is_text_input_active()) {
+                input_stop_text_input();
+            }
         }
 
         // Prevents click-through on menu close

@@ -13,7 +13,7 @@ const char* trigger_condition_type_str(TriggerConditionType type) {
 const char* trigger_effect_type_str(TriggerEffectType type) {
     switch (type) {
         case TRIGGER_EFFECT_TYPE_HINT:
-            return "Message";
+            return "Hint";
         case TRIGGER_EFFECT_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";

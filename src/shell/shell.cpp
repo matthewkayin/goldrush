@@ -30,6 +30,8 @@ static const size_t CHAT_MAX_LENGTH = 64;
 static const uint32_t CHAT_MESSAGE_DURATION = 180;
 static const uint32_t CHAT_MAX_LINES = 8;
 static const uint32_t CHAT_CURSOR_BLINK_DURATION = 30;
+static const uint8_t CHAT_PLAYER_HINT = MAX_PLAYERS + 1;
+static const uint32_t CHAT_MESSAGE_HINT_DURATION = 60U * 60U * 15U;
 
 // UI panel rects
 static const Rect BOTTOM_PANEL_RECT = (Rect) {
@@ -2189,7 +2191,7 @@ bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const 
 void match_shell_do_trigger_effect(MatchShellState* state, const TriggerEffect& effect) {
     switch (effect.type) {
         case TRIGGER_EFFECT_TYPE_HINT: {
-            match_shell_add_chat_message(state, PLAYER_NONE, effect.hint.message);
+            match_shell_add_chat_message(state, CHAT_PLAYER_HINT, effect.hint.message);
             break;
         }
         case TRIGGER_EFFECT_TYPE_COUNT:
@@ -2547,7 +2549,7 @@ int match_shell_get_fog(const MatchShellState* state, ivec2 cell) {
 void match_shell_add_chat_message(MatchShellState* state, uint8_t player_id, const char* message) {
     ChatMessage chat_message = (ChatMessage) {
         .message = std::string(message),
-        .timer = CHAT_MESSAGE_DURATION,
+        .timer = player_id == CHAT_PLAYER_HINT ? CHAT_MESSAGE_DURATION : CHAT_MESSAGE_HINT_DURATION,
         .player_id = player_id
     };
     if (state->chat.size() == CHAT_MAX_LINES) {
@@ -3636,7 +3638,12 @@ void match_shell_render(const MatchShellState* state) {
     for (uint32_t chat_index = 0; chat_index < state->chat.size(); chat_index++) {
         const ChatMessage& message = state->chat[state->chat.size() - chat_index - 1];
         ivec2 message_pos = CHAT_PROMPT_POSITION + ivec2(0, -((chat_index + 1) * 16));
-        if (message.player_id != PLAYER_NONE) {
+        if (message.player_id == CHAT_PLAYER_HINT) {
+            const char* hint_text = "Hint: ";
+            render_text(FONT_HACK_SHADOW, hint_text, message_pos + ivec2(1, 1));
+            render_text(FONT_HACK_PLAYER0, hint_text, message_pos);
+            message_pos.x += render_get_text_size(FONT_HACK_WHITE, hint_text).x;
+        } else if (message.player_id != PLAYER_NONE) {
             const MatchPlayer& player = state->match_state.players[message.player_id];
             char player_text[40];
             sprintf(player_text, "%s: ", player.name);
