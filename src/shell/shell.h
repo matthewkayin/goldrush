@@ -11,6 +11,7 @@
 #include "render/ysort.h"
 #include "shell/hotkey.h"
 #include "scenario/scenario.h"
+#include "scenario/objective.h"
 
 #define MATCH_SHELL_CONTROL_GROUP_COUNT 10
 #define MATCH_SHELL_CONTROL_GROUP_NONE -1
@@ -150,6 +151,9 @@ struct MatchShellState {
     bool scenario_allowed_entities[ENTITY_TYPE_COUNT];
     uint32_t scenario_allowed_upgrades;
 
+    // Scenario objective
+    std::vector<Objective> scenario_objectives;
+
     // Replay file (write)
     FILE* replay_file;
 
@@ -205,7 +209,7 @@ bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyB
 // Triggers
 bool match_shell_is_trigger_condition_met(const MatchShellState* state, const TriggerCondition& condition);
 bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const std::vector<TriggerCondition>& conditions);
-void match_shell_do_trigger_effect(MatchShellState* state, const TriggerEffect& effect);
+void match_shell_do_trigger_effect(MatchShellState* state, const TriggerAction& effect);
 
 // State queries
 bool match_shell_is_mouse_in_ui();

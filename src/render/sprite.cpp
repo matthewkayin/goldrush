@@ -647,6 +647,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_UI_OBJECTIVE_CHECKBOX, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = {
+            .path = "ui/objective_checkbox.png",
+            .hframes = 2,
+            .vframes = 1
+        }
+    }},
     { SPRITE_BUTTON_ICON_ATTACK, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {

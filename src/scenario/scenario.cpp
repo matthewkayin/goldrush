@@ -235,8 +235,13 @@ bool scenario_save_file(const Scenario* scenario, const char* path) {
         // Effects
         size_t effects_size = trigger.effects.size();
         fwrite(&effects_size, 1, sizeof(size_t), file);
-        fwrite(&trigger.effects[0], 1, effects_size * sizeof(TriggerEffect), file);
+        fwrite(&trigger.effects[0], 1, effects_size * sizeof(TriggerAction), file);
     }
+
+    // Objectives
+    size_t objectives_size = scenario->objectives.size();
+    fwrite(&objectives_size, 1, sizeof(size_t), file);
+    fwrite(&scenario->objectives[0], 1, objectives_size * sizeof(Objective), file);
 
     fclose(file);
     log_info("Map file %s saved successfully.", path);
@@ -341,9 +346,15 @@ Scenario* scenario_open_file(const char* path) {
         // Effects
         size_t effects_size;
         fread(&effects_size, 1, sizeof(size_t), file);
-        trigger.effects = std::vector<TriggerEffect>(effects_size);
-        fread(&trigger.effects[0], 1, effects_size * sizeof(TriggerEffect), file);
+        trigger.effects = std::vector<TriggerAction>(effects_size);
+        fread(&trigger.effects[0], 1, effects_size * sizeof(TriggerAction), file);
     }
+
+    // Objectives
+    size_t objectives_size;
+    fread(&objectives_size, 1, sizeof(size_t), file);
+    scenario->objectives = std::vector<Objective>(objectives_size);
+    fread(&scenario->objectives[0], 1, objectives_size * sizeof(Objective), file);
 
     fclose(file);
     log_info("Loaded map file %s.", path);

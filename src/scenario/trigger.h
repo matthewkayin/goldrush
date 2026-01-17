@@ -1,10 +1,11 @@
 #pragma once
 
+#include "scenario/objective.h"
 #include "bot/entity_count.h"
 #include <vector>
 
-#define TRIGGER_NAME_MAX_LENGTH 32
-#define TRIGGER_EFFECT_HINT_MESSAGE_MAX_LENGTH 64
+#define TRIGGER_NAME_BUFFER_LENGTH 32
+#define TRIGGER_ACTION_HINT_MESSAGE_BUFFER_LENGTH 64
 #define TRIGGER_EFFECT_COUNT_MAX 16
 
 // Condition
@@ -27,32 +28,46 @@ struct TriggerCondition {
 };
 STATIC_ASSERT(sizeof(TriggerCondition) == 12ULL);
 
-// Effect
+// Action
 
-enum TriggerEffectType {
-    TRIGGER_EFFECT_TYPE_HINT,
-    TRIGGER_EFFECT_TYPE_COUNT
+enum TriggerActionType {
+    TRIGGER_ACTION_TYPE_HINT,
+    TRIGGER_ACTION_TYPE_ADD_OBJECTIVE,
+    TRIGGER_ACTION_TYPE_UPDATE_OBJECTIVE,
+    TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES,
+    TRIGGER_ACTION_TYPE_COUNT
 };
 
-struct TriggerEffectHint {
-    char message[TRIGGER_EFFECT_HINT_MESSAGE_MAX_LENGTH];
+struct TriggerActionHint {
+    char message[TRIGGER_ACTION_HINT_MESSAGE_BUFFER_LENGTH];
 };
 
-struct TriggerEffect {
-    TriggerEffectType type;
+struct TriggerActionAddObjective {
+    uint32_t objective_index;
+};
+
+struct TriggerActionUpdateObjective {
+    uint32_t objective_index;
+    bool is_finished;
+};
+
+struct TriggerAction {
+    TriggerActionType type;
     union {
-        TriggerEffectHint hint;
+        TriggerActionHint hint;
+        TriggerActionAddObjective add_objective;
+        TriggerActionUpdateObjective update_objective;
     };
 };
-STATIC_ASSERT(sizeof(TriggerEffect) == 68ULL);
+STATIC_ASSERT(sizeof(TriggerAction) == 68ULL);
 
 struct Trigger {
     bool is_active;
-    char name[TRIGGER_NAME_MAX_LENGTH];
+    char name[TRIGGER_NAME_BUFFER_LENGTH];
     std::vector<TriggerCondition> conditions;
-    std::vector<TriggerEffect> effects;
+    std::vector<TriggerAction> effects;
 };
 
 const char* trigger_condition_type_str(TriggerConditionType type);
-const char* trigger_effect_type_str(TriggerEffectType type);
+const char* trigger_effect_type_str(TriggerActionType type);
 int trigger_condition_sprintf(char* str_ptr, const TriggerCondition& condition);

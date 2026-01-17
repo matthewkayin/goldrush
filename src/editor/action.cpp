@@ -167,7 +167,7 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
             const char* name_ptr = mode == EDITOR_ACTION_MODE_DO
                 ? action_data.new_name
                 : action_data.previous_name;
-            strncpy(scenario->triggers[action_data.index].name, name_ptr, TRIGGER_NAME_MAX_LENGTH);
+            strncpy(scenario->triggers[action_data.index].name, name_ptr, TRIGGER_NAME_BUFFER_LENGTH);
             break;
         }
         case EDITOR_ACTION_ADD_TRIGGER_CONDITION: {
@@ -215,8 +215,8 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
             const EditorActionAddTriggerEffect& action_data = std::get<EditorActionAddTriggerEffect>(action.data);
 
             if (mode == EDITOR_ACTION_MODE_DO) {
-                TriggerEffect new_effect;
-                new_effect.type = TRIGGER_EFFECT_TYPE_HINT;
+                TriggerAction new_effect;
+                new_effect.type = TRIGGER_ACTION_TYPE_HINT;
                 sprintf(new_effect.hint.message, "");
 
                 scenario->triggers[action_data.trigger_index].effects.push_back(new_effect);

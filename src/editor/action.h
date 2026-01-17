@@ -100,8 +100,8 @@ struct EditorActionRemoveTrigger {
 
 struct EditorActionRenameTrigger {
     uint32_t index;
-    char previous_name[TRIGGER_NAME_MAX_LENGTH];
-    char new_name[TRIGGER_NAME_MAX_LENGTH];
+    char previous_name[TRIGGER_NAME_BUFFER_LENGTH];
+    char new_name[TRIGGER_NAME_BUFFER_LENGTH];
 };
 
 struct EditorActionAddTriggerCondition {
@@ -128,14 +128,14 @@ struct EditorActionAddTriggerEffect {
 struct EditorActionRemoveTriggerEffect {
     uint32_t trigger_index;
     uint32_t effect_index;
-    TriggerEffect value;
+    TriggerAction value;
 };
 
 struct EditorActionEditTriggerEffect {
     uint32_t trigger_index;
     uint32_t effect_index;
-    TriggerEffect previous_value;
-    TriggerEffect new_value;
+    TriggerAction previous_value;
+    TriggerAction new_value;
 };
 
 struct EditorAction {

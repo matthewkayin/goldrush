@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include "scenario/objective.h"
 #include "scenario/trigger.h"
 #include "match/noise.h"
 #include "match/state.h"
@@ -52,6 +53,7 @@ struct Scenario {
 
     std::vector<ScenarioSquad> squads;
     std::vector<Trigger> triggers;
+    std::vector<Objective> objectives;
 };
 
 Scenario* scenario_init_blank(MapType map_type, MapSize map_size);

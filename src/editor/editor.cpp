@@ -557,7 +557,7 @@ void editor_update() {
                         });
                         
                         for (uint32_t effect_index = 0; effect_index < trigger.effects.size(); effect_index++) {
-                            const TriggerEffect& effect = trigger.effects[effect_index];
+                            const TriggerAction& effect = trigger.effects[effect_index];
 
                             scrollable_ui_funcs.push_back([effect, effect_index]() {
                                 ui_begin_row(state.ui, ivec2(0, 0), 4);
@@ -718,8 +718,8 @@ void editor_update() {
                 if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
                     EditorActionRenameTrigger rename_trigger;
                     rename_trigger.index = state.tool_value;
-                    strncpy(rename_trigger.previous_name, state.scenario->triggers[state.tool_value].name, TRIGGER_NAME_MAX_LENGTH);
-                    strncpy(rename_trigger.new_name, menu.trigger_name.c_str(), TRIGGER_NAME_MAX_LENGTH);
+                    strncpy(rename_trigger.previous_name, state.scenario->triggers[state.tool_value].name, TRIGGER_NAME_BUFFER_LENGTH);
+                    strncpy(rename_trigger.new_name, menu.trigger_name.c_str(), TRIGGER_NAME_BUFFER_LENGTH);
                     editor_do_action((EditorAction) {
                         .type = EDITOR_ACTION_RENAME_TRIGGER,
                         .data = rename_trigger

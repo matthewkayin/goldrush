@@ -21,7 +21,7 @@ void editor_menu_rename_trigger_update(EditorMenuRenameTrigger& menu, UI& ui, Ed
 
     // Name
     ui_element_position(ui, ivec2(MENU_RECT.x + 8, MENU_RECT.y + 30));
-    ui_text_input(ui, "Name: ", ivec2(MENU_RECT.w - 32, 24), &menu.trigger_name, TRIGGER_NAME_MAX_LENGTH - 1);
+    ui_text_input(ui, "Name: ", ivec2(MENU_RECT.w - 32, 24), &menu.trigger_name, TRIGGER_NAME_BUFFER_LENGTH - 1);
 
     editor_menu_back_save_buttons(ui, MENU_RECT, mode);
 }

@@ -1224,7 +1224,7 @@ void match_shell_update(MatchShellState* state) {
         }
 
         if (match_shell_are_trigger_conditions_met(state, trigger.conditions)) {
-            for (const TriggerEffect& effect : trigger.effects) {
+            for (const TriggerAction& effect : trigger.effects) {
                 match_shell_do_trigger_effect(state, effect);
             }
             trigger.is_active = false;
@@ -2144,7 +2144,8 @@ bool match_shell_does_player_meet_hotkey_requirements(const MatchState& state, I
 }
 
 bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyButtonInfo& info) {
-    if ((info.type == HOTKEY_BUTTON_TRAIN || info.type == HOTKEY_BUTTON_TRAIN) && !state->scenario_allowed_entities[info.entity_type]) {
+    if ((info.type == HOTKEY_BUTTON_TRAIN || info.type == HOTKEY_BUTTON_BUILD) && 
+            !state->scenario_allowed_entities[info.entity_type]) {
         return false;
     }
     if (info.type == HOTKEY_BUTTON_RESEARCH && 
@@ -2188,13 +2189,13 @@ bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const 
     return true;
 }
 
-void match_shell_do_trigger_effect(MatchShellState* state, const TriggerEffect& effect) {
+void match_shell_do_trigger_effect(MatchShellState* state, const TriggerAction& effect) {
     switch (effect.type) {
-        case TRIGGER_EFFECT_TYPE_HINT: {
+        case TRIGGER_ACTION_TYPE_HINT: {
             match_shell_add_chat_message(state, CHAT_PLAYER_HINT, effect.hint.message);
             break;
         }
-        case TRIGGER_EFFECT_TYPE_COUNT:
+        case TRIGGER_ACTION_TYPE_COUNT:
             GOLD_ASSERT(false);
     }
 }
