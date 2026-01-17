@@ -96,7 +96,7 @@ void game_set_mode(GameState& state, GameSetModeParams params) {
         state.match_shell_state = nullptr;
     }
 #ifdef GOLD_DEBUG
-    if (state.mode == GAME_MODE_MAP_EDIT && params.mode == GAME_MODE_NONE) {
+    if ((state.mode == GAME_MODE_MAP_EDIT || state.mode == GAME_MODE_MATCH_TEST_SCENARIO) && params.mode == GAME_MODE_NONE) {
         editor_quit();
     }
 #endif

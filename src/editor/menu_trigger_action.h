@@ -6,6 +6,7 @@
 
 #include "editor/menu.h"
 #include "scenario/trigger.h"
+#include "scenario/scenario.h"
 #include <vector>
 #include <string>
 
@@ -13,10 +14,11 @@ struct EditorMenuTriggerAction {
     uint32_t action_index;
     TriggerAction action;
     std::vector<std::string> action_type_items;
+    std::vector<std::string> objective_items;
     std::string hint_value;
 };
 
-EditorMenuTriggerAction editor_menu_trigger_action_open(const TriggerAction& action, uint32_t action_index);
+EditorMenuTriggerAction editor_menu_trigger_action_open(const Scenario* scenario, const TriggerAction& action, uint32_t action_index);
 void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, EditorMenuMode& mode);
 
 #endif

@@ -410,6 +410,9 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
     // Triggers
     state->scenario_triggers = scenario->triggers;
 
+    // Objectives
+    state->scenario_objectives = scenario->objectives;
+
     state->match_state.is_fog_dirty = false;
 
     return state;
@@ -2167,6 +2170,9 @@ bool match_shell_is_trigger_condition_met(const MatchShellState* state, const Tr
                 if (entity.type != condition.entity_count.entity_type) {
                     continue;
                 }
+                if (entity_is_building(entity.type) && entity.mode != MODE_BUILDING_FINISHED) {
+                    continue;
+                }
                 count++;
             }
 
@@ -2189,10 +2195,18 @@ bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const 
     return true;
 }
 
-void match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& effect) {
-    switch (effect.type) {
+void match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& action) {
+    switch (action.type) {
         case TRIGGER_ACTION_TYPE_HINT: {
-            match_shell_add_chat_message(state, CHAT_PLAYER_HINT, effect.hint.message);
+            match_shell_add_chat_message(state, CHAT_PLAYER_HINT, action.hint.message);
+            break;
+        }
+        case TRIGGER_ACTION_TYPE_ADD_OBJECTIVE: {
+            state->current_objective_indices.push_back(action.add_objective.objective_index);
+            break;
+        }
+        case TRIGGER_ACTION_TYPE_FINISH_OBJECTIVE: {
+            state->scenario_objectives[action.finish_objective.objective_index].is_finished = true;
             break;
         }
         case TRIGGER_ACTION_TYPE_COUNT:
@@ -4087,6 +4101,27 @@ void match_shell_render(const MatchShellState* state) {
         }
 
         resource_base_y += population_icon_sprite_info.frame_height;
+    }
+
+    // Objectives
+    if (!state->current_objective_indices.empty()) {
+        const SpriteInfo& menu_button_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_BURGER);
+        ivec2 objectives_text_pos = MENU_BUTTON_POSITION + ivec2(4, menu_button_sprite_info.frame_height + 4);
+        render_text(FONT_HACK_SHADOW, "Objectives:", objectives_text_pos + ivec2(1, 1));
+        render_text(FONT_HACK_GOLD, "Objectives:", objectives_text_pos);
+
+        objectives_text_pos += ivec2(4, 20);
+        const SpriteInfo& checkbox_sprite_info = render_get_sprite_info(SPRITE_UI_OBJECTIVE_CHECKBOX);
+        for (uint32_t objective_index : state->current_objective_indices) {
+            const Objective& objective = state->scenario_objectives[objective_index];
+            render_sprite_frame(SPRITE_UI_OBJECTIVE_CHECKBOX, ivec2((int)objective.is_finished, 0), objectives_text_pos, RENDER_SPRITE_NO_CULL, 0);
+
+            ivec2 text_pos = objectives_text_pos + ivec2(checkbox_sprite_info.frame_width + 2, 1);
+            render_text(FONT_HACK_SHADOW, objective.description, text_pos + ivec2(1, 1));
+            render_text(FONT_HACK_GOLD, objective.description, text_pos);
+
+            objectives_text_pos.y += checkbox_sprite_info.frame_height + 4;
+        }
     }
 
     // Menu button icon

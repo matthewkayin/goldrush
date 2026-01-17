@@ -153,6 +153,7 @@ struct MatchShellState {
 
     // Scenario objective
     std::vector<Objective> scenario_objectives;
+    std::vector<uint32_t> current_objective_indices;
 
     // Replay file (write)
     FILE* replay_file;

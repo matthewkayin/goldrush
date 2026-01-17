@@ -570,7 +570,7 @@ void editor_update() {
                                         state.menu = (EditorMenu) {
                                             .type = EDITOR_MENU_TYPE_TRIGGER_ACTION,
                                             .mode = EDITOR_MENU_MODE_OPEN,
-                                            .menu = editor_menu_trigger_action_open(action, action_index)
+                                            .menu = editor_menu_trigger_action_open(state.scenario, action, action_index)
                                         };
                                     }
                                     if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, false, false)) {

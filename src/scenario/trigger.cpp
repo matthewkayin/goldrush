@@ -14,6 +14,10 @@ const char* trigger_action_type_str(TriggerActionType type) {
     switch (type) {
         case TRIGGER_ACTION_TYPE_HINT:
             return "Hint";
+        case TRIGGER_ACTION_TYPE_ADD_OBJECTIVE:
+            return "Add Objective";
+        case TRIGGER_ACTION_TYPE_FINISH_OBJECTIVE:
+            return "Finish Objective";
         case TRIGGER_ACTION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";

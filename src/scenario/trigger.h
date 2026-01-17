@@ -32,6 +32,8 @@ STATIC_ASSERT(sizeof(TriggerCondition) == 12ULL);
 
 enum TriggerActionType {
     TRIGGER_ACTION_TYPE_HINT,
+    TRIGGER_ACTION_TYPE_ADD_OBJECTIVE,
+    TRIGGER_ACTION_TYPE_FINISH_OBJECTIVE,
     TRIGGER_ACTION_TYPE_COUNT
 };
 
@@ -43,7 +45,7 @@ struct TriggerActionAddObjective {
     uint32_t objective_index;
 };
 
-struct TriggerActionUpdateObjective {
+struct TriggerActionFinishObjective {
     uint32_t objective_index;
     bool is_finished;
 };
@@ -53,7 +55,7 @@ struct TriggerAction {
     union {
         TriggerActionHint hint;
         TriggerActionAddObjective add_objective;
-        TriggerActionUpdateObjective update_objective;
+        TriggerActionFinishObjective finish_objective;
     };
 };
 STATIC_ASSERT(sizeof(TriggerAction) == 68ULL);
