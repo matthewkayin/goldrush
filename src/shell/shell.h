@@ -209,7 +209,7 @@ bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyB
 // Triggers
 bool match_shell_is_trigger_condition_met(const MatchShellState* state, const TriggerCondition& condition);
 bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const std::vector<TriggerCondition>& conditions);
-void match_shell_do_trigger_effect(MatchShellState* state, const TriggerAction& effect);
+void match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& effect);
 
 // State queries
 bool match_shell_is_mouse_in_ui();

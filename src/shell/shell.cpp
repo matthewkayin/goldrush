@@ -1224,8 +1224,8 @@ void match_shell_update(MatchShellState* state) {
         }
 
         if (match_shell_are_trigger_conditions_met(state, trigger.conditions)) {
-            for (const TriggerAction& effect : trigger.effects) {
-                match_shell_do_trigger_effect(state, effect);
+            for (const TriggerAction& action : trigger.actions) {
+                match_shell_do_trigger_action(state, action);
             }
             trigger.is_active = false;
         }
@@ -2189,7 +2189,7 @@ bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const 
     return true;
 }
 
-void match_shell_do_trigger_effect(MatchShellState* state, const TriggerAction& effect) {
+void match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& effect) {
     switch (effect.type) {
         case TRIGGER_ACTION_TYPE_HINT: {
             match_shell_add_chat_message(state, CHAT_PLAYER_HINT, effect.hint.message);

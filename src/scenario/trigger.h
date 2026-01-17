@@ -32,9 +32,6 @@ STATIC_ASSERT(sizeof(TriggerCondition) == 12ULL);
 
 enum TriggerActionType {
     TRIGGER_ACTION_TYPE_HINT,
-    TRIGGER_ACTION_TYPE_ADD_OBJECTIVE,
-    TRIGGER_ACTION_TYPE_UPDATE_OBJECTIVE,
-    TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES,
     TRIGGER_ACTION_TYPE_COUNT
 };
 
@@ -65,9 +62,9 @@ struct Trigger {
     bool is_active;
     char name[TRIGGER_NAME_BUFFER_LENGTH];
     std::vector<TriggerCondition> conditions;
-    std::vector<TriggerAction> effects;
+    std::vector<TriggerAction> actions;
 };
 
 const char* trigger_condition_type_str(TriggerConditionType type);
-const char* trigger_effect_type_str(TriggerActionType type);
+const char* trigger_action_type_str(TriggerActionType type);
 int trigger_condition_sprintf(char* str_ptr, const TriggerCondition& condition);

@@ -33,9 +33,9 @@ enum EditorActionType {
     EDITOR_ACTION_ADD_TRIGGER_CONDITION,
     EDITOR_ACTION_EDIT_TRIGGER_CONDITION,
     EDITOR_ACTION_REMOVE_TRIGGER_CONDITION,
-    EDITOR_ACTION_ADD_TRIGGER_EFFECT,
-    EDITOR_ACTION_REMOVE_TRIGGER_EFFECT,
-    EDITOR_ACTION_EDIT_TRIGGER_EFFECT,
+    EDITOR_ACTION_ADD_TRIGGER_ACTION,
+    EDITOR_ACTION_REMOVE_TRIGGER_ACTION,
+    EDITOR_ACTION_EDIT_TRIGGER_ACTION,
 };
 
 struct EditorActionBrushStroke {
@@ -121,19 +121,19 @@ struct EditorActionEditTriggerCondition {
     TriggerCondition new_value;
 };
 
-struct EditorActionAddTriggerEffect {
+struct EditorActionAddTriggerAction {
     uint32_t trigger_index;
 };
 
-struct EditorActionRemoveTriggerEffect {
+struct EditorActionRemoveTriggerAction {
     uint32_t trigger_index;
-    uint32_t effect_index;
+    uint32_t action_index;
     TriggerAction value;
 };
 
-struct EditorActionEditTriggerEffect {
+struct EditorActionEditTriggerAction {
     uint32_t trigger_index;
-    uint32_t effect_index;
+    uint32_t action_index;
     TriggerAction previous_value;
     TriggerAction new_value;
 };
@@ -155,9 +155,10 @@ struct EditorAction {
         EditorActionAddTriggerCondition,
         EditorActionRemoveTriggerCondition,
         EditorActionEditTriggerCondition,
-        EditorActionAddTriggerEffect,
-        EditorActionRemoveTriggerEffect,
-        EditorActionEditTriggerEffect> data;
+        EditorActionAddTriggerAction,
+        EditorActionRemoveTriggerAction,
+        EditorActionEditTriggerAction
+    > data;
 };
 
 // Action

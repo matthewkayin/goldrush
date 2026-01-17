@@ -10,7 +10,7 @@ const char* trigger_condition_type_str(TriggerConditionType type) {
     }
 }
 
-const char* trigger_effect_type_str(TriggerActionType type) {
+const char* trigger_action_type_str(TriggerActionType type) {
     switch (type) {
         case TRIGGER_ACTION_TYPE_HINT:
             return "Hint";

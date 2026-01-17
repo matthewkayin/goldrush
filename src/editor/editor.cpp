@@ -9,7 +9,8 @@
 #include "editor/menu_edit_squad.h"
 #include "editor/menu_rename_trigger.h"
 #include "editor/menu_trigger_condition.h"
-#include "editor/menu_trigger_effect.h"
+#include "editor/menu_trigger_action.h"
+#include "editor/menu_objective.h"
 #include "editor/menu.h"
 #include "editor/action.h"
 #include "core/logger.h"
@@ -53,7 +54,7 @@ static const Rect CANVAS_RECT = (Rect) {
 
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save", "Save As" },
-    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players" },
+    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players", "Objectives", },
     { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads", "Player Spawn", "Triggers" },
 };
 
@@ -110,7 +111,8 @@ enum EditorMenuType {
     EDITOR_MENU_TYPE_RENAME_TRIGGER,
     EDITOR_MENU_TYPE_EDIT_SQUAD,
     EDITOR_MENU_TYPE_TRIGGER_CONDITION,
-    EDITOR_MENU_TYPE_TRIGGER_EFFECT,
+    EDITOR_MENU_TYPE_TRIGGER_ACTION,
+    EDITOR_MENU_TYPE_OBJECTIVE
 };
 
 struct EditorMenu {
@@ -122,7 +124,8 @@ struct EditorMenu {
         EditorMenuRenameTrigger,
         EditorMenuEditSquad,
         EditorMenuTriggerCondition,
-        EditorMenuTriggerEffect
+        EditorMenuTriggerAction,
+        EditorMenuObjective
     > menu;
 };
 
@@ -556,27 +559,27 @@ void editor_update() {
                             ui_text(state.ui, FONT_HACK_GOLD, "Effects");
                         });
                         
-                        for (uint32_t effect_index = 0; effect_index < trigger.effects.size(); effect_index++) {
-                            const TriggerAction& effect = trigger.effects[effect_index];
+                        for (uint32_t action_index = 0; action_index < trigger.actions.size(); action_index++) {
+                            const TriggerAction& action = trigger.actions[action_index];
 
-                            scrollable_ui_funcs.push_back([effect, effect_index]() {
+                            scrollable_ui_funcs.push_back([action, action_index]() {
                                 ui_begin_row(state.ui, ivec2(0, 0), 4);
-                                    ui_slim_button(state.ui, trigger_effect_type_str(effect.type), true);
+                                    ui_slim_button(state.ui, trigger_action_type_str(action.type), true);
 
                                     if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, false, false)) {
                                         state.menu = (EditorMenu) {
-                                            .type = EDITOR_MENU_TYPE_TRIGGER_EFFECT,
+                                            .type = EDITOR_MENU_TYPE_TRIGGER_ACTION,
                                             .mode = EDITOR_MENU_MODE_OPEN,
-                                            .menu = editor_menu_trigger_effect_open(effect, effect_index)
+                                            .menu = editor_menu_trigger_action_open(action, action_index)
                                         };
                                     }
                                     if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, false, false)) {
                                         editor_do_action((EditorAction) {
-                                            .type = EDITOR_ACTION_REMOVE_TRIGGER_EFFECT,
-                                            .data = (EditorActionRemoveTriggerEffect) {
+                                            .type = EDITOR_ACTION_REMOVE_TRIGGER_ACTION,
+                                            .data = (EditorActionRemoveTriggerAction) {
                                                 .trigger_index = state.tool_value,
-                                                .effect_index = effect_index,
-                                                .value = effect
+                                                .action_index = action_index,
+                                                .value = action
                                             }
                                         });
                                     }
@@ -587,8 +590,8 @@ void editor_update() {
                         scrollable_ui_funcs.push_back([]() {
                             if (ui_slim_button(state.ui, "+ Effect")) {
                                 editor_do_action((EditorAction) {
-                                    .type = EDITOR_ACTION_ADD_TRIGGER_EFFECT,
-                                    .data = (EditorActionAddTriggerEffect) {
+                                    .type = EDITOR_ACTION_ADD_TRIGGER_ACTION,
+                                    .data = (EditorActionAddTriggerAction) {
                                         .trigger_index = state.tool_value
                                     }
                                 });
@@ -746,21 +749,27 @@ void editor_update() {
 
                 break;
             }
-            case EDITOR_MENU_TYPE_TRIGGER_EFFECT: {
-                EditorMenuTriggerEffect& menu = std::get<EditorMenuTriggerEffect>(state.menu.menu);
-                editor_menu_trigger_effect_update(menu, state.ui, state.menu.mode);
+            case EDITOR_MENU_TYPE_TRIGGER_ACTION: {
+                EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
+                editor_menu_trigger_action_update(menu, state.ui, state.menu.mode);
 
                 if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
                     editor_do_action((EditorAction) {
-                        .type = EDITOR_ACTION_EDIT_TRIGGER_EFFECT,
-                        .data = (EditorActionEditTriggerEffect) {
+                        .type = EDITOR_ACTION_EDIT_TRIGGER_ACTION,
+                        .data = (EditorActionEditTriggerAction) {
                             .trigger_index = state.tool_value,
-                            .effect_index = menu.effect_index,
-                            .previous_value = state.scenario->triggers[state.tool_value].effects[menu.effect_index],
-                            .new_value = menu.effect
+                            .action_index = menu.action_index,
+                            .previous_value = state.scenario->triggers[state.tool_value].actions[menu.action_index],
+                            .new_value = menu.action
                         }
                     });
                 }
+
+                break;
+            }
+            case EDITOR_MENU_TYPE_OBJECTIVE: {
+                EditorMenuObjective& menu = std::get<EditorMenuObjective>(state.menu.menu);
+                editor_menu_objective_update(menu, state.ui, state.menu.mode, state.scenario);
 
                 break;
             }
@@ -1143,7 +1152,13 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
                 .mode = EDITOR_MENU_MODE_OPEN,
                 .menu = editor_menu_players_open(state.scenario)
             };
-        } 
+        } else if (action == "Objectives") {
+            state.menu = (EditorMenu) {
+                .type = EDITOR_MENU_TYPE_OBJECTIVE,
+                .mode = EDITOR_MENU_MODE_OPEN,
+                .menu = editor_menu_objective_open(state.scenario)
+            };
+        }
     } else if (column == "Tool") {
         for (uint32_t index = 1; index < TOOLBAR_OPTIONS[2].size(); index++) {
             if (action == TOOLBAR_OPTIONS[2][index]) {
@@ -1670,7 +1685,7 @@ int editor_tool_get_scroll_max() {
     }
     if (state.tool == EDITOR_TOOL_TRIGGERS && !state.scenario->triggers.empty()) {
         const Trigger& trigger = state.scenario->triggers[state.tool_value];
-        int count = 4 + (int)trigger.conditions.size() + (int)trigger.effects.size();
+        int count = 4 + (int)trigger.conditions.size() + (int)trigger.actions.size();
         return std::max(0, count - ((int)TOOL_TRIGGERS_VISIBLE_ROW_COUNT - 1));
     }
     return 0;

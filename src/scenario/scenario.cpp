@@ -232,10 +232,10 @@ bool scenario_save_file(const Scenario* scenario, const char* path) {
         fwrite(&conditions_size, 1, sizeof(size_t), file);
         fwrite(&trigger.conditions[0], 1, conditions_size * sizeof(TriggerCondition), file);
 
-        // Effects
-        size_t effects_size = trigger.effects.size();
-        fwrite(&effects_size, 1, sizeof(size_t), file);
-        fwrite(&trigger.effects[0], 1, effects_size * sizeof(TriggerAction), file);
+        // Actions
+        size_t actions_size = trigger.actions.size();
+        fwrite(&actions_size, 1, sizeof(size_t), file);
+        fwrite(&trigger.actions[0], 1, actions_size * sizeof(TriggerAction), file);
     }
 
     // Objectives
@@ -343,11 +343,11 @@ Scenario* scenario_open_file(const char* path) {
         trigger.conditions = std::vector<TriggerCondition>(conditions_size);
         fread(&trigger.conditions[0], 1, conditions_size * sizeof(TriggerCondition), file);
 
-        // Effects
-        size_t effects_size;
-        fread(&effects_size, 1, sizeof(size_t), file);
-        trigger.effects = std::vector<TriggerAction>(effects_size);
-        fread(&trigger.effects[0], 1, effects_size * sizeof(TriggerAction), file);
+        // Actions
+        size_t actions_size;
+        fread(&actions_size, 1, sizeof(size_t), file);
+        trigger.actions = std::vector<TriggerAction>(actions_size);
+        fread(&trigger.actions[0], 1, actions_size * sizeof(TriggerAction), file);
     }
 
     // Objectives
