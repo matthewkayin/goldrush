@@ -231,6 +231,7 @@ bool match_shell_does_player_meet_hotkey_requirements(const MatchState& state, I
 bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyButtonInfo& info);
 
 // Triggers
+uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type);
 bool match_shell_is_trigger_condition_met(const MatchShellState* state, const TriggerCondition& condition);
 bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const std::vector<TriggerCondition>& conditions);
 bool match_shell_trigger_action_instance_should_continue(const MatchShellState* state, const TriggerActionInstance& instance);

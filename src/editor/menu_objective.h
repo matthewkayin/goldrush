@@ -10,6 +10,7 @@
 struct EditorMenuObjective {
     uint32_t objective_index;
     std::vector<std::string> text_values;
+    std::vector<std::string> objective_counter_type_dropdown_items;
     int scroll;
 };
 

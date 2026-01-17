@@ -2184,20 +2184,27 @@ bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyB
 
 // TRIGGERS
 
+uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type) {
+    uint32_t count = 0;
+
+    for (const Entity& entity : state->match_state.entities) {
+        if (entity.type != entity_type ||
+                entity.player_id != player_id ||
+                entity.health == 0 ||
+                entity.mode == MODE_BUILDING_IN_PROGRESS) {
+            continue;
+        }
+        count++;
+    }
+
+    return count;
+}
+
 bool match_shell_is_trigger_condition_met(const MatchShellState* state, const TriggerCondition& condition) {
     switch (condition.type) {
         case TRIGGER_CONDITION_TYPE_ENTITY_COUNT: {
-            uint32_t count = 0;
-            for (const Entity& entity : state->match_state.entities) {
-                if (entity.type != condition.entity_count.entity_type) {
-                    continue;
-                }
-                if (entity_is_building(entity.type) && entity.mode != MODE_BUILDING_FINISHED) {
-                    continue;
-                }
-                count++;
-            }
-
+            uint32_t count = 
+                match_shell_get_player_entity_count(state, network_get_player_id(), condition.entity_count.entity_type);
             return count >= condition.entity_count.entity_count;
             break;
         }
@@ -4172,9 +4179,25 @@ void match_shell_render(const MatchShellState* state) {
             const Objective& objective = state->scenario_objectives[objective_index];
             render_sprite_frame(SPRITE_UI_OBJECTIVE_CHECKBOX, ivec2((int)objective.is_finished, 0), objectives_text_pos, RENDER_SPRITE_NO_CULL, 0);
 
+            // Determine objective text
+            char objective_text[128];
+            char* objective_text_ptr = objective_text;
+            objective_text_ptr += sprintf(objective_text_ptr, "%s", objective.description);
+            if (!objective.is_finished && objective.counter_type != OBJECTIVE_COUNTER_TYPE_NONE) {
+                uint32_t counter_value = 0; 
+                if (objective.counter_type == OBJECTIVE_COUNTER_TYPE_ENTITY) {
+                    counter_value = match_shell_get_player_entity_count(state, network_get_player_id(), (EntityType)objective.counter_value);
+                } else if (objective.counter_type == OBJECTIVE_COUNTER_TYPE_VARIABLE) {
+                    counter_value = objective.counter_value;
+                }
+
+                objective_text_ptr += sprintf(objective_text_ptr, " (%u/%u)", counter_value, objective.counter_target);
+            }
+
+            // Render objective text
             ivec2 text_pos = objectives_text_pos + ivec2(checkbox_sprite_info.frame_width + 2, 1);
-            render_text(FONT_HACK_SHADOW, objective.description, text_pos + ivec2(1, 1));
-            render_text(FONT_HACK_GOLD, objective.description, text_pos);
+            render_text(FONT_HACK_SHADOW, objective_text, text_pos + ivec2(1, 1));
+            render_text(FONT_HACK_GOLD, objective_text, text_pos);
 
             objectives_text_pos.y += checkbox_sprite_info.frame_height + 4;
         }
