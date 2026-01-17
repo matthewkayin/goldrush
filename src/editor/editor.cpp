@@ -556,7 +556,7 @@ void editor_update() {
                         });
 
                         scrollable_ui_funcs.push_back([]() {
-                            ui_text(state.ui, FONT_HACK_GOLD, "Effects");
+                            ui_text(state.ui, FONT_HACK_GOLD, "Actions");
                         });
                         
                         for (uint32_t action_index = 0; action_index < trigger.actions.size(); action_index++) {
@@ -588,7 +588,7 @@ void editor_update() {
                         }
 
                         scrollable_ui_funcs.push_back([]() {
-                            if (ui_slim_button(state.ui, "+ Effect")) {
+                            if (ui_slim_button(state.ui, "+ Action")) {
                                 editor_do_action((EditorAction) {
                                     .type = EDITOR_ACTION_ADD_TRIGGER_ACTION,
                                     .data = (EditorActionAddTriggerAction) {
