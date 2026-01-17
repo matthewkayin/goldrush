@@ -517,7 +517,7 @@ void editor_update() {
                             const TriggerCondition& condition = trigger.conditions[condition_index];
 
                             scrollable_ui_funcs.push_back([condition, condition_index]() {
-                                ui_begin_row(state.ui, ivec2(0, 0), 4);
+                                ui_begin_row(state.ui, ivec2(0, 0), 2);
                                     char condition_str[128];
                                     trigger_condition_sprintf(condition_str, condition);
                                     ui_slim_button(state.ui, condition_str, true);
@@ -559,12 +559,35 @@ void editor_update() {
                             ui_text(state.ui, FONT_HACK_GOLD, "Actions");
                         });
                         
+                        const size_t actions_size = trigger.actions.size();
+                        const uint32_t trigger_index = state.tool_value;
                         for (uint32_t action_index = 0; action_index < trigger.actions.size(); action_index++) {
                             const TriggerAction& action = trigger.actions[action_index];
 
-                            scrollable_ui_funcs.push_back([action, action_index]() {
-                                ui_begin_row(state.ui, ivec2(0, 0), 4);
+                            scrollable_ui_funcs.push_back([trigger_index, &trigger, action, action_index, actions_size]() {
+                                ui_begin_row(state.ui, ivec2(0, 0), 2);
                                     ui_slim_button(state.ui, trigger_action_type_str(action.type), true);
+
+                                    const bool is_shift_pressed = input_is_action_pressed(INPUT_ACTION_SHIFT);
+                                    const bool is_disabled = is_shift_pressed
+                                        ? action_index == actions_size - 1
+                                        : action_index == 0;
+                                    if (ui_sprite_button(state.ui, is_shift_pressed ? SPRITE_UI_EDITOR_DOWN : SPRITE_UI_EDITOR_UP, is_disabled, false)) {
+                                        editor_do_action((EditorAction) {
+                                            .type = EDITOR_ACTION_SWAP_TRIGGER_ACTIONS,
+                                            .data = (EditorActionSwapTriggerActions) {
+                                                .trigger_index = trigger_index,
+                                                .index_a = action_index,
+                                                .index_b = is_shift_pressed 
+                                                    ? action_index + 1 
+                                                    : action_index - 1,
+                                                .action_a = action,
+                                                .action_b = is_shift_pressed 
+                                                    ? trigger.actions[action_index + 1] 
+                                                    : trigger.actions[action_index - 1]
+                                            }
+                                        });
+                                    }
 
                                     if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, false, false)) {
                                         state.menu = (EditorMenu) {

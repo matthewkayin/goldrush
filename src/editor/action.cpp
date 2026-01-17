@@ -244,6 +244,19 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
 
             break;
         }
+        case EDITOR_ACTION_SWAP_TRIGGER_ACTIONS: {
+            const EditorActionSwapTriggerActions& action_data = std::get<EditorActionSwapTriggerActions>(action.data);
+
+            scenario->triggers[action_data.trigger_index].actions[action_data.index_a] = 
+                mode == EDITOR_ACTION_MODE_DO
+                    ? action_data.action_b
+                    : action_data.action_a;
+            scenario->triggers[action_data.trigger_index].actions[action_data.index_b] =
+                mode == EDITOR_ACTION_MODE_DO
+                    ? action_data.action_a
+                    : action_data.action_b;
+            break;
+        }
     }
 }
 

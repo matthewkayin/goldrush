@@ -507,6 +507,22 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_UI_EDITOR_DOWN, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = {
+            .path = "ui/editor_down.png",
+            .hframes = 2,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_EDITOR_UP, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = {
+            .path = "ui/editor_up.png",
+            .hframes = 2,
+            .vframes = 1
+        }
+    }},
 #endif
     { SPRITE_UI_GOLD_ICON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
