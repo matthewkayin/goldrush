@@ -9,6 +9,14 @@ static const Rect MENU_RECT = (Rect) {
     .h = 256
 };
 
+static const UiSliderParams ACTION_WAIT_SECONDS_SLIDER_PARAMS = (UiSliderParams) {
+    .display = UI_SLIDER_DISPLAY_RAW_VALUE,
+    .size = UI_SLIDER_SIZE_NORMAL,
+    .min = 1,
+    .max = 60,
+    .step = 1
+};
+
 void editor_menu_trigger_action_set_action_type(EditorMenuTriggerAction& menu, TriggerActionType action_type);
 
 EditorMenuTriggerAction editor_menu_trigger_action_open(const Scenario* scenario, const TriggerAction& action, uint32_t action_index) {
@@ -59,6 +67,10 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
                 editor_menu_dropdown(ui, "Objective:", &menu.action.finish_objective.objective_index, menu.objective_items, MENU_RECT);
                 break;
             }
+            case TRIGGER_ACTION_TYPE_WAIT: {
+                editor_menu_slider(ui, "Seconds:", &menu.action.wait.seconds, ACTION_WAIT_SECONDS_SLIDER_PARAMS, MENU_RECT);
+                break;
+            }
             case TRIGGER_ACTION_TYPE_COUNT: {
                 GOLD_ASSERT(false);
                 break;
@@ -90,6 +102,10 @@ void editor_menu_trigger_action_set_action_type(EditorMenuTriggerAction& menu, T
         }
         case TRIGGER_ACTION_TYPE_FINISH_OBJECTIVE: {
             action.finish_objective.objective_index = 0;
+            break;
+        }
+        case TRIGGER_ACTION_TYPE_WAIT: {
+            action.wait.seconds = 1;
             break;
         }
         case TRIGGER_ACTION_TYPE_COUNT: 

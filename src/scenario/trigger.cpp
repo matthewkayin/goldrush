@@ -18,6 +18,8 @@ const char* trigger_action_type_str(TriggerActionType type) {
             return "Add Objective";
         case TRIGGER_ACTION_TYPE_FINISH_OBJECTIVE:
             return "Finish Objective";
+        case TRIGGER_ACTION_TYPE_WAIT:
+            return "Wait";
         case TRIGGER_ACTION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";

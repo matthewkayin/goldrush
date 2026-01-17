@@ -1227,10 +1227,32 @@ void match_shell_update(MatchShellState* state) {
         }
 
         if (match_shell_are_trigger_conditions_met(state, trigger.conditions)) {
-            for (const TriggerAction& action : trigger.actions) {
-                match_shell_do_trigger_action(state, action);
-            }
+            state->trigger_action_instances.push_back((TriggerActionInstance) {
+                .trigger_index = trigger_index,
+                .action_index = 0,
+                .result = (TriggerActionResult) {
+                    .type = TRIGGER_ACTION_RESULT_CONTINUE
+                }
+            });
             trigger.is_active = false;
+        }
+    }
+
+    // Trigger actions
+    {
+        uint32_t instance_index = 0;
+        while (instance_index < state->trigger_action_instances.size()) {
+            TriggerActionInstance& instance = state->trigger_action_instances[instance_index];
+            while (match_shell_trigger_action_instance_should_continue(state, instance)) {
+                const TriggerAction& action = state->scenario_triggers[instance.trigger_index].actions[instance.action_index];
+                instance.result = match_shell_do_trigger_action(state, action);
+                instance.action_index++;
+            }
+            if (match_shell_trigger_action_instance_is_finished(state, instance)) {
+                state->trigger_action_instances.erase(state->trigger_action_instances.begin() + instance_index);
+            } else {
+                instance_index++;
+            }
         }
     }
 
@@ -2195,22 +2217,56 @@ bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const 
     return true;
 }
 
-void match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& action) {
+bool match_shell_trigger_action_instance_should_continue(const MatchShellState* state, const TriggerActionInstance& instance) {
+    if (match_shell_trigger_action_instance_is_finished(state, instance)) {
+        return false;
+    }
+    switch (instance.result.type) {
+        case TRIGGER_ACTION_RESULT_CONTINUE: 
+            return true;
+        case TRIGGER_ACTION_RESULT_WAIT:
+            return state->match_timer >= instance.result.wait.resume_time;
+    }
+}
+
+bool match_shell_trigger_action_instance_is_finished(const MatchShellState* state, const TriggerActionInstance& instance) {
+    return instance.action_index >= state->scenario_triggers[instance.trigger_index].actions.size();
+}
+
+TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& action) {
     switch (action.type) {
         case TRIGGER_ACTION_TYPE_HINT: {
             match_shell_add_chat_message(state, CHAT_PLAYER_HINT, action.hint.message);
-            break;
+            return (TriggerActionResult) {
+                .type = TRIGGER_ACTION_RESULT_CONTINUE
+            };
         }
         case TRIGGER_ACTION_TYPE_ADD_OBJECTIVE: {
             state->current_objective_indices.push_back(action.add_objective.objective_index);
-            break;
+            return (TriggerActionResult) {
+                .type = TRIGGER_ACTION_RESULT_CONTINUE
+            };
         }
         case TRIGGER_ACTION_TYPE_FINISH_OBJECTIVE: {
             state->scenario_objectives[action.finish_objective.objective_index].is_finished = true;
-            break;
+            return (TriggerActionResult) {
+                .type = TRIGGER_ACTION_RESULT_CONTINUE
+            };
         }
-        case TRIGGER_ACTION_TYPE_COUNT:
+        case TRIGGER_ACTION_TYPE_WAIT: {
+            return (TriggerActionResult) {
+                .type = TRIGGER_ACTION_RESULT_WAIT,
+                .wait = (TriggerActionResultWait) {
+                    .resume_time = state->match_timer + (60U * action.wait.seconds)
+                }
+            };
+        }
+        case TRIGGER_ACTION_TYPE_COUNT: {
             GOLD_ASSERT(false);
+            return (TriggerActionResult) {
+                .type = TRIGGER_ACTION_RESULT_CONTINUE
+            };
+        }
     }
 }
 

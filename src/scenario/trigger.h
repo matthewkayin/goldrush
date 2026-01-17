@@ -34,6 +34,7 @@ enum TriggerActionType {
     TRIGGER_ACTION_TYPE_HINT,
     TRIGGER_ACTION_TYPE_ADD_OBJECTIVE,
     TRIGGER_ACTION_TYPE_FINISH_OBJECTIVE,
+    TRIGGER_ACTION_TYPE_WAIT,
     TRIGGER_ACTION_TYPE_COUNT
 };
 
@@ -50,12 +51,17 @@ struct TriggerActionFinishObjective {
     bool is_finished;
 };
 
+struct TriggerActionWait {
+    uint32_t seconds;
+};
+
 struct TriggerAction {
     TriggerActionType type;
     union {
         TriggerActionHint hint;
         TriggerActionAddObjective add_objective;
         TriggerActionFinishObjective finish_objective;
+        TriggerActionWait wait;
     };
 };
 STATIC_ASSERT(sizeof(TriggerAction) == 68ULL);

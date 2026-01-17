@@ -76,6 +76,28 @@ enum FireCellRender {
     FIRE_CELL_RENDER_ABOVE
 };
 
+enum TriggerActionResultType {
+    TRIGGER_ACTION_RESULT_CONTINUE,
+    TRIGGER_ACTION_RESULT_WAIT
+};
+
+struct TriggerActionResultWait {
+    uint32_t resume_time;
+};
+
+struct TriggerActionResult {
+    TriggerActionResultType type;
+    union {
+        TriggerActionResultWait wait;
+    };
+};
+
+struct TriggerActionInstance {
+    uint32_t trigger_index;
+    uint32_t action_index;
+    TriggerActionResult result;
+};
+
 #ifdef GOLD_DEBUG
     enum DebugFog {
         DEBUG_FOG_ENABLED,
@@ -150,6 +172,7 @@ struct MatchShellState {
     std::vector<Trigger> scenario_triggers;
     bool scenario_allowed_entities[ENTITY_TYPE_COUNT];
     uint32_t scenario_allowed_upgrades;
+    std::vector<TriggerActionInstance> trigger_action_instances;
 
     // Scenario objective
     std::vector<Objective> scenario_objectives;
@@ -210,7 +233,9 @@ bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyB
 // Triggers
 bool match_shell_is_trigger_condition_met(const MatchShellState* state, const TriggerCondition& condition);
 bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const std::vector<TriggerCondition>& conditions);
-void match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& effect);
+bool match_shell_trigger_action_instance_should_continue(const MatchShellState* state, const TriggerActionInstance& instance);
+bool match_shell_trigger_action_instance_is_finished(const MatchShellState* state, const TriggerActionInstance& instance);
+TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& effect);
 
 // State queries
 bool match_shell_is_mouse_in_ui();
