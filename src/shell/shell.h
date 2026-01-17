@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include "shell/chat.h"
 #include "shell/replay.h"
 #include "match/state.h"
 #include "core/ui.h"
@@ -62,12 +63,6 @@ struct Alert {
     ivec2 cell;
     int cell_size;
     uint32_t timer;
-};
-
-struct ChatMessage {
-    std::string message;
-    uint32_t timer;
-    uint8_t player_id;
 };
 
 enum FireCellRender {
@@ -237,6 +232,8 @@ bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const 
 bool match_shell_trigger_action_instance_should_continue(const MatchShellState* state, const TriggerActionInstance& instance);
 bool match_shell_trigger_action_instance_is_finished(const MatchShellState* state, const TriggerActionInstance& instance);
 TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& effect);
+FontName match_shell_trigger_action_chat_get_prefix_font(TriggerActionChatPrefixType type);
+
 
 // State queries
 bool match_shell_is_mouse_in_ui();
@@ -264,7 +261,9 @@ bool match_shell_is_cell_rect_revealed(const MatchShellState* state, ivec2 cell,
 int match_shell_get_fog(const MatchShellState* state, ivec2 cell);
 
 // Chat
-void match_shell_add_chat_message(MatchShellState* state, uint8_t player_id, const char* message);
+void match_shell_get_player_prefix(const MatchShellState* state, uint8_t player_id, char* prefix);
+FontName match_shell_get_player_font(uint8_t player_id);
+void match_shell_add_chat_message(MatchShellState* state, FontName prefix_font, const char* prefix, const char* message, uint32_t duration);
 void match_shell_handle_player_disconnect(MatchShellState* state, uint8_t player_id);
 
 // Status

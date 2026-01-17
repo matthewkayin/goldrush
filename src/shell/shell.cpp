@@ -27,11 +27,10 @@ static const Rect DESYNC_MENU_RECT = (Rect) {
 
 // Chat
 static const size_t CHAT_MAX_LENGTH = 64;
-static const uint32_t CHAT_MESSAGE_DURATION = 180;
+static const uint32_t CHAT_MESSAGE_DURATION = 3U * 60U;
 static const uint32_t CHAT_MAX_LINES = 8;
 static const uint32_t CHAT_CURSOR_BLINK_DURATION = 30;
-static const uint8_t CHAT_PLAYER_HINT = MAX_PLAYERS + 1;
-static const uint32_t CHAT_MESSAGE_HINT_DURATION = 60U * 60U * 15U;
+static const uint32_t CHAT_MESSAGE_HINT_DURATION = 10U * 60U;
 
 // UI panel rects
 static const Rect BOTTOM_PANEL_RECT = (Rect) {
@@ -528,7 +527,9 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
             break;
         }
         case NETWORK_EVENT_CHAT: {
-            match_shell_add_chat_message(state, event.chat.player_id, event.chat.message);
+            char prefix[SHELL_CHAT_PREFIX_BUFFER_SIZE];
+            match_shell_get_player_prefix(state, event.chat.player_id, prefix);
+            match_shell_add_chat_message(state, match_shell_get_player_font(event.chat.player_id), prefix, event.chat.message, CHAT_MESSAGE_DURATION);
             break;
         }
         case NETWORK_EVENT_PLAYER_DISCONNECTED: {
@@ -963,7 +964,9 @@ void match_shell_update(MatchShellState* state) {
 
                 // Check for bot surrender
                 if (bot_should_surrender(state->match_state, state->bots[player_id], state->match_timer)) {
-                    match_shell_add_chat_message(state, player_id, "gg");
+                    char prefix[SHELL_CHAT_PREFIX_BUFFER_SIZE];
+                    match_shell_get_player_prefix(state, player_id, prefix);
+                    match_shell_add_chat_message(state, match_shell_get_player_font(player_id), prefix, "gg", CHAT_MESSAGE_DURATION);
                     match_shell_handle_player_disconnect(state, player_id);
                     // handle_player_disconnect should have set the bot to inactive for us
                     GOLD_ASSERT(!state->match_state.players[player_id].active);
@@ -1046,7 +1049,7 @@ void match_shell_update(MatchShellState* state) {
             uint32_t turn_index = state->match_timer / TURN_DURATION;
             for (const ReplayChatMessage& message : state->replay_chatlog) {
                 if (message.turn == turn_index) {
-                    match_shell_add_chat_message(state, message.player_id, message.message);
+                    match_shell_add_chat_message(state, message.chat.prefix_font, message.chat.prefix, message.chat.message, message.chat.timer);
                 }
             }
         }
@@ -1466,7 +1469,7 @@ void match_shell_update(MatchShellState* state) {
 
                 char defeat_message[128];
                 sprintf(defeat_message, "%s has been defeated.", state->match_state.players[player_id].name);
-                match_shell_add_chat_message(state, PLAYER_NONE, defeat_message);
+                match_shell_add_chat_message(state, FONT_HACK_WHITE, "", defeat_message, CHAT_MESSAGE_DURATION);
 
                 if (player_id == network_get_player_id()) {
                     state->mode = MATCH_SHELL_MODE_MATCH_OVER_DEFEAT;
@@ -1517,7 +1520,10 @@ void match_shell_handle_input(MatchShellState* state) {
                 }
             #endif
             network_send_chat(state->chat_message.c_str());
-            match_shell_add_chat_message(state, network_get_player_id(), state->chat_message.c_str());
+
+            char prefix[SHELL_CHAT_PREFIX_BUFFER_SIZE];
+            match_shell_get_player_prefix(state, network_get_player_id(), prefix);
+            match_shell_add_chat_message(state, match_shell_get_player_font(network_get_player_id()), prefix, state->chat_message.c_str(), CHAT_MESSAGE_DURATION);
         }
         sound_play(SOUND_UI_CLICK);
         input_stop_text_input();
@@ -2242,8 +2248,14 @@ bool match_shell_trigger_action_instance_is_finished(const MatchShellState* stat
 
 TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& action) {
     switch (action.type) {
-        case TRIGGER_ACTION_TYPE_HINT: {
-            match_shell_add_chat_message(state, CHAT_PLAYER_HINT, action.hint.message);
+        case TRIGGER_ACTION_TYPE_CHAT: {
+            match_shell_add_chat_message(state, 
+                match_shell_trigger_action_chat_get_prefix_font(action.chat.prefix_type), 
+                action.chat.prefix, 
+                action.chat.message, 
+                strcmp(action.chat.prefix, "Hint:") == 0
+                    ? CHAT_MESSAGE_HINT_DURATION 
+                    : CHAT_MESSAGE_DURATION);
             return (TriggerActionResult) {
                 .type = TRIGGER_ACTION_RESULT_CONTINUE
             };
@@ -2256,6 +2268,12 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
         }
         case TRIGGER_ACTION_TYPE_FINISH_OBJECTIVE: {
             state->scenario_objectives[action.finish_objective.objective_index].is_finished = true;
+            return (TriggerActionResult) {
+                .type = TRIGGER_ACTION_RESULT_CONTINUE
+            };
+        }
+        case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES: {
+            state->current_objective_indices.clear();
             return (TriggerActionResult) {
                 .type = TRIGGER_ACTION_RESULT_CONTINUE
             };
@@ -2274,6 +2292,20 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
                 .type = TRIGGER_ACTION_RESULT_CONTINUE
             };
         }
+    }
+}
+
+FontName match_shell_trigger_action_chat_get_prefix_font(TriggerActionChatPrefixType type) {
+    switch (type) {
+        case TRIGGER_ACTION_CHAT_PREFIX_TYPE_NONE:
+            return FONT_HACK_WHITE;
+        case TRIGGER_ACTION_CHAT_PREFIX_TYPE_GOLD:
+            return FONT_HACK_GOLD;
+        case TRIGGER_ACTION_CHAT_PREFIX_TYPE_BLUE:
+            return FONT_HACK_PLAYER0;
+        case TRIGGER_ACTION_CHAT_PREFIX_TYPE_COUNT:
+            GOLD_ASSERT(false);
+            return FONT_HACK_WHITE;
     }
 }
 
@@ -2624,26 +2656,37 @@ int match_shell_get_fog(const MatchShellState* state, ivec2 cell) {
 
 // CHAT
 
-void match_shell_add_chat_message(MatchShellState* state, uint8_t player_id, const char* message) {
-    ChatMessage chat_message = (ChatMessage) {
-        .message = std::string(message),
-        .timer = player_id == CHAT_PLAYER_HINT ? CHAT_MESSAGE_DURATION : CHAT_MESSAGE_HINT_DURATION,
-        .player_id = player_id
-    };
+void match_shell_get_player_prefix(const MatchShellState* state, uint8_t player_id, char* prefix) {
+    sprintf(prefix, "%s:", state->match_state.players[player_id].name);
+}
+
+FontName match_shell_get_player_font(uint8_t player_id) {
+    return (FontName)(FONT_HACK_PLAYER0 + player_id);
+}
+
+void match_shell_add_chat_message(MatchShellState* state, FontName prefix_font, const char* prefix, const char* message, uint32_t duration) {
+    ChatMessage chat_message;
+    chat_message.prefix_font = prefix_font;
+    chat_message.timer = duration;
+    strncpy(chat_message.prefix, prefix, SHELL_CHAT_PREFIX_BUFFER_SIZE);
+    strncpy(chat_message.message, message, SHELL_CHAT_MESSAGE_BUFFER_SIZE);
     if (state->chat.size() == CHAT_MAX_LINES) {
         state->chat.erase(state->chat.begin());
     }
     state->chat.push_back(chat_message);
 
     if (!state->replay_mode) {
-        replay_file_write_chat(state->replay_file, player_id, state->match_timer / TURN_DURATION, message);
+        replay_file_write_chat(state->replay_file, (ReplayChatMessage) {
+            .turn = state->match_timer / TURN_DURATION,
+            .chat = chat_message
+        });
     }
 }
 
 void match_shell_handle_player_disconnect(MatchShellState* state, uint8_t player_id) {
     char message[128];
     sprintf(message, "%s left the game.", network_get_player(player_id).name);
-    match_shell_add_chat_message(state, PLAYER_NONE, message);
+    match_shell_add_chat_message(state, FONT_HACK_WHITE, "", message, CHAT_MESSAGE_DURATION);
 
     // Show the victory banner to other players when this player leaves,
     // but only if the player was still active. If they are not active, it means they've 
@@ -3716,21 +3759,13 @@ void match_shell_render(const MatchShellState* state) {
     for (uint32_t chat_index = 0; chat_index < state->chat.size(); chat_index++) {
         const ChatMessage& message = state->chat[state->chat.size() - chat_index - 1];
         ivec2 message_pos = CHAT_PROMPT_POSITION + ivec2(0, -((chat_index + 1) * 16));
-        if (message.player_id == CHAT_PLAYER_HINT) {
-            const char* hint_text = "Hint: ";
-            render_text(FONT_HACK_SHADOW, hint_text, message_pos + ivec2(1, 1));
-            render_text(FONT_HACK_PLAYER0, hint_text, message_pos);
-            message_pos.x += render_get_text_size(FONT_HACK_WHITE, hint_text).x;
-        } else if (message.player_id != PLAYER_NONE) {
-            const MatchPlayer& player = state->match_state.players[message.player_id];
-            char player_text[40];
-            sprintf(player_text, "%s: ", player.name);
-            render_text(FONT_HACK_SHADOW, player_text, message_pos + ivec2(1, 1));
-            render_text((FontName)(FONT_HACK_PLAYER0 + player.recolor_id), player_text, message_pos);
-            message_pos.x += render_get_text_size(FONT_HACK_WHITE, player_text).x;
+        if (strlen(message.prefix) != 0) {
+            render_text(FONT_HACK_SHADOW, message.prefix, message_pos + ivec2(1, 1));
+            render_text(message.prefix_font, message.prefix, message_pos);
+            message_pos.x += render_get_text_size(FONT_HACK_WHITE, message.prefix).x + render_get_text_size(FONT_HACK_WHITE, " ").x;
         }
-        render_text(FONT_HACK_SHADOW, message.message.c_str(), message_pos + ivec2(1, 1));
-        render_text(FONT_HACK_WHITE, message.message.c_str(), message_pos);
+        render_text(FONT_HACK_SHADOW, message.message, message_pos + ivec2(1, 1));
+        render_text(FONT_HACK_WHITE, message.message, message_pos);
     }
     if (input_is_text_input_active()) {
         char prompt_str[128];

@@ -5,7 +5,8 @@
 #include <vector>
 
 #define TRIGGER_NAME_BUFFER_LENGTH 32
-#define TRIGGER_ACTION_HINT_MESSAGE_BUFFER_LENGTH 64
+#define TRIGGER_ACTION_CHAT_PREFIX_BUFFER_LENGTH MAX_USERNAME_LENGTH
+#define TRIGGER_ACTION_CHAT_MESSAGE_BUFFER_LENGTH 64
 #define TRIGGER_EFFECT_COUNT_MAX 16
 
 // Condition
@@ -31,15 +32,25 @@ STATIC_ASSERT(sizeof(TriggerCondition) == 12ULL);
 // Action
 
 enum TriggerActionType {
-    TRIGGER_ACTION_TYPE_HINT,
+    TRIGGER_ACTION_TYPE_CHAT,
     TRIGGER_ACTION_TYPE_ADD_OBJECTIVE,
     TRIGGER_ACTION_TYPE_FINISH_OBJECTIVE,
+    TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES,
     TRIGGER_ACTION_TYPE_WAIT,
     TRIGGER_ACTION_TYPE_COUNT
 };
 
-struct TriggerActionHint {
-    char message[TRIGGER_ACTION_HINT_MESSAGE_BUFFER_LENGTH];
+enum TriggerActionChatPrefixType {
+    TRIGGER_ACTION_CHAT_PREFIX_TYPE_NONE,
+    TRIGGER_ACTION_CHAT_PREFIX_TYPE_GOLD,
+    TRIGGER_ACTION_CHAT_PREFIX_TYPE_BLUE,
+    TRIGGER_ACTION_CHAT_PREFIX_TYPE_COUNT
+};
+
+struct TriggerActionChat {
+    TriggerActionChatPrefixType prefix_type;
+    char prefix[TRIGGER_ACTION_CHAT_PREFIX_BUFFER_LENGTH];
+    char message[TRIGGER_ACTION_CHAT_MESSAGE_BUFFER_LENGTH];
 };
 
 struct TriggerActionAddObjective {
@@ -58,13 +69,13 @@ struct TriggerActionWait {
 struct TriggerAction {
     TriggerActionType type;
     union {
-        TriggerActionHint hint;
+        TriggerActionChat chat;
         TriggerActionAddObjective add_objective;
         TriggerActionFinishObjective finish_objective;
         TriggerActionWait wait;
     };
 };
-STATIC_ASSERT(sizeof(TriggerAction) == 68ULL);
+STATIC_ASSERT(sizeof(TriggerAction) == 104ULL);
 
 struct Trigger {
     bool is_active;
@@ -75,4 +86,7 @@ struct Trigger {
 
 const char* trigger_condition_type_str(TriggerConditionType type);
 const char* trigger_action_type_str(TriggerActionType type);
+const char* trigger_action_chat_prefix_type_str(TriggerActionChatPrefixType type);
 int trigger_condition_sprintf(char* str_ptr, const TriggerCondition& condition);
+
+TriggerAction trigger_action_init();

@@ -215,11 +215,8 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
             const EditorActionAddTriggerAction& action_data = std::get<EditorActionAddTriggerAction>(action.data);
 
             if (mode == EDITOR_ACTION_MODE_DO) {
-                TriggerAction new_effect;
-                new_effect.type = TRIGGER_ACTION_TYPE_HINT;
-                sprintf(new_effect.hint.message, "");
-
-                scenario->triggers[action_data.trigger_index].actions.push_back(new_effect);
+                TriggerAction new_action = trigger_action_init();
+                scenario->triggers[action_data.trigger_index].actions.push_back(new_action);
             } else {
                 scenario->triggers[action_data.trigger_index].actions.pop_back();
             }

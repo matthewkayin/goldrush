@@ -34,8 +34,13 @@ EditorMenuTriggerAction editor_menu_trigger_action_open(const Scenario* scenario
         menu.objective_items.push_back(std::string(text));
     }
 
-    if (action.type == TRIGGER_ACTION_TYPE_HINT) {
-        menu.hint_value = std::string(action.hint.message);
+    for (uint32_t message_type = 0; message_type < TRIGGER_ACTION_CHAT_PREFIX_TYPE_COUNT; message_type++) {
+        menu.message_type_items.push_back(trigger_action_chat_prefix_type_str((TriggerActionChatPrefixType)message_type));
+    }
+
+    if (action.type == TRIGGER_ACTION_TYPE_CHAT) {
+        menu.chat_prefix_value = std::string(action.chat.prefix);
+        menu.chat_message_value = std::string(action.chat.message);
     }
 
     return menu;
@@ -48,14 +53,22 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
         uint32_t action_type = menu.action.type;
         if (editor_menu_dropdown(ui, "Action Type:", &action_type, menu.action_type_items, MENU_RECT)) {
             editor_menu_trigger_action_set_action_type(menu, (TriggerActionType)action_type);
-            if (menu.action.type == TRIGGER_ACTION_TYPE_HINT) {
-                menu.hint_value = std::string(menu.action.hint.message);
+            if (menu.action.type == TRIGGER_ACTION_TYPE_CHAT) {
+                menu.chat_prefix_value = std::string(menu.action.chat.prefix);
+                menu.chat_message_value = std::string(menu.action.chat.message);
             }
         }
 
         switch (menu.action.type) {
-            case TRIGGER_ACTION_TYPE_HINT: {
-                ui_text_input(ui, "Message: ", ivec2(MENU_RECT.w - 32, 24), &menu.hint_value, TRIGGER_ACTION_HINT_MESSAGE_BUFFER_LENGTH - 1);
+            case TRIGGER_ACTION_TYPE_CHAT: {
+                uint32_t prefix_type = menu.action.chat.prefix_type;
+                if (editor_menu_dropdown(ui, "Prefix Type:", &prefix_type, menu.message_type_items, MENU_RECT)) {
+                    menu.action.chat.prefix_type = (TriggerActionChatPrefixType)prefix_type;
+                }
+                if (menu.action.chat.prefix_type != TRIGGER_ACTION_CHAT_PREFIX_TYPE_NONE) {
+                    ui_text_input(ui, "Prefix: ", ivec2(MENU_RECT.w - 32, 24), &menu.chat_prefix_value, TRIGGER_ACTION_CHAT_PREFIX_BUFFER_LENGTH - 1);
+                }
+                ui_text_input(ui, "Message: ", ivec2(MENU_RECT.w - 32, 24), &menu.chat_message_value, TRIGGER_ACTION_CHAT_MESSAGE_BUFFER_LENGTH - 1);
 
                 break;
             }
@@ -71,6 +84,8 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
                 editor_menu_slider(ui, "Seconds:", &menu.action.wait.seconds, ACTION_WAIT_SECONDS_SLIDER_PARAMS, MENU_RECT);
                 break;
             }
+            case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES:
+                break;
             case TRIGGER_ACTION_TYPE_COUNT: {
                 GOLD_ASSERT(false);
                 break;
@@ -81,8 +96,13 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
     editor_menu_back_save_buttons(ui, MENU_RECT, mode);
 
     if (mode == EDITOR_MENU_MODE_SUBMIT) {
-        if (menu.action.type == TRIGGER_ACTION_TYPE_HINT) {
-            strncpy(menu.action.hint.message, menu.hint_value.c_str(), TRIGGER_ACTION_HINT_MESSAGE_BUFFER_LENGTH - 1);
+        if (menu.action.type == TRIGGER_ACTION_TYPE_CHAT) {
+            if (menu.action.chat.prefix_type == TRIGGER_ACTION_CHAT_PREFIX_TYPE_NONE) {
+                sprintf(menu.action.chat.prefix, "");
+            } else {
+                strncpy(menu.action.chat.prefix, menu.chat_prefix_value.c_str(), TRIGGER_ACTION_CHAT_PREFIX_BUFFER_LENGTH - 1);
+            }
+            strncpy(menu.action.chat.message, menu.chat_message_value.c_str(), TRIGGER_ACTION_CHAT_MESSAGE_BUFFER_LENGTH - 1);
         }
     }
 }
@@ -92,8 +112,10 @@ void editor_menu_trigger_action_set_action_type(EditorMenuTriggerAction& menu, T
     action.type = action_type;
 
     switch (action_type) {
-        case TRIGGER_ACTION_TYPE_HINT: {
-            sprintf(action.hint.message, "");
+        case TRIGGER_ACTION_TYPE_CHAT: {
+            action.chat.prefix_type = TRIGGER_ACTION_CHAT_PREFIX_TYPE_NONE;
+            sprintf(action.chat.prefix, "");
+            sprintf(action.chat.message, "");
             break;
         }
         case TRIGGER_ACTION_TYPE_ADD_OBJECTIVE: {
@@ -108,6 +130,8 @@ void editor_menu_trigger_action_set_action_type(EditorMenuTriggerAction& menu, T
             action.wait.seconds = 1;
             break;
         }
+        case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES:
+            break;
         case TRIGGER_ACTION_TYPE_COUNT: 
             GOLD_ASSERT(false);
             break;

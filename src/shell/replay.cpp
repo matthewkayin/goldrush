@@ -94,23 +94,21 @@ void replay_file_write_inputs(FILE* file, uint8_t player_id, const std::vector<M
     fwrite(out_buffer, 1, out_buffer_length, file);
 }
 
-void replay_file_write_chat(FILE* file, uint8_t player_id, uint32_t turn, const char* message) {
+void replay_file_write_chat(FILE* file, const ReplayChatMessage& message) {
     if (file == NULL) {
         return;
     }
 
     // Header
-    uint8_t block_header = REPLAY_BLOCK_TYPE_CHAT + player_id;
+    uint8_t block_header = REPLAY_BLOCK_TYPE_CHAT;
     fwrite(&block_header, 1, sizeof(uint8_t), file);
 
     // Length
-    size_t message_byte_length = strlen(message) + 1;
-    size_t block_length = message_byte_length + sizeof(uint32_t);
+    size_t block_length = sizeof(ReplayChatMessage);
     fwrite(&block_length, 1, sizeof(size_t), file);
 
-    // Content
-    fwrite(&turn, 1, sizeof(uint32_t), file);
-    fwrite(message, 1, message_byte_length, file);
+    // Message
+    fwrite(&message, 1, sizeof(ReplayChatMessage), file);
 }
 
 bool replay_file_read(const char* path, MatchState* state, std::vector<std::vector<MatchInput>>* match_inputs, std::vector<ReplayChatMessage>* match_chatlog) {
@@ -204,16 +202,8 @@ bool replay_file_read(const char* path, MatchState* state, std::vector<std::vect
                 break;
             }
             case REPLAY_BLOCK_TYPE_CHAT: {
-                if (block_player > MAX_PLAYERS) {
-                    log_error("Replay file corruption: Unhandled player id of %u in block type chat.", block_player);
-                    read_successful = false;
-                    break;
-                }
-
                 ReplayChatMessage message;
-                message.player_id = block_player;
-                fread(&message.turn, 1, sizeof(uint32_t), file);
-                fread(message.message, 1, block_length - sizeof(uint32_t), file);
+                fread(&message, 1, sizeof(ReplayChatMessage), file);
 
                 match_chatlog->push_back(message);
 
