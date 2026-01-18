@@ -5,7 +5,7 @@ const char* trigger_condition_type_str(TriggerConditionType type) {
         case TRIGGER_CONDITION_TYPE_ENTITY_COUNT: 
             return "Entity Count";
         case TRIGGER_CONDITION_TYPE_OBJECTIVE_COMPLETE:
-            return "Objective Complete";
+            return "Obj Complete";
         case TRIGGER_CONDITION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
@@ -17,11 +17,11 @@ const char* trigger_action_type_str(TriggerActionType type) {
         case TRIGGER_ACTION_TYPE_CHAT:
             return "Message";
         case TRIGGER_ACTION_TYPE_ADD_OBJECTIVE:
-            return "Add Objective";
+            return "Add Obj";
         case TRIGGER_ACTION_TYPE_COMPLETE_OBJECTIVE:
-            return "Complete Objective";
+            return "Complete Obj";
         case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES:
-            return "Clear Objectives";
+            return "Clear Objs";
         case TRIGGER_ACTION_TYPE_WAIT:
             return "Wait";
         case TRIGGER_ACTION_TYPE_FOG_REVEAL:
@@ -55,7 +55,7 @@ int trigger_condition_sprintf(char* str_ptr, const TriggerCondition& condition) 
             return sprintf(str_ptr, "%u %s", condition.entity_count.entity_count, entity_data.name);
         }
         case TRIGGER_CONDITION_TYPE_OBJECTIVE_COMPLETE: {
-            return sprintf(str_ptr, "Objective %u Complete", condition.objective_complete.objective_index);
+            return sprintf(str_ptr, "Obj %u Complete", condition.objective_complete.objective_index);
         }
         case TRIGGER_CONDITION_TYPE_COUNT:
             GOLD_ASSERT(false);
