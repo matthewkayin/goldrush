@@ -95,7 +95,8 @@ enum EditorTool {
     EDITOR_TOOL_SQUADS,
     EDITOR_TOOL_PLAYER_SPAWN,
     EDITOR_TOOL_TRIGGERS,
-    EDITOR_TOOL_FOG_REVEAL
+    EDITOR_TOOL_FOG_REVEAL,
+    EDITOR_TOOL_ALERT,
 };
 
 struct EditorClipboard {
@@ -221,8 +222,8 @@ uint32_t editor_get_entity_squad(uint32_t entity_index);
 void editor_remove_entity_from_squad(uint32_t squad_index, uint32_t entity_index);
 std::vector<std::string> editor_get_player_name_dropdown_items();
 ivec2 editor_get_player_spawn_camera_offset(ivec2 cell);
+void editor_tool_fog_get_hovered_cell(ivec2* cell, int* cell_size);
 std::vector<ivec2> editor_tool_fog_reveal_get_preview_cells();
-
 std::string editor_get_scenario_folder_path();
 static void SDLCALL editor_save_callback(void* user_data, const char* const* filelist, int filter);
 static void SDLCALL editor_open_callback(void* user_data, const char* const* filelist, int filter);
@@ -479,7 +480,8 @@ void editor_update() {
                 case EDITOR_TOOL_PLAYER_SPAWN:
                     break;
                 case EDITOR_TOOL_TRIGGERS:
-                case EDITOR_TOOL_FOG_REVEAL: {
+                case EDITOR_TOOL_FOG_REVEAL: 
+                case EDITOR_TOOL_ALERT: {
                     // Trigger selection dropdown
                     ui_begin_row(state.ui, ivec2(0, 0), 2);
                         std::vector<std::string> trigger_dropdown_items;
@@ -787,6 +789,8 @@ void editor_update() {
 
                 if (menu.request == EDITOR_MENU_TRIGGER_ACTION_REQUEST_FOG_REVEAL) {
                     editor_set_tool(EDITOR_TOOL_FOG_REVEAL);
+                } else if (menu.request == EDITOR_MENU_TRIGGER_ACTION_REQUEST_ALERT) {
+                    editor_set_tool(EDITOR_TOOL_ALERT);
                 }
 
                 if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
@@ -1055,9 +1059,24 @@ void editor_update() {
         state.tool_fog_sight = std::clamp(state.tool_fog_sight + input_get_mouse_scroll(), 1, 13);
         if (input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
             EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
-            editor_menu_trigger_action_set_fog_cell(menu, editor_get_hovered_cell(), state.tool_fog_sight);
+            ivec2 cell;
+            int cell_size;
+            editor_tool_fog_get_hovered_cell(&cell, &cell_size);
+            editor_menu_trigger_action_set_fog_cell(menu, cell, cell_size, state.tool_fog_sight);
             state.tool = EDITOR_TOOL_TRIGGERS;
         }
+    }
+
+    // Alert
+    if (state.tool == EDITOR_TOOL_ALERT &&
+            editor_can_single_use_tool_be_used() &&
+            editor_is_hovered_cell_valid() && 
+            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+        EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
+        uint32_t entity_index = editor_get_hovered_entity();
+        const ScenarioEntity& entity = state.scenario->entities[entity_index];
+        editor_menu_trigger_action_set_alert(menu, entity.cell, entity_get_data(entity.type).cell_size);
+        state.tool = EDITOR_TOOL_TRIGGERS;
     }
 
     // Entity add
@@ -1129,7 +1148,8 @@ bool editor_is_in_menu() {
 }
 
 bool editor_is_using_subtool() {
-    return state.tool == EDITOR_TOOL_FOG_REVEAL;
+    return state.tool == EDITOR_TOOL_FOG_REVEAL ||
+        state.tool == EDITOR_TOOL_ALERT;
 }
 
 bool editor_is_toolbar_open() {
@@ -1272,6 +1292,9 @@ void editor_set_tool(EditorTool tool) {
             state.tool_fog_sight = menu.action.fog.sight;
             break;
         }
+        case EDITOR_TOOL_ALERT: {
+            break;
+        }
     }
 }
 
@@ -1337,6 +1360,12 @@ bool editor_is_hovered_cell_valid() {
         }
 
         return true;
+    }
+    if (state.tool == EDITOR_TOOL_ALERT) {
+        uint32_t entity_index = editor_get_hovered_entity();
+        if (entity_index == INDEX_INVALID) {
+            return false;
+        }
     }
     return true;
 }
@@ -1854,11 +1883,24 @@ ivec2 editor_get_player_spawn_camera_offset(ivec2 cell) {
     return camera_offset;
 }
 
+void editor_tool_fog_get_hovered_cell(ivec2* cell, int* cell_size) {
+    uint32_t entity_index = editor_get_hovered_entity();
+    if (entity_index != INDEX_INVALID) {
+        const ScenarioEntity& entity = state.scenario->entities[entity_index];
+        *cell = entity.cell;
+        *cell_size = entity_get_data(entity.type).cell_size;
+    } else {
+        *cell = editor_get_hovered_cell();
+        *cell_size = 1;
+    }
+}
+
 std::vector<ivec2> editor_tool_fog_reveal_get_preview_cells() {
     std::vector<ivec2> cells;
-    const ivec2 cell = editor_get_hovered_cell();
+    ivec2 cell;
+    int cell_size;
+    editor_tool_fog_get_hovered_cell(&cell, &cell_size);
     const int sight = state.tool_fog_sight;
-    const int cell_size = 1;
     ivec2 search_corners[4] = {
         cell - ivec2(sight, sight),
         cell + ivec2((cell_size - 1) + sight, -sight),

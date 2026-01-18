@@ -12,7 +12,8 @@
 
 enum EditorMenuTriggerActionRequest {
     EDITOR_MENU_TRIGGER_ACTION_REQUEST_NONE,
-    EDITOR_MENU_TRIGGER_ACTION_REQUEST_FOG_REVEAL
+    EDITOR_MENU_TRIGGER_ACTION_REQUEST_FOG_REVEAL,
+    EDITOR_MENU_TRIGGER_ACTION_REQUEST_ALERT,
 };
 
 struct EditorMenuTriggerAction {
@@ -28,6 +29,7 @@ struct EditorMenuTriggerAction {
 
 EditorMenuTriggerAction editor_menu_trigger_action_open(const Scenario* scenario, const TriggerAction& action, uint32_t action_index);
 void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, EditorMenuMode& mode);
-void editor_menu_trigger_action_set_fog_cell(EditorMenuTriggerAction& menu, ivec2 cell, int sight);
+void editor_menu_trigger_action_set_fog_cell(EditorMenuTriggerAction& menu, ivec2 cell, int cell_size, int sight);
+void editor_menu_trigger_action_set_alert(EditorMenuTriggerAction& menu, ivec2 cell, int cell_size);
 
 #endif

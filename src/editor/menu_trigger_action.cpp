@@ -91,12 +91,21 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
             }
             case TRIGGER_ACTION_TYPE_FOG_REVEAL: {
                 char prompt_str[32];
-                sprintf(prompt_str, "Cell: <%i, %i> Sight: %i", menu.action.fog.cell.x, menu.action.fog.cell.y, menu.action.fog.sight);
+                sprintf(prompt_str, "Cell: <%i, %i> Size: %i Sight: %i", menu.action.fog.cell.x, menu.action.fog.cell.y, menu.action.fog.cell_size, menu.action.fog.sight);
                 if (editor_menu_prompt_and_button(ui, prompt_str, "Edit", MENU_RECT)) {
                     menu.request = EDITOR_MENU_TRIGGER_ACTION_REQUEST_FOG_REVEAL;
                 }
 
                 editor_menu_slider(ui, "Duration:", &menu.action.fog.duration_seconds, ACTION_WAIT_SECONDS_SLIDER_PARAMS, MENU_RECT);
+                break;
+            }
+            case TRIGGER_ACTION_TYPE_ALERT: {
+                char prompt_str[32];
+                sprintf(prompt_str, "Cell: <%i, %i> Size: %i", menu.action.alert.cell.x, menu.action.alert.cell.y, menu.action.alert.cell_size);
+                if (editor_menu_prompt_and_button(ui, prompt_str, "Edit", MENU_RECT)) {
+                    menu.request = EDITOR_MENU_TRIGGER_ACTION_REQUEST_ALERT;
+                }
+
                 break;
             }
             case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES:
@@ -122,9 +131,16 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
     }
 }
 
-void editor_menu_trigger_action_set_fog_cell(EditorMenuTriggerAction& menu, ivec2 cell, int sight) {
+void editor_menu_trigger_action_set_fog_cell(EditorMenuTriggerAction& menu, ivec2 cell, int cell_size, int sight) {
     menu.action.fog.cell = cell;
+    menu.action.fog.cell_size = cell_size;
     menu.action.fog.sight = sight;
+    menu.request = EDITOR_MENU_TRIGGER_ACTION_REQUEST_NONE;
+}
+
+void editor_menu_trigger_action_set_alert(EditorMenuTriggerAction& menu, ivec2 cell, int cell_size) {
+    menu.action.alert.cell = cell;
+    menu.action.alert.cell_size = cell_size;
     menu.request = EDITOR_MENU_TRIGGER_ACTION_REQUEST_NONE;
 }
 
@@ -153,7 +169,14 @@ void editor_menu_trigger_action_set_action_type(EditorMenuTriggerAction& menu, T
         }
         case TRIGGER_ACTION_TYPE_FOG_REVEAL: {
             action.fog.cell = ivec2(10, 10);
+            action.fog.cell_size = 1;
             action.fog.sight = 4;
+            action.fog.duration_seconds = 3;
+            break;
+        }
+        case TRIGGER_ACTION_TYPE_ALERT: {
+            action.alert.cell = ivec2(10, 10);
+            action.alert.cell_size = 1;
             break;
         }
         case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES:

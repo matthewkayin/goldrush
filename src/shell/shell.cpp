@@ -2290,7 +2290,7 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
             FogReveal fog_reveal = (FogReveal) {
                 .team = state->match_state.players[network_get_player_id()].team,
                 .cell = action.fog.cell,
-                .cell_size = 1,
+                .cell_size = action.fog.cell_size,
                 .sight = action.fog.sight,
                 .timer = 60U * action.fog.duration_seconds
             };
@@ -2305,6 +2305,17 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
                 CELL_LAYER_SKY, // This makes us ignore elevation
                 true);
             state->match_state.fog_reveals.push_back(fog_reveal);
+            return (TriggerActionResult) {
+                .type = TRIGGER_ACTION_RESULT_CONTINUE
+            };
+        }
+        case TRIGGER_ACTION_TYPE_ALERT: {
+            state->alerts.push_back((Alert) {
+                .pixel = MINIMAP_PIXEL_GOLD,
+                .cell = action.alert.cell,
+                .cell_size = action.alert.cell_size,
+                .timer = ALERT_TOTAL_DURATION
+            });
             return (TriggerActionResult) {
                 .type = TRIGGER_ACTION_RESULT_CONTINUE
             };

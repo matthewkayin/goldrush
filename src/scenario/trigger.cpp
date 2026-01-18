@@ -24,6 +24,8 @@ const char* trigger_action_type_str(TriggerActionType type) {
             return "Wait";
         case TRIGGER_ACTION_TYPE_FOG_REVEAL:
             return "Fog Reveal";
+        case TRIGGER_ACTION_TYPE_ALERT:
+            return "Alert";
         case TRIGGER_ACTION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
