@@ -22,6 +22,8 @@ const char* trigger_action_type_str(TriggerActionType type) {
             return "Clear Objectives";
         case TRIGGER_ACTION_TYPE_WAIT:
             return "Wait";
+        case TRIGGER_ACTION_TYPE_FOG_REVEAL:
+            return "Fog Reveal";
         case TRIGGER_ACTION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";

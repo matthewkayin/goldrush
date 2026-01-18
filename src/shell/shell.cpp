@@ -2286,6 +2286,29 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
                 }
             };
         }
+        case TRIGGER_ACTION_TYPE_FOG_REVEAL: {
+            FogReveal fog_reveal = (FogReveal) {
+                .team = state->match_state.players[network_get_player_id()].team,
+                .cell = action.fog.cell,
+                .cell_size = 1,
+                .sight = action.fog.sight,
+                .timer = 60U * action.fog.duration_seconds
+            };
+
+            match_fog_update(
+                state->match_state, 
+                fog_reveal.team,
+                fog_reveal.cell,
+                fog_reveal.cell_size, 
+                fog_reveal.sight,
+                false, 
+                CELL_LAYER_SKY, // This makes us ignore elevation
+                true);
+            state->match_state.fog_reveals.push_back(fog_reveal);
+            return (TriggerActionResult) {
+                .type = TRIGGER_ACTION_RESULT_CONTINUE
+            };
+        }
         case TRIGGER_ACTION_TYPE_COUNT: {
             GOLD_ASSERT(false);
             return (TriggerActionResult) {

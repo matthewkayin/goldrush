@@ -94,7 +94,8 @@ enum EditorTool {
     EDITOR_TOOL_EDIT_ENTITY,
     EDITOR_TOOL_SQUADS,
     EDITOR_TOOL_PLAYER_SPAWN,
-    EDITOR_TOOL_TRIGGERS
+    EDITOR_TOOL_TRIGGERS,
+    EDITOR_TOOL_FOG_REVEAL
 };
 
 struct EditorClipboard {
@@ -160,6 +161,7 @@ struct EditorState {
     uint32_t tool_edit_entity_gold_held;
     ivec2 tool_edit_entity_offset;
     uint32_t tool_dropdown_scroll;
+    int tool_fog_sight;
     bool is_painting;
     bool is_pasting;
 
@@ -177,6 +179,7 @@ static EditorState state;
 // Update
 void editor_free_current_document();
 bool editor_is_in_menu();
+bool editor_is_using_subtool();
 bool editor_is_toolbar_open();
 void editor_clamp_camera();
 void editor_center_camera_on_cell(ivec2 cell);
@@ -218,6 +221,7 @@ uint32_t editor_get_entity_squad(uint32_t entity_index);
 void editor_remove_entity_from_squad(uint32_t squad_index, uint32_t entity_index);
 std::vector<std::string> editor_get_player_name_dropdown_items();
 ivec2 editor_get_player_spawn_camera_offset(ivec2 cell);
+std::vector<ivec2> editor_tool_fog_reveal_get_preview_cells();
 
 std::string editor_get_scenario_folder_path();
 static void SDLCALL editor_save_callback(void* user_data, const char* const* filelist, int filter);
@@ -285,7 +289,8 @@ void editor_update() {
     state.ui.input_enabled = 
         !state.is_minimap_dragging && 
         state.camera_drag_mouse_position.x == -1 &&
-        !editor_is_in_menu();
+        !editor_is_in_menu() &&
+        !editor_is_using_subtool();
 
     // Toolbar
     ui_small_frame_rect(state.ui, TOOLBAR_RECT);
@@ -298,7 +303,10 @@ void editor_update() {
     {
         ui_begin_column(state.ui, ivec2(SIDEBAR_RECT.x + 4, SIDEBAR_RECT.y + 4), 4);
             char tool_text[64];
-            sprintf(tool_text, "%s Tool", TOOLBAR_OPTIONS[2][state.tool + 1].c_str());
+            const uint32_t tool_index = editor_is_using_subtool()
+                ? EDITOR_TOOL_TRIGGERS
+                : state.tool;
+            sprintf(tool_text, "%s Tool", TOOLBAR_OPTIONS[2][tool_index + 1].c_str());
             ui_text(state.ui, FONT_HACK_GOLD, tool_text);
 
             switch (state.tool) {
@@ -470,7 +478,8 @@ void editor_update() {
                 }
                 case EDITOR_TOOL_PLAYER_SPAWN:
                     break;
-                case EDITOR_TOOL_TRIGGERS: {
+                case EDITOR_TOOL_TRIGGERS:
+                case EDITOR_TOOL_FOG_REVEAL: {
                     // Trigger selection dropdown
                     ui_begin_row(state.ui, ivec2(0, 0), 2);
                         std::vector<std::string> trigger_dropdown_items;
@@ -776,6 +785,10 @@ void editor_update() {
                 EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
                 editor_menu_trigger_action_update(menu, state.ui, state.menu.mode);
 
+                if (menu.request == EDITOR_MENU_TRIGGER_ACTION_REQUEST_FOG_REVEAL) {
+                    editor_set_tool(EDITOR_TOOL_FOG_REVEAL);
+                }
+
                 if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
                     editor_do_action((EditorAction) {
                         .type = EDITOR_ACTION_EDIT_TRIGGER_ACTION,
@@ -1035,6 +1048,18 @@ void editor_update() {
         });
     }
 
+    // Fog reveal
+    if (state.tool == EDITOR_TOOL_FOG_REVEAL &&
+            editor_can_single_use_tool_be_used() &&
+            editor_is_hovered_cell_valid()) {
+        state.tool_fog_sight = std::clamp(state.tool_fog_sight + input_get_mouse_scroll(), 1, 13);
+        if (input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+            EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
+            editor_menu_trigger_action_set_fog_cell(menu, editor_get_hovered_cell(), state.tool_fog_sight);
+            state.tool = EDITOR_TOOL_TRIGGERS;
+        }
+    }
+
     // Entity add
     if (state.tool == EDITOR_TOOL_ADD_ENTITY && 
             editor_can_single_use_tool_be_used() && 
@@ -1100,7 +1125,11 @@ void editor_update() {
 }
 
 bool editor_is_in_menu() {
-    return state.menu.type != EDITOR_MENU_TYPE_NONE;
+    return state.menu.type != EDITOR_MENU_TYPE_NONE && !editor_is_using_subtool();
+}
+
+bool editor_is_using_subtool() {
+    return state.tool == EDITOR_TOOL_FOG_REVEAL;
 }
 
 bool editor_is_toolbar_open() {
@@ -1236,6 +1265,11 @@ void editor_set_tool(EditorTool tool) {
             state.tool_value = 0;
             state.tool_scroll = 0;
             state.tool_dropdown_scroll = 0;
+            break;
+        }
+        case EDITOR_TOOL_FOG_REVEAL: {
+            EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
+            state.tool_fog_sight = menu.action.fog.sight;
             break;
         }
     }
@@ -1820,6 +1854,90 @@ ivec2 editor_get_player_spawn_camera_offset(ivec2 cell) {
     return camera_offset;
 }
 
+std::vector<ivec2> editor_tool_fog_reveal_get_preview_cells() {
+    std::vector<ivec2> cells;
+    const ivec2 cell = editor_get_hovered_cell();
+    const int sight = state.tool_fog_sight;
+    const int cell_size = 1;
+    ivec2 search_corners[4] = {
+        cell - ivec2(sight, sight),
+        cell + ivec2((cell_size - 1) + sight, -sight),
+        cell + ivec2((cell_size - 1) + sight, (cell_size - 1) + sight),
+        cell + ivec2(-sight, (cell_size - 1) + sight)
+    };
+    for (int search_index = 0; search_index < 4; search_index++) {
+        ivec2 search_goal = search_corners[search_index + 1 == 4 ? 0 : search_index + 1];
+        ivec2 search_step = DIRECTION_IVEC2[(search_index * 2) + 2 == DIRECTION_COUNT 
+                                            ? DIRECTION_NORTH 
+                                            : (search_index * 2) + 2];
+        for (ivec2 line_end = search_corners[search_index]; line_end != search_goal; line_end += search_step) {
+            ivec2 line_start;
+            switch (cell_size) {
+                case 1:
+                    line_start = cell;
+                    break;
+                case 3:
+                    line_start = cell + ivec2(1, 1);
+                    break;
+                case 2:
+                case 4: {
+                    ivec2 center_cell = cell_size == 2 ? cell : cell + ivec2(1, 1);
+                    if (line_end.x < center_cell.x) {
+                        line_start.x = center_cell.x;
+                    } else if (line_end.x > center_cell.x + 1) {
+                        line_start.x = center_cell.x + 1;
+                    } else {
+                        line_start.x = line_end.x;
+                    }
+                    if (line_end.y < center_cell.y) {
+                        line_start.y = center_cell.y;
+                    } else if (line_end.y > center_cell.y + 1) {
+                        line_start.y = center_cell.y + 1;
+                    } else {
+                        line_start.y = line_end.y;
+                    }
+                    break;
+                }
+                default:
+                    log_warn("cell size of %i not handled in map_fog_update", cell_size);
+                    line_start = cell;
+                    break;
+            }
+
+            // we want slope to be between 0 and 1
+            // if "run" is greater than "rise" then m is naturally between 0 and 1, we will step with x in increments of 1 and handle y increments that are less than 1
+            // if "rise" is greater than "run" (use_x_step is false) then we will swap x and y so that we can step with y in increments of 1 and handle x increments that are less than 1
+            bool use_x_step = std::abs(line_end.x - line_start.x) >= std::abs(line_end.y - line_start.y);
+            int slope = std::abs(2 * (use_x_step ? (line_end.y - line_start.y) : (line_end.x - line_start.x)));
+            int slope_error = slope - std::abs((use_x_step ? (line_end.x - line_start.x) : (line_end.y - line_start.y)));
+            ivec2 line_step;
+            ivec2 line_opposite_step;
+            if (use_x_step) {
+                line_step = ivec2(1, 0) * (line_end.x >= line_start.x ? 1 : -1);
+                line_opposite_step = ivec2(0, 1) * (line_end.y >= line_start.y ? 1 : -1);
+            } else {
+                line_step = ivec2(0, 1) * (line_end.y >= line_start.y ? 1 : -1);
+                line_opposite_step = ivec2(1, 0) * (line_end.x >= line_start.x ? 1 : -1);
+            }
+            for (ivec2 line_cell = line_start; line_cell != line_end; line_cell += line_step) {
+                if (!map_is_cell_in_bounds(state.scenario->map, line_cell) || ivec2::euclidean_distance_squared(line_start, line_cell) > sight * sight) {
+                    break;
+                }
+
+                cells.push_back(line_cell);
+
+                slope_error += slope;
+                if (slope_error >= 0) {
+                    line_cell += line_opposite_step;
+                    slope_error -= 2 * std::abs((use_x_step ? (line_end.x - line_start.x) : (line_end.y - line_start.y)));
+                }
+            } // End for each line cell in line
+        } // End for each line end from corner to corner
+    } // End for each search index
+
+    return cells;
+}
+
 std::string editor_get_scenario_folder_path() {
     std::string base_path = SDL_GetBasePath();
     // The substring is to remove the trailing "bin/"
@@ -2140,6 +2258,25 @@ void editor_render() {
             .w = TILE_SIZE, .h = TILE_SIZE
         };
         render_draw_rect(rect, state.scenario == NULL || editor_is_hovered_cell_valid() ? RENDER_COLOR_WHITE : RENDER_COLOR_RED);
+    }
+
+    // Tool fog reveal preview
+    if (CANVAS_RECT.has_point(input_get_mouse_position()) &&
+            !state.is_minimap_dragging &&
+            state.camera_drag_mouse_position.x == -1 &&
+            state.tool == EDITOR_TOOL_FOG_REVEAL) {
+        std::vector<ivec2> cells = editor_tool_fog_reveal_get_preview_cells();
+        for (ivec2 cell : cells) {
+            Rect rect = (Rect) {
+                .x = ((cell.x * TILE_SIZE) - state.camera_offset.x) + CANVAS_RECT.x,
+                .y = ((cell.y * TILE_SIZE) - state.camera_offset.y) + CANVAS_RECT.y,
+                .w = TILE_SIZE, .h = TILE_SIZE
+            };
+            if (!CANVAS_RECT.intersects(rect)) {
+                continue;
+            }
+            render_draw_rect(rect, RENDER_COLOR_WHITE);
+        }
     }
 
     // Tool rect preview

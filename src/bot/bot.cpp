@@ -973,7 +973,11 @@ MatchInput bot_saturate_bases(const MatchState& state, Bot& bot) {
 
             for (uint32_t miner_index = 0; miner_index < state.entities.size(); miner_index++) {
                 const Entity& miner = state.entities[miner_index];
-                if (miner.player_id == bot.player_id && miner.goldmine_id == goldmine_id && entity_is_mining(state, miner)) {
+                EntityId miner_id = state.entities.get_id_of(miner_index);
+                if (miner.player_id == bot.player_id && 
+                        miner.goldmine_id == goldmine_id && 
+                        miner_id != bot.scout_id &&
+                        entity_is_mining(state, miner)) {
                     input.stop.entity_ids[input.stop.entity_count] = state.entities.get_id_of(miner_index);
                     input.stop.entity_count++;
                 }

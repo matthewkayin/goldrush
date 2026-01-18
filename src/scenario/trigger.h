@@ -37,6 +37,7 @@ enum TriggerActionType {
     TRIGGER_ACTION_TYPE_FINISH_OBJECTIVE,
     TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES,
     TRIGGER_ACTION_TYPE_WAIT,
+    TRIGGER_ACTION_TYPE_FOG_REVEAL,
     TRIGGER_ACTION_TYPE_COUNT
 };
 
@@ -66,6 +67,12 @@ struct TriggerActionWait {
     uint32_t seconds;
 };
 
+struct TriggerActionFogReveal {
+    ivec2 cell;
+    int sight;
+    uint32_t duration_seconds;
+};
+
 struct TriggerAction {
     TriggerActionType type;
     union {
@@ -73,6 +80,7 @@ struct TriggerAction {
         TriggerActionAddObjective add_objective;
         TriggerActionFinishObjective finish_objective;
         TriggerActionWait wait;
+        TriggerActionFogReveal fog;
     };
 };
 STATIC_ASSERT(sizeof(TriggerAction) == 104ULL);
