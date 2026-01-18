@@ -2,7 +2,7 @@
 
 Objective objective_init() {
     Objective objective;
-    objective.is_finished = false;
+    objective.is_complete = false;
     objective.counter_type = OBJECTIVE_COUNTER_TYPE_NONE;
     objective.counter_value = 0;
     objective.counter_target = 1;

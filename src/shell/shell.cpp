@@ -2212,7 +2212,9 @@ bool match_shell_is_trigger_condition_met(const MatchShellState* state, const Tr
             uint32_t count = 
                 match_shell_get_player_entity_count(state, network_get_player_id(), condition.entity_count.entity_type);
             return count >= condition.entity_count.entity_count;
-            break;
+        }
+        case TRIGGER_CONDITION_TYPE_OBJECTIVE_COMPLETE: {
+            return state->scenario_objectives[condition.objective_complete.objective_index].is_complete;
         }
         case TRIGGER_CONDITION_TYPE_COUNT:
             GOLD_ASSERT(false);
@@ -2266,8 +2268,8 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
                 .type = TRIGGER_ACTION_RESULT_CONTINUE
             };
         }
-        case TRIGGER_ACTION_TYPE_FINISH_OBJECTIVE: {
-            state->scenario_objectives[action.finish_objective.objective_index].is_finished = true;
+        case TRIGGER_ACTION_TYPE_COMPLETE_OBJECTIVE: {
+            state->scenario_objectives[action.finish_objective.objective_index].is_complete = true;
             return (TriggerActionResult) {
                 .type = TRIGGER_ACTION_RESULT_CONTINUE
             };
@@ -4246,13 +4248,13 @@ void match_shell_render(const MatchShellState* state) {
         const SpriteInfo& checkbox_sprite_info = render_get_sprite_info(SPRITE_UI_OBJECTIVE_CHECKBOX);
         for (uint32_t objective_index : state->current_objective_indices) {
             const Objective& objective = state->scenario_objectives[objective_index];
-            render_sprite_frame(SPRITE_UI_OBJECTIVE_CHECKBOX, ivec2((int)objective.is_finished, 0), objectives_text_pos, RENDER_SPRITE_NO_CULL, 0);
+            render_sprite_frame(SPRITE_UI_OBJECTIVE_CHECKBOX, ivec2((int)objective.is_complete, 0), objectives_text_pos, RENDER_SPRITE_NO_CULL, 0);
 
             // Determine objective text
             char objective_text[128];
             char* objective_text_ptr = objective_text;
             objective_text_ptr += sprintf(objective_text_ptr, "%s", objective.description);
-            if (!objective.is_finished && objective.counter_type != OBJECTIVE_COUNTER_TYPE_NONE) {
+            if (!objective.is_complete && objective.counter_type != OBJECTIVE_COUNTER_TYPE_NONE) {
                 uint32_t counter_value = 0; 
                 if (objective.counter_type == OBJECTIVE_COUNTER_TYPE_ENTITY) {
                     counter_value = match_shell_get_player_entity_count(state, network_get_player_id(), (EntityType)objective.counter_value);

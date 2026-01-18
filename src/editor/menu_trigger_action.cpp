@@ -81,7 +81,7 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
                 editor_menu_dropdown(ui, "Objective:", &menu.action.add_objective.objective_index, menu.objective_items, MENU_RECT);
                 break;
             }
-            case TRIGGER_ACTION_TYPE_FINISH_OBJECTIVE: {
+            case TRIGGER_ACTION_TYPE_COMPLETE_OBJECTIVE: {
                 editor_menu_dropdown(ui, "Objective:", &menu.action.finish_objective.objective_index, menu.objective_items, MENU_RECT);
                 break;
             }
@@ -159,7 +159,7 @@ void editor_menu_trigger_action_set_action_type(EditorMenuTriggerAction& menu, T
             action.add_objective.objective_index = 0;
             break;
         }
-        case TRIGGER_ACTION_TYPE_FINISH_OBJECTIVE: {
+        case TRIGGER_ACTION_TYPE_COMPLETE_OBJECTIVE: {
             action.finish_objective.objective_index = 0;
             break;
         }

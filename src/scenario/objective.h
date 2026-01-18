@@ -13,7 +13,7 @@ enum ObjectiveCounterType {
 };
 
 struct Objective {
-    bool is_finished;
+    bool is_complete;
     ObjectiveCounterType counter_type;
     uint32_t counter_value;
     uint32_t counter_target;

@@ -20,7 +20,7 @@ static const UiSliderParams ENTITY_COUNT_SLIDER_PARAMS = (UiSliderParams) {
 void editor_menu_trigger_condition_set_condition_type(EditorMenuTriggerCondition& menu, TriggerConditionType condition_type);
 void editor_menu_trigger_condition_entity_type_picker(UI& ui, EntityType& entity_type);
 
-EditorMenuTriggerCondition editor_menu_trigger_condition_open(const TriggerCondition& condition, uint32_t condition_index) {
+EditorMenuTriggerCondition editor_menu_trigger_condition_open(const Scenario* scenario, const TriggerCondition& condition, uint32_t condition_index) {
     EditorMenuTriggerCondition menu;
     menu.condition = condition;
     menu.condition_index = condition_index;
@@ -29,6 +29,12 @@ EditorMenuTriggerCondition editor_menu_trigger_condition_open(const TriggerCondi
         menu.condition_type_items.push_back(
             std::string(trigger_condition_type_str((TriggerConditionType)condition_type))
         );
+    }
+
+    for (uint32_t objective_index = 0; objective_index < scenario->objectives.size(); objective_index++) {
+        char objective_text[64];
+        sprintf(objective_text, "%u: %s", objective_index, scenario->objectives[objective_index].description);
+        menu.objective_dropdown_items.push_back(std::string(objective_text));
     }
 
     return menu;
@@ -54,6 +60,10 @@ void editor_menu_trigger_condition_update(EditorMenuTriggerCondition& menu, UI& 
 
                 break;
             }
+            case TRIGGER_CONDITION_TYPE_OBJECTIVE_COMPLETE: {
+                editor_menu_dropdown(ui, "Objective:", &menu.condition.objective_complete.objective_index, menu.objective_dropdown_items, MENU_RECT);
+                break;
+            }
             case TRIGGER_CONDITION_TYPE_COUNT:
                 GOLD_ASSERT(false);
                 break;
@@ -64,22 +74,25 @@ void editor_menu_trigger_condition_update(EditorMenuTriggerCondition& menu, UI& 
 }
 
 void editor_menu_trigger_condition_set_condition_type(EditorMenuTriggerCondition& menu, TriggerConditionType condition_type) {
+    TriggerCondition condition;
+    condition.type = condition_type;
+
     switch (condition_type) {
         case TRIGGER_CONDITION_TYPE_ENTITY_COUNT: {
-            menu.condition = (TriggerCondition) {
-                .type = TRIGGER_CONDITION_TYPE_ENTITY_COUNT,
-                .entity_count = (TriggerConditionEntityCount) {
-                    .entity_type = ENTITY_MINER,
-                    .entity_count = 1
-                }
-            };
-
+            condition.entity_count.entity_type = ENTITY_MINER;
+            condition.entity_count.entity_count = 1;
+            break;
+        }
+        case TRIGGER_CONDITION_TYPE_OBJECTIVE_COMPLETE: {
+            condition.objective_complete.objective_index = 0;
             break;
         }
         case TRIGGER_CONDITION_TYPE_COUNT:
             GOLD_ASSERT(false);
             break;
     }
+
+    menu.condition = condition;
 }
 
 void editor_menu_trigger_condition_entity_type_picker(UI& ui, EntityType& entity_type) {

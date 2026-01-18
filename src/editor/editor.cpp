@@ -537,7 +537,7 @@ void editor_update() {
                                         state.menu = (EditorMenu) {
                                             .type = EDITOR_MENU_TYPE_TRIGGER_CONDITION,
                                             .mode = EDITOR_MENU_MODE_OPEN,
-                                            .menu = editor_menu_trigger_condition_open(condition, condition_index)
+                                            .menu = editor_menu_trigger_condition_open(state.scenario, condition, condition_index)
                                         };
                                     }
 

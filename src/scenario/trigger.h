@@ -13,6 +13,7 @@
 
 enum TriggerConditionType {
     TRIGGER_CONDITION_TYPE_ENTITY_COUNT,
+    TRIGGER_CONDITION_TYPE_OBJECTIVE_COMPLETE,
     TRIGGER_CONDITION_TYPE_COUNT
 };
 
@@ -21,10 +22,15 @@ struct TriggerConditionEntityCount {
     uint32_t entity_count;
 };
 
+struct TriggerConditionObjectiveComplete {
+    uint32_t objective_index;
+};
+
 struct TriggerCondition {
     TriggerConditionType type;
     union {
         TriggerConditionEntityCount entity_count;
+        TriggerConditionObjectiveComplete objective_complete;
     };
 };
 STATIC_ASSERT(sizeof(TriggerCondition) == 12ULL);
@@ -34,7 +40,7 @@ STATIC_ASSERT(sizeof(TriggerCondition) == 12ULL);
 enum TriggerActionType {
     TRIGGER_ACTION_TYPE_CHAT,
     TRIGGER_ACTION_TYPE_ADD_OBJECTIVE,
-    TRIGGER_ACTION_TYPE_FINISH_OBJECTIVE,
+    TRIGGER_ACTION_TYPE_COMPLETE_OBJECTIVE,
     TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES,
     TRIGGER_ACTION_TYPE_WAIT,
     TRIGGER_ACTION_TYPE_FOG_REVEAL,
@@ -61,7 +67,7 @@ struct TriggerActionAddObjective {
 
 struct TriggerActionFinishObjective {
     uint32_t objective_index;
-    bool is_finished;
+    bool is_complete;
 };
 
 struct TriggerActionWait {
