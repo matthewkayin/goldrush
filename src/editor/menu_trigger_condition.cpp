@@ -22,6 +22,7 @@ void editor_menu_trigger_condition_entity_type_picker(UI& ui, EntityType& entity
 
 EditorMenuTriggerCondition editor_menu_trigger_condition_open(const Scenario* scenario, const TriggerCondition& condition, uint32_t condition_index) {
     EditorMenuTriggerCondition menu;
+    menu.request = EDITOR_MENU_TRIGGER_CONDITION_REQUEST_NONE;
     menu.condition = condition;
     menu.condition_index = condition_index;
     
@@ -41,6 +42,10 @@ EditorMenuTriggerCondition editor_menu_trigger_condition_open(const Scenario* sc
 }
 
 void editor_menu_trigger_condition_update(EditorMenuTriggerCondition& menu, UI& ui, EditorMenuMode& mode) {
+    if (menu.request != EDITOR_MENU_TRIGGER_CONDITION_REQUEST_NONE) {
+        return;
+    }
+
     editor_menu_header(ui, MENU_RECT, "Edit Condition");
 
     ui_begin_column(ui, ivec2(MENU_RECT.x + 8, MENU_RECT.y + 30), 4);
@@ -64,6 +69,14 @@ void editor_menu_trigger_condition_update(EditorMenuTriggerCondition& menu, UI& 
                 editor_menu_dropdown(ui, "Objective:", &menu.condition.objective_complete.objective_index, menu.objective_dropdown_items, MENU_RECT);
                 break;
             }
+            case TRIGGER_CONDITION_TYPE_AREA_DISCOVERED: {
+                char prompt[32];
+                sprintf(prompt, "Cell: <%i, %i> Size: %i", menu.condition.area_discovered.cell.x, menu.condition.area_discovered.cell.y, menu.condition.area_discovered.cell_size);
+                if (editor_menu_prompt_and_button(ui, prompt, "Edit", MENU_RECT)) {
+                    menu.request = EDITOR_MENU_TRIGGER_CONDITION_REQUEST_AREA;
+                }
+                break;
+            }
             case TRIGGER_CONDITION_TYPE_COUNT:
                 GOLD_ASSERT(false);
                 break;
@@ -71,6 +84,12 @@ void editor_menu_trigger_condition_update(EditorMenuTriggerCondition& menu, UI& 
     ui_end_container(ui);
 
     editor_menu_back_save_buttons(ui, MENU_RECT, mode);
+}
+
+void editor_menu_trigger_condition_set_request_area(EditorMenuTriggerCondition& menu, ivec2 cell, int cell_size) {
+    menu.condition.area_discovered.cell = cell;
+    menu.condition.area_discovered.cell_size = cell_size;
+    menu.request = EDITOR_MENU_TRIGGER_CONDITION_REQUEST_NONE;
 }
 
 void editor_menu_trigger_condition_set_condition_type(EditorMenuTriggerCondition& menu, TriggerConditionType condition_type) {
@@ -85,6 +104,11 @@ void editor_menu_trigger_condition_set_condition_type(EditorMenuTriggerCondition
         }
         case TRIGGER_CONDITION_TYPE_OBJECTIVE_COMPLETE: {
             condition.objective_complete.objective_index = 0;
+            break;
+        }
+        case TRIGGER_CONDITION_TYPE_AREA_DISCOVERED: {
+            condition.area_discovered.cell = ivec2(0, 0);
+            condition.area_discovered.cell_size = 1;
             break;
         }
         case TRIGGER_CONDITION_TYPE_COUNT:

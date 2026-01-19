@@ -14,6 +14,7 @@
 enum TriggerConditionType {
     TRIGGER_CONDITION_TYPE_ENTITY_COUNT,
     TRIGGER_CONDITION_TYPE_OBJECTIVE_COMPLETE,
+    TRIGGER_CONDITION_TYPE_AREA_DISCOVERED,
     TRIGGER_CONDITION_TYPE_COUNT
 };
 
@@ -26,14 +27,20 @@ struct TriggerConditionObjectiveComplete {
     uint32_t objective_index;
 };
 
+struct TriggerConditionAreaDiscovered {
+    ivec2 cell;
+    int cell_size;
+};
+
 struct TriggerCondition {
     TriggerConditionType type;
     union {
         TriggerConditionEntityCount entity_count;
         TriggerConditionObjectiveComplete objective_complete;
+        TriggerConditionAreaDiscovered area_discovered;
     };
 };
-STATIC_ASSERT(sizeof(TriggerCondition) == 12ULL);
+STATIC_ASSERT(sizeof(TriggerCondition) == 16ULL);
 
 // Action
 
@@ -127,5 +134,6 @@ const char* trigger_condition_type_str(TriggerConditionType type);
 const char* trigger_action_type_str(TriggerActionType type);
 const char* trigger_action_chat_prefix_type_str(TriggerActionChatPrefixType type);
 int trigger_condition_sprintf(char* str_ptr, const TriggerCondition& condition);
+int trigger_action_sprintf(char* str_ptr, const TriggerAction& action);
 
 TriggerAction trigger_action_init();

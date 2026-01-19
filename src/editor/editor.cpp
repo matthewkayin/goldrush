@@ -98,6 +98,7 @@ enum EditorTool {
     EDITOR_TOOL_FOG_REVEAL,
     EDITOR_TOOL_ALERT,
     EDITOR_TOOL_REQUEST_CELL,
+    EDITOR_TOOL_REQUEST_AREA,
 };
 
 struct EditorClipboard {
@@ -163,7 +164,7 @@ struct EditorState {
     uint32_t tool_edit_entity_gold_held;
     ivec2 tool_edit_entity_offset;
     uint32_t tool_dropdown_scroll;
-    int tool_fog_sight;
+    int tool_size;
     bool is_painting;
     bool is_pasting;
 
@@ -483,7 +484,8 @@ void editor_update() {
                 case EDITOR_TOOL_TRIGGERS:
                 case EDITOR_TOOL_FOG_REVEAL: 
                 case EDITOR_TOOL_ALERT:
-                case EDITOR_TOOL_REQUEST_CELL: {
+                case EDITOR_TOOL_REQUEST_CELL:
+                case EDITOR_TOOL_REQUEST_AREA: {
                     // Trigger selection dropdown
                     ui_begin_row(state.ui, ivec2(0, 0), 2);
                         std::vector<std::string> trigger_dropdown_items;
@@ -579,7 +581,9 @@ void editor_update() {
 
                             scrollable_ui_funcs.push_back([trigger_index, &trigger, action, action_index, actions_size]() {
                                 ui_begin_row(state.ui, ivec2(0, 0), 2);
-                                    ui_slim_button(state.ui, trigger_action_type_str(action.type), true);
+                                    char action_str[64];
+                                    trigger_action_sprintf(action_str, action);
+                                    ui_slim_button(state.ui, action_str, true);
 
                                     const bool is_shift_pressed = input_is_action_pressed(INPUT_ACTION_SHIFT);
                                     const bool is_disabled = is_shift_pressed
@@ -770,6 +774,15 @@ void editor_update() {
             case EDITOR_MENU_TYPE_TRIGGER_CONDITION: {
                 EditorMenuTriggerCondition& menu = std::get<EditorMenuTriggerCondition>(state.menu.menu);
                 editor_menu_trigger_condition_update(menu, state.ui, state.menu.mode);
+                
+                switch (menu.request) {
+                    case EDITOR_MENU_TRIGGER_CONDITION_REQUEST_NONE:
+                        break;
+                    case EDITOR_MENU_TRIGGER_CONDITION_REQUEST_AREA: {
+                        editor_set_tool(EDITOR_TOOL_REQUEST_AREA);
+                        break;
+                    }
+                }
 
                 if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
                     editor_do_action((EditorAction) {
@@ -1070,13 +1083,25 @@ void editor_update() {
     if (state.tool == EDITOR_TOOL_FOG_REVEAL &&
             editor_can_single_use_tool_be_used() &&
             editor_is_hovered_cell_valid()) {
-        state.tool_fog_sight = std::clamp(state.tool_fog_sight + input_get_mouse_scroll(), 1, 13);
+        state.tool_size = std::clamp(state.tool_size + input_get_mouse_scroll(), 1, 13);
         if (input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
             EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
             ivec2 cell;
             int cell_size;
             editor_tool_fog_get_hovered_cell(&cell, &cell_size);
-            editor_menu_trigger_action_set_fog_cell(menu, cell, cell_size, state.tool_fog_sight);
+            editor_menu_trigger_action_set_fog_cell(menu, cell, cell_size, state.tool_size);
+            state.tool = EDITOR_TOOL_TRIGGERS;
+        }
+    }
+
+    // Request area
+    if (state.tool == EDITOR_TOOL_REQUEST_AREA &&
+            editor_can_single_use_tool_be_used() &&
+            editor_is_hovered_cell_valid()) {
+        state.tool_size = std::clamp(state.tool_size + input_get_mouse_scroll(), 1, 4);
+        if (input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+            EditorMenuTriggerCondition& menu = std::get<EditorMenuTriggerCondition>(state.menu.menu);
+            editor_menu_trigger_condition_set_request_area(menu, editor_get_hovered_cell(), state.tool_size);
             state.tool = EDITOR_TOOL_TRIGGERS;
         }
     }
@@ -1174,7 +1199,8 @@ bool editor_is_in_menu() {
 bool editor_is_using_subtool() {
     return state.tool == EDITOR_TOOL_FOG_REVEAL ||
         state.tool == EDITOR_TOOL_ALERT || 
-        state.tool == EDITOR_TOOL_REQUEST_CELL;
+        state.tool == EDITOR_TOOL_REQUEST_CELL ||
+        state.tool == EDITOR_TOOL_REQUEST_AREA;
 }
 
 bool editor_is_toolbar_open() {
@@ -1313,7 +1339,11 @@ void editor_set_tool(EditorTool tool) {
         }
         case EDITOR_TOOL_FOG_REVEAL: {
             EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
-            state.tool_fog_sight = menu.action.fog.sight;
+            state.tool_size = menu.action.fog.sight;
+            break;
+        }
+        case EDITOR_TOOL_REQUEST_AREA: {
+            state.tool_size = 1;
             break;
         }
         case EDITOR_TOOL_ALERT:
@@ -1932,7 +1962,7 @@ std::vector<ivec2> editor_tool_fog_reveal_get_preview_cells() {
     ivec2 cell;
     int cell_size;
     editor_tool_fog_get_hovered_cell(&cell, &cell_size);
-    const int sight = state.tool_fog_sight;
+    const int sight = state.tool_size;
     ivec2 search_corners[4] = {
         cell - ivec2(sight, sight),
         cell + ivec2((cell_size - 1) + sight, -sight),
@@ -2331,6 +2361,10 @@ void editor_render() {
             .y = ((cell.y * TILE_SIZE) - state.camera_offset.y) + CANVAS_RECT.y,
             .w = TILE_SIZE, .h = TILE_SIZE
         };
+        if (state.tool == EDITOR_TOOL_REQUEST_AREA) {
+            rect.w = TILE_SIZE * state.tool_size;
+            rect.h = rect.w;
+        }
         render_draw_rect(rect, state.scenario == NULL || editor_is_hovered_cell_valid() ? RENDER_COLOR_WHITE : RENDER_COLOR_RED);
     }
 

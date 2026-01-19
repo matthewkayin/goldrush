@@ -30,7 +30,7 @@ static const size_t CHAT_MAX_LENGTH = 64;
 static const uint32_t CHAT_MESSAGE_DURATION = 3U * 60U;
 static const uint32_t CHAT_MAX_LINES = 8;
 static const uint32_t CHAT_CURSOR_BLINK_DURATION = 30;
-static const uint32_t CHAT_MESSAGE_HINT_DURATION = 10U * 60U;
+static const uint32_t CHAT_MESSAGE_HINT_DURATION = 5U * 60U;
 
 // UI panel rects
 static const Rect BOTTOM_PANEL_RECT = (Rect) {
@@ -2232,6 +2232,9 @@ bool match_shell_is_trigger_condition_met(const MatchShellState* state, const Tr
         }
         case TRIGGER_CONDITION_TYPE_OBJECTIVE_COMPLETE: {
             return state->scenario_objectives[condition.objective_complete.objective_index].is_complete;
+        }
+        case TRIGGER_CONDITION_TYPE_AREA_DISCOVERED: {
+            return match_shell_is_cell_rect_revealed(state, condition.area_discovered.cell, condition.area_discovered.cell_size);
         }
         case TRIGGER_CONDITION_TYPE_COUNT:
             GOLD_ASSERT(false);

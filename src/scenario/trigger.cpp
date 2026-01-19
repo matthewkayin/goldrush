@@ -5,7 +5,9 @@ const char* trigger_condition_type_str(TriggerConditionType type) {
         case TRIGGER_CONDITION_TYPE_ENTITY_COUNT: 
             return "Entity Count";
         case TRIGGER_CONDITION_TYPE_OBJECTIVE_COMPLETE:
-            return "Obj Complete";
+            return "Obj Comp";
+        case TRIGGER_CONDITION_TYPE_AREA_DISCOVERED:
+            return "Area Discvrd";
         case TRIGGER_CONDITION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
@@ -15,11 +17,11 @@ const char* trigger_condition_type_str(TriggerConditionType type) {
 const char* trigger_action_type_str(TriggerActionType type) {
     switch (type) {
         case TRIGGER_ACTION_TYPE_CHAT:
-            return "Message";
+            return "Chat";
         case TRIGGER_ACTION_TYPE_ADD_OBJECTIVE:
             return "Add Obj";
         case TRIGGER_ACTION_TYPE_COMPLETE_OBJECTIVE:
-            return "Complete Obj";
+            return "Comp Obj";
         case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES:
             return "Clear Objs";
         case TRIGGER_ACTION_TYPE_WAIT:
@@ -63,9 +65,61 @@ int trigger_condition_sprintf(char* str_ptr, const TriggerCondition& condition) 
         case TRIGGER_CONDITION_TYPE_OBJECTIVE_COMPLETE: {
             return sprintf(str_ptr, "Obj %u Complete", condition.objective_complete.objective_index);
         }
+        case TRIGGER_CONDITION_TYPE_AREA_DISCOVERED: {
+            return sprintf(str_ptr, "Area Discvrd");
+        }
         case TRIGGER_CONDITION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return 0;
+    }
+}
+
+int trigger_action_sprintf(char* str_ptr, const TriggerAction& action) {  
+    switch (action.type) {
+        case TRIGGER_ACTION_TYPE_CHAT: {
+            switch (action.chat.prefix_type) {
+                case TRIGGER_ACTION_CHAT_PREFIX_TYPE_NONE:
+                    return sprintf(str_ptr, "Chat: None");
+                case TRIGGER_ACTION_CHAT_PREFIX_TYPE_GOLD:
+                    return sprintf(str_ptr, "Chat: Obj");
+                case TRIGGER_ACTION_CHAT_PREFIX_TYPE_BLUE:
+                    return sprintf(str_ptr, "Chat: Hint");
+                default:
+                    GOLD_ASSERT(false);
+                    return 0;
+            }
+        }
+        case TRIGGER_ACTION_TYPE_ADD_OBJECTIVE: {
+            return sprintf(str_ptr, "Add Obj %u", action.add_objective.objective_index);
+        }
+        case TRIGGER_ACTION_TYPE_COMPLETE_OBJECTIVE: {
+            return sprintf(str_ptr, "Cmp Obj %u", action.finish_objective.objective_index);
+        }
+        case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES: {
+            return sprintf(str_ptr, "Clear Objs");
+        }
+        case TRIGGER_ACTION_TYPE_WAIT: {
+            return sprintf(str_ptr, "Wait %us", action.wait.seconds);
+        }
+        case TRIGGER_ACTION_TYPE_FOG_REVEAL: {
+            return sprintf(str_ptr, "Fog %us", action.fog.duration_seconds);
+        }
+        case TRIGGER_ACTION_TYPE_ALERT: {
+            return sprintf(str_ptr, "Alert <%i,%i>", action.alert.cell.x, action.alert.cell.y);
+        }
+        case TRIGGER_ACTION_TYPE_SPAWN_UNITS: {
+            return sprintf(str_ptr, "Spawn %u", action.spawn_units.entity_count);
+        }
+        case TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD: {
+            return sprintf(str_ptr, "Show Opp Gld");
+        }
+        case TRIGGER_ACTION_TYPE_SET_LOSE_CONDITION: {
+            return sprintf(str_ptr, "Lose Cond");
+        }
+        case TRIGGER_ACTION_TYPE_COUNT: {
+            GOLD_ASSERT(false);
+            return 0;
+        }
     }
 }
 
