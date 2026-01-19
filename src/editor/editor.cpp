@@ -1671,8 +1671,8 @@ bool editor_is_using_noise_tool() {
 void editor_flatten_rect(const Rect& rect) {
     std::vector<EditorActionBrushStroke> stroke;
 
-    for (int y = rect.y; y < rect.y + rect.w; y++) {
-        for (int x = rect.x; x < rect.x + rect.h; x++) {
+    for (int y = rect.y; y < rect.y + rect.h; y++) {
+        for (int x = rect.x; x < rect.x + rect.w; x++) {
             stroke.push_back((EditorActionBrushStroke) {
                 .index = x + (y * state.scenario->noise->width),
                 .previous_value = state.scenario->noise->map[x + (y * state.scenario->noise->width)],
