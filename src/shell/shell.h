@@ -165,9 +165,10 @@ struct MatchShellState {
 
     // Scenario triggers
     std::vector<Trigger> scenario_triggers;
-    bool scenario_allowed_entities[ENTITY_TYPE_COUNT];
-    uint32_t scenario_allowed_upgrades;
     std::vector<TriggerActionInstance> trigger_action_instances;
+    uint32_t scenario_allowed_upgrades;
+    bool scenario_allowed_entities[ENTITY_TYPE_COUNT];
+    bool scenario_show_enemy_gold;
 
     // Scenario objective
     std::vector<Objective> scenario_objectives;
@@ -318,6 +319,7 @@ void match_shell_render_particle(const MatchShellState* state, const Particle& p
 bool match_shell_should_render_hotkey_toggled(const MatchShellState* state, InputAction hotkey);
 const char* match_shell_render_get_stat_tooltip(SpriteName sprite);
 void match_shell_render_tooltip(const MatchShellState* state, InputAction hotkey);
+void match_shell_should_render_player_resources(const MatchShellState* state, uint8_t player_id, bool* should_render_gold, bool* should_render_population, bool* should_render_name);
 ivec2 match_shell_get_queued_target_position(const MatchShellState* state, const Target& target);
 FireCellRender match_shell_get_fire_cell_render(const MatchShellState* state, const Fire& fire);
 MinimapPixel match_shell_get_minimap_pixel_for_cell(const MatchShellState* state, ivec2 cell);

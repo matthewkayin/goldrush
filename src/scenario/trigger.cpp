@@ -30,6 +30,8 @@ const char* trigger_action_type_str(TriggerActionType type) {
             return "Alert";
         case TRIGGER_ACTION_TYPE_SPAWN_UNITS:
             return "Spawn Units";
+        case TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD:
+            return "Show Enemy Gold";
         case TRIGGER_ACTION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
