@@ -24,6 +24,8 @@ static const UiSliderParams ACTION_WAIT_SECONDS_SLIDER_PARAMS = (UiSliderParams)
     .step = 1
 };
 
+static const std::vector<std::string> YES_NO_ITEMS = { "No", "Yes" };
+
 static const uint32_t ICON_ROW_SIZE = 8U;
 
 void editor_menu_trigger_action_set_action_type(EditorMenuTriggerAction& menu, TriggerActionType action_type);
@@ -165,6 +167,15 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
                 }
                 break;
             }
+            case TRIGGER_ACTION_TYPE_SET_LOSE_CONDITION: {
+                uint32_t lose_on_buildings_destroyed = (uint32_t)menu.action.set_lose_condition.lose_on_buildings_destroyed;
+                if (editor_menu_dropdown(ui, "Lose on Buildings Destroyed:", &lose_on_buildings_destroyed, YES_NO_ITEMS, MENU_RECT)) {
+                    menu.action.set_lose_condition.lose_on_buildings_destroyed = (bool)lose_on_buildings_destroyed;
+                }
+
+                break;
+            }
+            case TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD:
             case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES:
                 break;
             case TRIGGER_ACTION_TYPE_COUNT: {
@@ -278,6 +289,10 @@ void editor_menu_trigger_action_set_action_type(EditorMenuTriggerAction& menu, T
             action.spawn_units.entity_count = 0;
             break;
         }
+        case TRIGGER_ACTION_TYPE_SET_LOSE_CONDITION: {
+            action.set_lose_condition.lose_on_buildings_destroyed = true;
+        }
+        case TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD:
         case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES:
             break;
         case TRIGGER_ACTION_TYPE_COUNT: 

@@ -169,6 +169,7 @@ struct MatchShellState {
     uint32_t scenario_allowed_upgrades;
     bool scenario_allowed_entities[ENTITY_TYPE_COUNT];
     bool scenario_show_enemy_gold;
+    bool scenario_lose_on_buildings_destroyed;
 
     // Scenario objective
     std::vector<Objective> scenario_objectives;

@@ -1242,7 +1242,6 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
             editor_set_tool(EDITOR_TOOL_SELECT);
             editor_tool_select_clear_selection();
             state.is_pasting = true;
-            log_debug("begin pasting");
         } else if (action == "Players") {
             state.menu = (EditorMenu) {
                 .type = EDITOR_MENU_TYPE_PLAYERS,
@@ -1571,7 +1570,8 @@ SpriteName editor_get_noise_preview_sprite(uint8_t value) {
         case NOISE_VALUE_LOWGROUND: {
             return map_get_plain_ground_tile_sprite(state.scenario->map.type);
         }
-        case NOISE_VALUE_HIGHGROUND: {
+        case NOISE_VALUE_HIGHGROUND:
+        case NOISE_VALUE_RAMP: {
             return SPRITE_TILE_WALL_SOUTH_EDGE;
         }
         default: {

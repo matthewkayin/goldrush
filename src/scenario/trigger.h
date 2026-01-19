@@ -47,6 +47,7 @@ enum TriggerActionType {
     TRIGGER_ACTION_TYPE_ALERT,
     TRIGGER_ACTION_TYPE_SPAWN_UNITS,
     TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD,
+    TRIGGER_ACTION_TYPE_SET_LOSE_CONDITION,
     TRIGGER_ACTION_TYPE_COUNT
 };
 
@@ -96,6 +97,10 @@ struct TriggerActionSpawnUnits {
     EntityType entity_types[TRIGGER_ACTION_SPAWN_UNITS_ENTITY_COUNT_MAX];
 };
 
+struct TriggerActionSetLoseCondition {
+    bool lose_on_buildings_destroyed;
+};
+
 struct TriggerAction {
     TriggerActionType type;
     union {
@@ -106,6 +111,7 @@ struct TriggerAction {
         TriggerActionFogReveal fog;
         TriggerActionAlert alert;
         TriggerActionSpawnUnits spawn_units;
+        TriggerActionSetLoseCondition set_lose_condition;
     };
 };
 STATIC_ASSERT(sizeof(TriggerAction) == 108ULL);

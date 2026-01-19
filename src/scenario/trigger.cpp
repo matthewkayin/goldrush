@@ -31,7 +31,9 @@ const char* trigger_action_type_str(TriggerActionType type) {
         case TRIGGER_ACTION_TYPE_SPAWN_UNITS:
             return "Spawn Units";
         case TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD:
-            return "Show Enemy Gold";
+            return "Show Opp Gold";
+        case TRIGGER_ACTION_TYPE_SET_LOSE_CONDITION:
+            return "Set Lose Cnd";
         case TRIGGER_ACTION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";

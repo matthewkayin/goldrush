@@ -188,6 +188,7 @@ MatchShellState* match_shell_base_init() {
 
     // Scenario
     state->scenario_show_enemy_gold = false;
+    state->scenario_lose_on_buildings_destroyed = true;
 
     // Replay file
     state->replay_file = NULL;
@@ -1462,15 +1463,28 @@ void match_shell_update(MatchShellState* state) {
     // Check win conditions
     if (!state->replay_mode && state->scenario_triggers.empty()) {
         bool player_has_buildings[MAX_PLAYERS];
-        bool opposing_player_just_lost = false;
+        bool player_has_entities[MAX_PLAYERS];
         memset(player_has_buildings, 0, sizeof(player_has_buildings));
+        memset(player_has_entities, 0, sizeof(player_has_entities));
+
         for (const Entity& entity : state->match_state.entities) {
-            if (entity_is_building(entity.type) && entity.type != ENTITY_LANDMINE && entity_is_selectable(entity)) {
-                player_has_buildings[entity.player_id] = true;
+            if (entity.type == ENTITY_GOLDMINE || entity.type == ENTITY_LANDMINE) {
+                continue;
             }
+            player_has_buildings[entity.player_id] |= entity_is_building(entity.type) && entity.health != 0;
+            player_has_entities[entity.player_id] |= entity.health != 0;
         }
+
+        bool opposing_player_just_lost = false;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (state->match_state.players[player_id].active && !player_has_buildings[player_id]) {
+            if (!state->match_state.players[player_id].active) {
+                continue;
+            }
+
+            const bool player_has_lost = 
+                (state->scenario_lose_on_buildings_destroyed && !player_has_buildings[player_id]) ||
+                !player_has_entities[player_id];
+            if (player_has_lost) {
                 state->match_state.players[player_id].active = false;
 
                 char defeat_message[128];
@@ -2417,6 +2431,12 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
         }
         case TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD: {
             state->scenario_show_enemy_gold = true;
+            return (TriggerActionResult) {
+                .type = TRIGGER_ACTION_RESULT_CONTINUE
+            };
+        }
+        case TRIGGER_ACTION_TYPE_SET_LOSE_CONDITION: {
+            state->scenario_lose_on_buildings_destroyed = action.set_lose_condition.lose_on_buildings_destroyed;
             return (TriggerActionResult) {
                 .type = TRIGGER_ACTION_RESULT_CONTINUE
             };
