@@ -3465,6 +3465,10 @@ void bot_release_scout(Bot& bot) {
 }
 
 bool bot_should_scout(const Bot& bot, uint32_t match_timer) {
+    if (!bitflag_check(bot.config.flags, BOT_CONFIG_SHOULD_SCOUT)) {
+        return false;
+    }
+
     uint32_t next_scout_time;
     if (bot.last_scout_time == 0U)  {
         next_scout_time = 0U;

@@ -79,6 +79,7 @@ void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorMenuMode&
                 editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Attack:", BOT_CONFIG_SHOULD_ATTACK);
                 editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Harass:", BOT_CONFIG_SHOULD_HARASS);
                 editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Retreat:", BOT_CONFIG_SHOULD_RETREAT);
+                editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Scout:", BOT_CONFIG_SHOULD_SCOUT);
 
                 uint32_t target_base_count_selection = bot_config.target_base_count == BOT_TARGET_BASE_COUNT_MATCH_ENEMY
                     ? TARGET_BASE_COUNT_MATCH_ENEMY_INDEX
