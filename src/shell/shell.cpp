@@ -412,6 +412,9 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
     // Objectives
     state->scenario_objectives = scenario->objectives;
 
+    // Player spawn
+    match_shell_center_camera_on_cell(state, scenario->player_spawn);
+
     state->match_state.is_fog_dirty = false;
 
     return state;
@@ -2248,6 +2251,61 @@ bool match_shell_trigger_action_instance_is_finished(const MatchShellState* stat
     return instance.action_index >= state->scenario_triggers[instance.trigger_index].actions.size();
 }
 
+ivec2 match_shell_trigger_action_spawn_units_find_spawn_cell(const MatchShellState* state, EntityType entity_type, ivec2 spawn_cell, ivec2 target_cell) {
+    const EntityData& entity_data = entity_get_data(entity_type);
+
+    std::vector<ivec2> frontier;
+    std::vector<bool> explored = std::vector<bool>(state->match_state.map.width * state->match_state.map.height, false);
+
+    frontier.push_back(spawn_cell);
+
+    while (!frontier.empty()) {
+        uint32_t nearest_index = 0;
+        for (uint32_t index = 1; index < frontier.size(); index++) {
+            if (ivec2::manhattan_distance(frontier[index], spawn_cell) < 
+                    ivec2::manhattan_distance(frontier[nearest_index], spawn_cell)) {
+                nearest_index = index;
+            }
+        }
+        ivec2 next = frontier[nearest_index];
+        frontier[nearest_index] = frontier.back();
+        frontier.pop_back();
+
+        if (!map_is_cell_rect_occupied(state->match_state.map, entity_data.cell_layer, next, entity_data.cell_size)) {
+            return next;
+        }
+
+        explored[next.x + (next.y * state->match_state.map.width)] = true;
+
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            ivec2 child = next + DIRECTION_IVEC2[direction];
+            if (!map_is_cell_rect_in_bounds(state->match_state.map, child, entity_data.cell_size)) {
+                continue;
+            }
+            if (explored[child.x + (child.y * state->match_state.map.width)]) {
+                continue;
+            }
+            if (ivec2::manhattan_distance(child, spawn_cell) > 16 || 
+                    ivec2::manhattan_distance(child, target_cell) < 16) {
+                continue;
+            }
+
+            bool is_in_frontier = false;
+            for (ivec2 cell : frontier) {
+                if (cell == child) {
+                    is_in_frontier = true;
+                    break;
+                }
+            }
+            if (!is_in_frontier) {
+                frontier.push_back(child);
+            }
+        }
+    }
+
+    return ivec2(-1, -1);
+}
+
 TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& action) {
     switch (action.type) {
         case TRIGGER_ACTION_TYPE_CHAT: {
@@ -2318,6 +2376,38 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
                 .cell_size = action.alert.cell_size,
                 .timer = ALERT_TOTAL_DURATION
             });
+            return (TriggerActionResult) {
+                .type = TRIGGER_ACTION_RESULT_CONTINUE
+            };
+        }
+        case TRIGGER_ACTION_TYPE_SPAWN_UNITS: {
+            std::vector<EntityId> squad_entity_list;
+
+            for (uint32_t index = 0; index < action.spawn_units.entity_count; index++) {
+                EntityType entity_type = action.spawn_units.entity_types[index];
+                ivec2 entity_cell = match_shell_trigger_action_spawn_units_find_spawn_cell(state, entity_type, action.spawn_units.spawn_cell, action.spawn_units.target_cell);
+                if (entity_cell.x == -1) {
+                    log_warn("Couldn't find a place to spawn unit with type %u spawn cell <%i, %i>.", entity_type, action.spawn_units.spawn_cell.x, action.spawn_units.spawn_cell.y);
+                    break;
+                }
+
+                EntityId entity_id = entity_create(state->match_state, entity_type, entity_cell, action.spawn_units.player_id);
+                squad_entity_list.push_back(entity_id);
+            }
+
+            if (squad_entity_list.empty()) {
+                return (TriggerActionResult) {
+                    .type = TRIGGER_ACTION_RESULT_CONTINUE
+                };
+            }
+
+            state->bots[action.spawn_units.player_id].squads.push_back(
+                bot_squad_create(
+                    state->bots[action.spawn_units.player_id], 
+                    BOT_SQUAD_TYPE_ATTACK, 
+                    action.spawn_units.target_cell, 
+                    squad_entity_list));
+
             return (TriggerActionResult) {
                 .type = TRIGGER_ACTION_RESULT_CONTINUE
             };

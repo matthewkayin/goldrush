@@ -541,6 +541,10 @@ EntityId bot_get_least_defended_enemy_base_goldmine_id(const MatchState& state, 
             least_defended_base_goldmine_id_index = goldmine_id_index;
         }
     }
+
+    if (least_defended_base_goldmine_id_index == INDEX_INVALID) {
+        return ID_NULL;
+    }
     
     return bot.goldmine_ids[least_defended_base_goldmine_id_index];
 }
@@ -1974,12 +1978,15 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
         const Entity& entity = state.entities.get_by_id(entity_id);
         const EntityData& entity_data = entity_get_data(entity.type);
 
+        // If units cannot garrison, they are cavalry
         if (entity_data.garrison_size == ENTITY_CANNOT_GARRISON) {
             distant_cavalry.push_back(entity_id);
             continue;
         }
 
-        if (ivec2::manhattan_distance(entity.cell, squad.target_cell) > BOT_NEAR_DISTANCE) {
+        // If units are close enough that ferrying them isn't worth it, 
+        // then just place them straight into cavalary
+        if (ivec2::manhattan_distance(entity.cell, squad.target_cell) < BOT_MEDIUM_DISTANCE) {
             distant_cavalry.push_back(entity_id);
             continue;
         }
@@ -2059,10 +2066,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
     // At this point, any distant infantry have not been able to garrison, so move them
     // into the cavalry list so that they can be A-moved
     for (EntityId entity_id : distant_infantry) {
-        const Entity& entity = state.entities.get_by_id(entity_id);
-        if (ivec2::manhattan_distance(entity.cell, squad.target_cell) > BOT_NEAR_DISTANCE) {
-            distant_cavalry.push_back(entity_id);
-        }
+        distant_cavalry.push_back(entity_id);
     }
 
     MatchInput move_input = bot_squad_move_distant_units_to_target(state, squad, distant_cavalry);
@@ -2643,12 +2647,12 @@ MatchInput bot_squad_move_distant_units_to_target(const MatchState& state, const
         }
     }
 
-    if (input.move.entity_count != 0) {
-        log_debug("BOT squad_move_distant_units_to_target");
-        return input;
+    if (input.move.entity_count == 0) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
-    return (MatchInput) { .type = MATCH_INPUT_NONE };
+    log_debug("BOT squad_move_distant_units_to_target");
+    return input;
 }
 
 MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, BotSquad& squad) {

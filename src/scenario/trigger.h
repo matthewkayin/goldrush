@@ -7,7 +7,7 @@
 #define TRIGGER_NAME_BUFFER_LENGTH 32
 #define TRIGGER_ACTION_CHAT_PREFIX_BUFFER_LENGTH MAX_USERNAME_LENGTH
 #define TRIGGER_ACTION_CHAT_MESSAGE_BUFFER_LENGTH 64
-#define TRIGGER_EFFECT_COUNT_MAX 16
+#define TRIGGER_ACTION_SPAWN_UNITS_ENTITY_COUNT_MAX SELECTION_LIMIT
 
 // Condition
 
@@ -45,6 +45,7 @@ enum TriggerActionType {
     TRIGGER_ACTION_TYPE_WAIT,
     TRIGGER_ACTION_TYPE_FOG_REVEAL,
     TRIGGER_ACTION_TYPE_ALERT,
+    TRIGGER_ACTION_TYPE_SPAWN_UNITS,
     TRIGGER_ACTION_TYPE_COUNT
 };
 
@@ -86,6 +87,14 @@ struct TriggerActionAlert {
     int cell_size;
 };
 
+struct TriggerActionSpawnUnits {
+    uint8_t player_id;
+    ivec2 spawn_cell;
+    ivec2 target_cell;
+    uint32_t entity_count;
+    EntityType entity_types[TRIGGER_ACTION_SPAWN_UNITS_ENTITY_COUNT_MAX];
+};
+
 struct TriggerAction {
     TriggerActionType type;
     union {
@@ -95,9 +104,10 @@ struct TriggerAction {
         TriggerActionWait wait;
         TriggerActionFogReveal fog;
         TriggerActionAlert alert;
+        TriggerActionSpawnUnits spawn_units;
     };
 };
-STATIC_ASSERT(sizeof(TriggerAction) == 104ULL);
+STATIC_ASSERT(sizeof(TriggerAction) == 108ULL);
 
 struct Trigger {
     bool is_active;

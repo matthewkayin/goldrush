@@ -97,6 +97,7 @@ enum EditorTool {
     EDITOR_TOOL_TRIGGERS,
     EDITOR_TOOL_FOG_REVEAL,
     EDITOR_TOOL_ALERT,
+    EDITOR_TOOL_REQUEST_CELL,
 };
 
 struct EditorClipboard {
@@ -481,7 +482,8 @@ void editor_update() {
                     break;
                 case EDITOR_TOOL_TRIGGERS:
                 case EDITOR_TOOL_FOG_REVEAL: 
-                case EDITOR_TOOL_ALERT: {
+                case EDITOR_TOOL_ALERT:
+                case EDITOR_TOOL_REQUEST_CELL: {
                     // Trigger selection dropdown
                     ui_begin_row(state.ui, ivec2(0, 0), 2);
                         std::vector<std::string> trigger_dropdown_items;
@@ -787,10 +789,22 @@ void editor_update() {
                 EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
                 editor_menu_trigger_action_update(menu, state.ui, state.menu.mode);
 
-                if (menu.request == EDITOR_MENU_TRIGGER_ACTION_REQUEST_FOG_REVEAL) {
-                    editor_set_tool(EDITOR_TOOL_FOG_REVEAL);
-                } else if (menu.request == EDITOR_MENU_TRIGGER_ACTION_REQUEST_ALERT) {
-                    editor_set_tool(EDITOR_TOOL_ALERT);
+                switch (menu.request) {
+                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_NONE:
+                        break;
+                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_FOG_REVEAL: {
+                        editor_set_tool(EDITOR_TOOL_FOG_REVEAL);
+                        break;
+                    }
+                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_ALERT: {
+                        editor_set_tool(EDITOR_TOOL_ALERT);
+                        break;
+                    }
+                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_SPAWN_CELL:
+                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_TARGET_CELL: {
+                        editor_set_tool(EDITOR_TOOL_REQUEST_CELL);
+                        break;
+                    }
                 }
 
                 if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
@@ -1079,6 +1093,16 @@ void editor_update() {
         state.tool = EDITOR_TOOL_TRIGGERS;
     }
 
+    // Request cell (spawn units)
+    if (state.tool == EDITOR_TOOL_REQUEST_CELL &&
+            editor_can_single_use_tool_be_used() &&
+            editor_is_hovered_cell_valid() && 
+            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+        EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
+        editor_menu_trigger_action_set_request_cell(menu, editor_get_hovered_cell());
+        state.tool = EDITOR_TOOL_TRIGGERS;
+    }
+
     // Entity add
     if (state.tool == EDITOR_TOOL_ADD_ENTITY && 
             editor_can_single_use_tool_be_used() && 
@@ -1149,7 +1173,8 @@ bool editor_is_in_menu() {
 
 bool editor_is_using_subtool() {
     return state.tool == EDITOR_TOOL_FOG_REVEAL ||
-        state.tool == EDITOR_TOOL_ALERT;
+        state.tool == EDITOR_TOOL_ALERT || 
+        state.tool == EDITOR_TOOL_REQUEST_CELL;
 }
 
 bool editor_is_toolbar_open() {
@@ -1292,7 +1317,8 @@ void editor_set_tool(EditorTool tool) {
             state.tool_fog_sight = menu.action.fog.sight;
             break;
         }
-        case EDITOR_TOOL_ALERT: {
+        case EDITOR_TOOL_ALERT:
+        case EDITOR_TOOL_REQUEST_CELL: {
             break;
         }
     }
@@ -1364,6 +1390,12 @@ bool editor_is_hovered_cell_valid() {
     if (state.tool == EDITOR_TOOL_ALERT) {
         uint32_t entity_index = editor_get_hovered_entity();
         if (entity_index == INDEX_INVALID) {
+            return false;
+        }
+    }
+    if (state.tool == EDITOR_TOOL_REQUEST_CELL) {
+        const EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
+        if (menu.request == EDITOR_MENU_TRIGGER_ACTION_REQUEST_SPAWN_CELL && ivec2::manhattan_distance(cell, menu.action.spawn_units.target_cell) < 16) {
             return false;
         }
     }

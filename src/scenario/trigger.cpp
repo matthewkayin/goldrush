@@ -28,6 +28,8 @@ const char* trigger_action_type_str(TriggerActionType type) {
             return "Fog Reveal";
         case TRIGGER_ACTION_TYPE_ALERT:
             return "Alert";
+        case TRIGGER_ACTION_TYPE_SPAWN_UNITS:
+            return "Spawn Units";
         case TRIGGER_ACTION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
