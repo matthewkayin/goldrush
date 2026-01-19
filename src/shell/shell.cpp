@@ -1829,9 +1829,6 @@ void match_shell_handle_input(MatchShellState* state) {
         // Check to make sure that all buildings can rally
         for (EntityId id : state->selection) {
             const Entity& entity = state->match_state.entities.get_by_id(id);
-            if (entity.mode == MODE_BUILDING_IN_PROGRESS) {
-                return;
-            }
             if ((entity_get_data(entity.type).building_data.options & BUILDING_CAN_RALLY) != BUILDING_CAN_RALLY) {
                 return;
             }
@@ -3542,7 +3539,7 @@ void match_shell_render(const MatchShellState* state) {
     if (selection_type == MATCH_SHELL_SELECTION_BUILDINGS || (state->replay_mode && selection_type == MATCH_SHELL_SELECTION_ENEMY_BUILDING)) {
         for (EntityId id : state->selection) {
             const Entity& building = state->match_state.entities.get_by_id(id);
-            if (building.mode != MODE_BUILDING_FINISHED || building.rally_point.x == -1) {
+            if (building.mode == MODE_BUILDING_DESTROYED || building.rally_point.x == -1) {
                 continue;
             }
 
