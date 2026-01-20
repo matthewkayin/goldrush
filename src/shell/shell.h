@@ -159,6 +159,8 @@ struct MatchShellState {
     Animation building_fire_animation;
     ivec2 move_animation_position;
     EntityId move_animation_entity_id;
+    Animation highlight_animation;
+    EntityId highlight_entity_id;
 
     // Gold amounts
     uint32_t displayed_gold_amounts[MAX_PLAYERS];
@@ -316,7 +318,7 @@ void match_shell_render_target_build(const MatchShellState* state, const Target&
 RenderSpriteParams match_shell_create_entity_render_params(const MatchShellState* state, const Entity& entity);
 void match_shell_render_entity_select_rings_and_healthbars(const MatchShellState* state, const Entity& entity);
 void match_shell_render_entity_icon(const MatchShellState* state, const Entity& entity, Rect icon_rect);
-void match_shell_render_entity_move_animation(const MatchShellState* state, const Entity& entity);
+void match_shell_render_entity_move_animation(const MatchShellState* state, const Entity& entity, Animation move_animation);
 void match_shell_render_particle(const MatchShellState* state, const Particle& particle);
 bool match_shell_should_render_hotkey_toggled(const MatchShellState* state, InputAction hotkey);
 const char* match_shell_render_get_stat_tooltip(SpriteName sprite);

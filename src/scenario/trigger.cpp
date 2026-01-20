@@ -36,6 +36,8 @@ const char* trigger_action_type_str(TriggerActionType type) {
             return "Show Opp Gold";
         case TRIGGER_ACTION_TYPE_SET_LOSE_CONDITION:
             return "Set Lose Cnd";
+        case TRIGGER_ACTION_TYPE_HIGHLIGHT_ENTITY:
+            return "Highlight";
         case TRIGGER_ACTION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
@@ -107,6 +109,9 @@ int trigger_action_sprintf(char* str_ptr, const TriggerAction& action) {
         }
         case TRIGGER_ACTION_TYPE_SET_LOSE_CONDITION: {
             return sprintf(str_ptr, "Lose Cond");
+        }
+        case TRIGGER_ACTION_TYPE_HIGHLIGHT_ENTITY: {
+            return sprintf(str_ptr, "Highlight %u", action.highlight_entity.entity_index);
         }
         case TRIGGER_ACTION_TYPE_COUNT: {
             GOLD_ASSERT(false);

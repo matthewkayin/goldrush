@@ -99,6 +99,7 @@ enum EditorTool {
     EDITOR_TOOL_ALERT,
     EDITOR_TOOL_REQUEST_CELL,
     EDITOR_TOOL_REQUEST_AREA,
+    EDITOR_TOOL_REQUEST_ENTITY
 };
 
 struct EditorClipboard {
@@ -485,7 +486,8 @@ void editor_update() {
                 case EDITOR_TOOL_FOG_REVEAL: 
                 case EDITOR_TOOL_ALERT:
                 case EDITOR_TOOL_REQUEST_CELL:
-                case EDITOR_TOOL_REQUEST_AREA: {
+                case EDITOR_TOOL_REQUEST_AREA:
+                case EDITOR_TOOL_REQUEST_ENTITY: {
                     // Trigger selection dropdown
                     ui_begin_row(state.ui, ivec2(0, 0), 2);
                         std::vector<std::string> trigger_dropdown_items;
@@ -818,6 +820,10 @@ void editor_update() {
                         editor_set_tool(EDITOR_TOOL_REQUEST_CELL);
                         break;
                     }
+                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_ENTITY: {
+                        editor_set_tool(EDITOR_TOOL_REQUEST_ENTITY);
+                        break;
+                    }
                 }
 
                 if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
@@ -1128,6 +1134,16 @@ void editor_update() {
         state.tool = EDITOR_TOOL_TRIGGERS;
     }
 
+    // Request entity
+    if (state.tool == EDITOR_TOOL_REQUEST_ENTITY &&
+            editor_can_single_use_tool_be_used() &&
+            editor_is_hovered_cell_valid() &&
+            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+        EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
+        editor_menu_trigger_action_set_request_entity(menu, editor_get_hovered_entity());
+        state.tool = EDITOR_TOOL_TRIGGERS;
+    }
+
     // Entity add
     if (state.tool == EDITOR_TOOL_ADD_ENTITY && 
             editor_can_single_use_tool_be_used() && 
@@ -1200,7 +1216,8 @@ bool editor_is_using_subtool() {
     return state.tool == EDITOR_TOOL_FOG_REVEAL ||
         state.tool == EDITOR_TOOL_ALERT || 
         state.tool == EDITOR_TOOL_REQUEST_CELL ||
-        state.tool == EDITOR_TOOL_REQUEST_AREA;
+        state.tool == EDITOR_TOOL_REQUEST_AREA ||
+        state.tool == EDITOR_TOOL_REQUEST_ENTITY;
 }
 
 bool editor_is_toolbar_open() {
@@ -1347,7 +1364,8 @@ void editor_set_tool(EditorTool tool) {
             break;
         }
         case EDITOR_TOOL_ALERT:
-        case EDITOR_TOOL_REQUEST_CELL: {
+        case EDITOR_TOOL_REQUEST_CELL:
+        case EDITOR_TOOL_REQUEST_ENTITY: {
             break;
         }
     }
@@ -1427,6 +1445,9 @@ bool editor_is_hovered_cell_valid() {
         if (menu.request == EDITOR_MENU_TRIGGER_ACTION_REQUEST_SPAWN_CELL && ivec2::manhattan_distance(cell, menu.action.spawn_units.target_cell) < 16) {
             return false;
         }
+    }
+    if (state.tool == EDITOR_TOOL_REQUEST_ENTITY) {
+        return editor_get_hovered_entity() != INDEX_INVALID;
     }
     return true;
 }
@@ -2356,15 +2377,22 @@ void editor_render() {
         }
 
         ivec2 cell = editor_get_hovered_cell();
+        int cell_size = 1;
+        if (state.tool == EDITOR_TOOL_REQUEST_ENTITY) {
+            uint32_t entity_index = editor_get_hovered_entity();
+            if (entity_index != INDEX_INVALID) {
+                cell = state.scenario->entities[entity_index].cell;
+                cell_size = entity_get_data(state.scenario->entities[entity_index].type).cell_size;
+            }
+        }
+        if (state.tool == EDITOR_TOOL_REQUEST_AREA) {
+            cell_size = state.tool_size;
+        }
         Rect rect = (Rect) {
             .x = ((cell.x * TILE_SIZE) - state.camera_offset.x) + CANVAS_RECT.x,
             .y = ((cell.y * TILE_SIZE) - state.camera_offset.y) + CANVAS_RECT.y,
-            .w = TILE_SIZE, .h = TILE_SIZE
+            .w = cell_size * TILE_SIZE, .h = cell_size * TILE_SIZE
         };
-        if (state.tool == EDITOR_TOOL_REQUEST_AREA) {
-            rect.w = TILE_SIZE * state.tool_size;
-            rect.h = rect.w;
-        }
         render_draw_rect(rect, state.scenario == NULL || editor_is_hovered_cell_valid() ? RENDER_COLOR_WHITE : RENDER_COLOR_RED);
     }
 

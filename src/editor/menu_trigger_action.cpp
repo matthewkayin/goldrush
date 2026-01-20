@@ -174,6 +174,19 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
 
                 break;
             }
+            case TRIGGER_ACTION_TYPE_HIGHLIGHT_ENTITY: {
+                char text[64];
+                if (menu.action.highlight_entity.entity_index == INDEX_INVALID) {
+                    sprintf(text, "Entity: None Selected");
+                } else {
+                    sprintf(text, "Entity: %u", menu.action.highlight_entity.entity_index);
+                }
+                if (editor_menu_prompt_and_button(ui, text, "Edit", MENU_RECT)) {
+                    menu.request = EDITOR_MENU_TRIGGER_ACTION_REQUEST_ENTITY;
+                }
+
+                break;
+            }
             case TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD:
             case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES:
                 break;
@@ -270,6 +283,11 @@ void editor_menu_trigger_action_set_request_cell(EditorMenuTriggerAction& menu, 
     menu.request = EDITOR_MENU_TRIGGER_ACTION_REQUEST_NONE;
 }
 
+void editor_menu_trigger_action_set_request_entity(EditorMenuTriggerAction& menu, uint32_t entity_index) {
+    menu.action.highlight_entity.entity_index = entity_index;
+    menu.request = EDITOR_MENU_TRIGGER_ACTION_REQUEST_NONE;
+}
+
 void editor_menu_trigger_action_set_action_type(EditorMenuTriggerAction& menu, TriggerActionType action_type) {
     TriggerAction action;
     action.type = action_type;
@@ -314,6 +332,11 @@ void editor_menu_trigger_action_set_action_type(EditorMenuTriggerAction& menu, T
         }
         case TRIGGER_ACTION_TYPE_SET_LOSE_CONDITION: {
             action.set_lose_condition.lose_on_buildings_destroyed = true;
+            break;
+        }
+        case TRIGGER_ACTION_TYPE_HIGHLIGHT_ENTITY: {
+            action.highlight_entity.entity_index = INDEX_INVALID;
+            break;
         }
         case TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD:
         case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES:

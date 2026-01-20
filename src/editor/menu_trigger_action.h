@@ -16,6 +16,7 @@ enum EditorMenuTriggerActionRequest {
     EDITOR_MENU_TRIGGER_ACTION_REQUEST_ALERT,
     EDITOR_MENU_TRIGGER_ACTION_REQUEST_SPAWN_CELL,
     EDITOR_MENU_TRIGGER_ACTION_REQUEST_TARGET_CELL,
+    EDITOR_MENU_TRIGGER_ACTION_REQUEST_ENTITY,
 };
 
 struct EditorMenuTriggerAction {
@@ -35,5 +36,6 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
 void editor_menu_trigger_action_set_fog_cell(EditorMenuTriggerAction& menu, ivec2 cell, int cell_size, int sight);
 void editor_menu_trigger_action_set_alert(EditorMenuTriggerAction& menu, ivec2 cell, int cell_size);
 void editor_menu_trigger_action_set_request_cell(EditorMenuTriggerAction& menu, ivec2 cell);
+void editor_menu_trigger_action_set_request_entity(EditorMenuTriggerAction& menu, uint32_t entity_index);
 
 #endif

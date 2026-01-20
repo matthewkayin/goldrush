@@ -1270,6 +1270,9 @@ void match_shell_update(MatchShellState* state) {
     if (animation_is_playing(state->move_animation)) {
         animation_update(state->move_animation);
     }
+    if (animation_is_playing(state->highlight_animation)) {
+        animation_update(state->highlight_animation);
+    }
     animation_update(state->rally_flag_animation);
     animation_update(state->building_fire_animation);
     if (state->status_timer != 0) {
@@ -2424,6 +2427,11 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
             state->scenario_lose_on_buildings_destroyed = action.set_lose_condition.lose_on_buildings_destroyed;
             break;
         }
+        case TRIGGER_ACTION_TYPE_HIGHLIGHT_ENTITY: {
+            state->highlight_animation = animation_create(ANIMATION_UI_HIGHLIGHT_ENTITY);
+            state->highlight_entity_id = state->match_state.entities.get_id_of(action.highlight_entity.entity_index);
+            break;
+        }
         case TRIGGER_ACTION_TYPE_COUNT: {
             GOLD_ASSERT(false);
             break;
@@ -3378,7 +3386,7 @@ void match_shell_render(const MatchShellState* state) {
                     if (entity_index != INDEX_INVALID) {
                         const Entity& entity = state->match_state.entities[entity_index];
                         if (entity_get_data(entity.type).cell_layer == cell_layer) {
-                            match_shell_render_entity_move_animation(state, entity);
+                            match_shell_render_entity_move_animation(state, entity, state->move_animation);
                         }
                     } else if (cell_layer == CELL_LAYER_GROUND) {
                         auto it = state->match_state.remembered_entities[state->match_state.players[network_get_player_id()].team].find(state->move_animation_entity_id);
@@ -3387,6 +3395,17 @@ void match_shell_render(const MatchShellState* state) {
 
                             render_sprite_frame(match_shell_get_entity_select_ring(it->second.type, state->move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
                         }
+                    }
+                }
+            }
+
+            // Highlight animation
+            if (animation_is_playing(state->highlight_animation) && state->highlight_animation.frame.x % 2 == 0) {
+                uint32_t entity_index = state->match_state.entities.get_index_of(state->highlight_entity_id);
+                if (entity_index != INDEX_INVALID) {
+                    const Entity& entity = state->match_state.entities[entity_index];
+                    if (entity_get_data(entity.type).cell_layer == cell_layer) {
+                        match_shell_render_entity_move_animation(state, entity, state->highlight_animation);
                     }
                 }
             }
@@ -3735,7 +3754,7 @@ void match_shell_render(const MatchShellState* state) {
         if (entity_index != INDEX_INVALID) {
             const Entity& entity = state->match_state.entities[entity_index];
             if (entity_get_data(entity.type).cell_layer == CELL_LAYER_SKY) {
-                match_shell_render_entity_move_animation(state, entity);
+                match_shell_render_entity_move_animation(state, entity, state->move_animation);
             }
         }
     }
@@ -4703,7 +4722,7 @@ void match_shell_render_entity_icon(const MatchShellState* state, const Entity& 
     match_shell_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
 }
 
-void match_shell_render_entity_move_animation(const MatchShellState* state, const Entity& entity) {
+void match_shell_render_entity_move_animation(const MatchShellState* state, const Entity& entity, Animation move_animation) {
     Rect entity_rect = entity_get_rect(entity);
     ivec2 entity_center_position = entity_is_unit(entity.type) 
             ? entity.position.to_ivec2()
@@ -4713,7 +4732,7 @@ void match_shell_render_entity_move_animation(const MatchShellState* state, cons
         entity_center_position.y += ENTITY_SKY_POSITION_Y_OFFSET;
     }
 
-    render_sprite_frame(match_shell_get_entity_select_ring(entity.type, state->move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
+    render_sprite_frame(match_shell_get_entity_select_ring(entity.type, move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
 }
 
 void match_shell_render_particle(const MatchShellState* state, const Particle& particle) {

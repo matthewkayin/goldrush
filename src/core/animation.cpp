@@ -38,6 +38,11 @@ void animation_init() {
         .frames = animation_frame_range(0, 1, 8),
         .loops = 2
     };
+    ANIMATION_DATA[ANIMATION_UI_HIGHLIGHT_ENTITY] = (AnimationData) {
+        .vframe = 0,
+        .frames = animation_frame_range(0, 1, 16),
+        .loops = 5
+    };
     ANIMATION_DATA[ANIMATION_UI_MOVE_ATTACK_ENTITY] = (AnimationData) {
         .vframe = 0,
         .frames = animation_frame_range(0, 1, 8),
