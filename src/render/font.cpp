@@ -28,6 +28,12 @@ static const std::unordered_map<FontName, FontParams> FONT_PARAMS = {
         .size = 10,
         .color = (SDL_Color) { .r = 238, .g = 209, .b = 158, .a = 255 }
     }},
+    { FONT_HACK_GOLD_SATURATED, (FontParams) { 
+        .options = FONT_OPTION_IGNORE_BEARING,
+        .path = "hack.ttf", 
+        .size = 10,
+        .color = (SDL_Color) { .r = 237, .g = 200, .b = 135, .a = 255 }
+    }},
     { FONT_HACK_PLAYER0, (FontParams) { 
         .options = FONT_OPTION_IGNORE_BEARING,
         .path = "hack.ttf", 

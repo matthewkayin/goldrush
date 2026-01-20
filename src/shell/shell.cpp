@@ -2450,7 +2450,7 @@ FontName match_shell_trigger_action_chat_get_font(TriggerActionChatType type) {
             return FONT_HACK_WHITE;
         case TRIGGER_ACTION_CHAT_TYPE_NEW_OBJECTIVE:
         case TRIGGER_ACTION_CHAT_TYPE_OBJECTIVES_COMPLETE:
-            return FONT_HACK_GOLD;
+            return FONT_HACK_GOLD_SATURATED;
         case TRIGGER_ACTION_CHAT_TYPE_HINT:
             return FONT_HACK_PLAYER0;
         case TRIGGER_ACTION_CHAT_TYPE_COUNT:
@@ -4361,9 +4361,9 @@ void match_shell_render(const MatchShellState* state) {
         // Objectives
     if (!state->current_objective_indices.empty()) {
         const SpriteInfo& menu_button_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_BURGER);
-        ivec2 objectives_text_pos = MENU_BUTTON_POSITION + ivec2(4, menu_button_sprite_info.frame_height + 4);
+        ivec2 objectives_text_pos = MENU_BUTTON_POSITION + ivec2(1, menu_button_sprite_info.frame_height + 4);
         render_text(FONT_HACK_SHADOW, "Objectives:", objectives_text_pos + ivec2(1, 1));
-        render_text(FONT_HACK_GOLD, "Objectives:", objectives_text_pos);
+        render_text(FONT_HACK_GOLD_SATURATED, "Objectives:", objectives_text_pos);
 
         objectives_text_pos += ivec2(4, 20);
         const SpriteInfo& checkbox_sprite_info = render_get_sprite_info(SPRITE_UI_OBJECTIVE_CHECKBOX);
@@ -4389,7 +4389,7 @@ void match_shell_render(const MatchShellState* state) {
             // Render objective text
             ivec2 text_pos = objectives_text_pos + ivec2(checkbox_sprite_info.frame_width + 2, 1);
             render_text(FONT_HACK_SHADOW, objective_text, text_pos + ivec2(1, 1));
-            render_text(FONT_HACK_GOLD, objective_text, text_pos);
+            render_text(FONT_HACK_GOLD_SATURATED, objective_text, text_pos);
 
             objectives_text_pos.y += checkbox_sprite_info.frame_height + 4;
         }
