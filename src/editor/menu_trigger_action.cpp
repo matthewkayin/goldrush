@@ -87,7 +87,9 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
                 if (editor_menu_dropdown(ui, "Type:", &type, menu.message_type_items, MENU_RECT)) {
                     menu.action.chat.type = (TriggerActionChatType)type;
                 }
-                ui_text_input(ui, "Message: ", ivec2(MENU_RECT.w - 32, 24), &menu.chat_message_value, TRIGGER_ACTION_CHAT_MESSAGE_BUFFER_LENGTH - 1);
+                if (menu.action.chat.type != TRIGGER_ACTION_CHAT_TYPE_OBJECTIVES_COMPLETE) {
+                    ui_text_input(ui, "Message: ", ivec2(MENU_RECT.w - 32, 24), &menu.chat_message_value, TRIGGER_ACTION_CHAT_MESSAGE_BUFFER_LENGTH - 1);
+                }
 
                 break;
             }
@@ -212,6 +214,7 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
 
     if (mode == EDITOR_MENU_MODE_SUBMIT) {
         if (menu.action.type == TRIGGER_ACTION_TYPE_CHAT) {
+            // Prefix
             switch (menu.action.chat.type) {
                 case TRIGGER_ACTION_CHAT_TYPE_MESSAGE: {
                     sprintf(menu.action.chat.prefix, "");
@@ -225,13 +228,22 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
                     sprintf(menu.action.chat.prefix, "Hint:");
                     break;
                 }
+                case TRIGGER_ACTION_CHAT_TYPE_OBJECTIVES_COMPLETE: {
+                    sprintf(menu.action.chat.prefix, "Objective Complete");
+                    break;
+                }
                 case TRIGGER_ACTION_CHAT_TYPE_COUNT: {
                     GOLD_ASSERT(false);
                     break;
                 }
             }
 
-            strncpy(menu.action.chat.message, menu.chat_message_value.c_str(), TRIGGER_ACTION_CHAT_MESSAGE_BUFFER_LENGTH - 1);
+            // Message
+            if (menu.action.chat.type == TRIGGER_ACTION_CHAT_TYPE_NEW_OBJECTIVE) {
+                sprintf(menu.action.chat.message, "");
+            } else {
+                strncpy(menu.action.chat.message, menu.chat_message_value.c_str(), TRIGGER_ACTION_CHAT_MESSAGE_BUFFER_LENGTH - 1);
+            }
         }
     }
 }

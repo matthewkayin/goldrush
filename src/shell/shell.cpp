@@ -2333,35 +2333,28 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
                 action.chat.type == TRIGGER_ACTION_CHAT_TYPE_HINT
                     ? CHAT_MESSAGE_HINT_DURATION 
                     : CHAT_MESSAGE_DURATION);
-            return (TriggerActionResult) {
-                .type = TRIGGER_ACTION_RESULT_CONTINUE
-            };
+            if (action.chat.type == TRIGGER_ACTION_CHAT_TYPE_NEW_OBJECTIVE) {
+                return match_shell_trigger_action_result_wait(state, 2);
+            } else if (action.chat.type == TRIGGER_ACTION_CHAT_TYPE_OBJECTIVES_COMPLETE) {
+                return match_shell_trigger_action_result_wait(state, 5);
+            }
+
+            break;
         }
         case TRIGGER_ACTION_TYPE_ADD_OBJECTIVE: {
             state->current_objective_indices.push_back(action.add_objective.objective_index);
-            return (TriggerActionResult) {
-                .type = TRIGGER_ACTION_RESULT_CONTINUE
-            };
+            break;
         }
         case TRIGGER_ACTION_TYPE_COMPLETE_OBJECTIVE: {
             state->scenario_objectives[action.finish_objective.objective_index].is_complete = true;
-            return (TriggerActionResult) {
-                .type = TRIGGER_ACTION_RESULT_CONTINUE
-            };
+            break;
         }
         case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES: {
             state->current_objective_indices.clear();
-            return (TriggerActionResult) {
-                .type = TRIGGER_ACTION_RESULT_CONTINUE
-            };
+            break;
         }
         case TRIGGER_ACTION_TYPE_WAIT: {
-            return (TriggerActionResult) {
-                .type = TRIGGER_ACTION_RESULT_WAIT,
-                .wait = (TriggerActionResultWait) {
-                    .resume_time = state->match_timer + (60U * action.wait.seconds)
-                }
-            };
+            return match_shell_trigger_action_result_wait(state, action.wait.seconds);
         }
         case TRIGGER_ACTION_TYPE_FOG_REVEAL: {
             FogReveal fog_reveal = (FogReveal) {
@@ -2382,9 +2375,8 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
                 CELL_LAYER_SKY, // This makes us ignore elevation
                 true);
             state->match_state.fog_reveals.push_back(fog_reveal);
-            return (TriggerActionResult) {
-                .type = TRIGGER_ACTION_RESULT_CONTINUE
-            };
+
+            break;
         }
         case TRIGGER_ACTION_TYPE_ALERT: {
             state->alerts.push_back((Alert) {
@@ -2393,9 +2385,8 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
                 .cell_size = action.alert.cell_size,
                 .timer = ALERT_TOTAL_DURATION
             });
-            return (TriggerActionResult) {
-                .type = TRIGGER_ACTION_RESULT_CONTINUE
-            };
+
+            break;
         }
         case TRIGGER_ACTION_TYPE_SPAWN_UNITS: {
             std::vector<EntityId> squad_entity_list;
@@ -2413,9 +2404,7 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
             }
 
             if (squad_entity_list.empty()) {
-                return (TriggerActionResult) {
-                    .type = TRIGGER_ACTION_RESULT_CONTINUE
-                };
+                break;
             }
 
             state->bots[action.spawn_units.player_id].squads.push_back(
@@ -2425,29 +2414,34 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
                     action.spawn_units.target_cell, 
                     squad_entity_list));
 
-            return (TriggerActionResult) {
-                .type = TRIGGER_ACTION_RESULT_CONTINUE
-            };
+            break;
         }
         case TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD: {
             state->scenario_show_enemy_gold = true;
-            return (TriggerActionResult) {
-                .type = TRIGGER_ACTION_RESULT_CONTINUE
-            };
+            break;
         }
         case TRIGGER_ACTION_TYPE_SET_LOSE_CONDITION: {
             state->scenario_lose_on_buildings_destroyed = action.set_lose_condition.lose_on_buildings_destroyed;
-            return (TriggerActionResult) {
-                .type = TRIGGER_ACTION_RESULT_CONTINUE
-            };
+            break;
         }
         case TRIGGER_ACTION_TYPE_COUNT: {
             GOLD_ASSERT(false);
-            return (TriggerActionResult) {
-                .type = TRIGGER_ACTION_RESULT_CONTINUE
-            };
+            break;
         }
     }
+
+    return (TriggerActionResult) {
+        .type = TRIGGER_ACTION_RESULT_CONTINUE
+    };
+}
+
+TriggerActionResult match_shell_trigger_action_result_wait(const MatchShellState* state, uint32_t seconds) {
+    return (TriggerActionResult) {
+        .type = TRIGGER_ACTION_RESULT_WAIT,
+        .wait = (TriggerActionResultWait) {
+            .resume_time = state->match_timer + (60U * seconds)
+        }
+    };
 }
 
 FontName match_shell_trigger_action_chat_get_font(TriggerActionChatType type) {
@@ -2455,6 +2449,7 @@ FontName match_shell_trigger_action_chat_get_font(TriggerActionChatType type) {
         case TRIGGER_ACTION_CHAT_TYPE_MESSAGE:
             return FONT_HACK_WHITE;
         case TRIGGER_ACTION_CHAT_TYPE_NEW_OBJECTIVE:
+        case TRIGGER_ACTION_CHAT_TYPE_OBJECTIVES_COMPLETE:
             return FONT_HACK_GOLD;
         case TRIGGER_ACTION_CHAT_TYPE_HINT:
             return FONT_HACK_PLAYER0;

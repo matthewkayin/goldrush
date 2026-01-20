@@ -50,6 +50,8 @@ const char* trigger_action_chat_type_str(TriggerActionChatType type) {
             return "New Obj";
         case TRIGGER_ACTION_CHAT_TYPE_HINT:
             return "Hint";
+        case TRIGGER_ACTION_CHAT_TYPE_OBJECTIVES_COMPLETE:
+            return "Obj Comp";
         case TRIGGER_ACTION_CHAT_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
