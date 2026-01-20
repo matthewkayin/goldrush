@@ -8,6 +8,8 @@ const char* trigger_condition_type_str(TriggerConditionType type) {
             return "Obj Comp";
         case TRIGGER_CONDITION_TYPE_AREA_DISCOVERED:
             return "Area Discvrd";
+        case TRIGGER_CONDITION_TYPE_FULL_BUNKER:
+            return "Full Bunker";
         case TRIGGER_CONDITION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
@@ -71,6 +73,9 @@ int trigger_condition_sprintf(char* str_ptr, const TriggerCondition& condition) 
         }
         case TRIGGER_CONDITION_TYPE_AREA_DISCOVERED: {
             return sprintf(str_ptr, "Area Discvrd");
+        }
+        case TRIGGER_CONDITION_TYPE_FULL_BUNKER: {
+            return sprintf(str_ptr, "Full Bunker");
         }
         case TRIGGER_CONDITION_TYPE_COUNT:
             GOLD_ASSERT(false);

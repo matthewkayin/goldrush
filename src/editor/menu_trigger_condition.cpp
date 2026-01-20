@@ -77,6 +77,8 @@ void editor_menu_trigger_condition_update(EditorMenuTriggerCondition& menu, UI& 
                 }
                 break;
             }
+            case TRIGGER_CONDITION_TYPE_FULL_BUNKER:
+                break;
             case TRIGGER_CONDITION_TYPE_COUNT:
                 GOLD_ASSERT(false);
                 break;
@@ -111,6 +113,8 @@ void editor_menu_trigger_condition_set_condition_type(EditorMenuTriggerCondition
             condition.area_discovered.cell_size = 1;
             break;
         }
+        case TRIGGER_CONDITION_TYPE_FULL_BUNKER:
+            break;
         case TRIGGER_CONDITION_TYPE_COUNT:
             GOLD_ASSERT(false);
             break;

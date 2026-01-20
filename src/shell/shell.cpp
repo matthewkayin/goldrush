@@ -12,6 +12,10 @@
 // Status
 static const uint32_t STATUS_DURATION = 60;
 
+// Match over
+static const uint32_t MATCH_OVER_TIMER_DURATION = 60U;
+static const uint32_t MATCH_OVER_TIMER_NOT_STARTED = UINT32_MAX;
+
 // Menu
 static const ivec2 MENU_BUTTON_POSITION = ivec2(1, 1);
 static const int MENU_WIDTH = 150;
@@ -146,6 +150,7 @@ MatchShellState* match_shell_base_init() {
     // Simulation timers
     state->match_timer = 0;
     state->disconnect_timer = 0;
+    state->match_over_timer = MATCH_OVER_TIMER_NOT_STARTED;
     state->is_paused = false;
 
     // Camera
@@ -375,14 +380,14 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
                 continue;
             }
 
-            BotSquad bot_squad;
+            BotSquadType squad_type;
             switch (squad.type) {
                 case SCENARIO_SQUAD_TYPE_DEFEND: {
-                    bot_squad.type = BOT_SQUAD_TYPE_DEFEND;
+                    squad_type = BOT_SQUAD_TYPE_DEFEND;
                     break;
                 }
                 case SCENARIO_SQUAD_TYPE_LANDMINES: {
-                    bot_squad.type = BOT_SQUAD_TYPE_LANDMINES;
+                    squad_type = BOT_SQUAD_TYPE_LANDMINES;
                     break;
                 }
                 case SCENARIO_SQUAD_TYPE_COUNT: {
@@ -392,18 +397,20 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
             }
 
             ivec2 squad_average_position = ivec2(0, 0);
+            std::vector<EntityId> squad_entity_list;
             for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entity_count; squad_entity_index++) {
                 uint32_t entity_index = squad.entities[squad_entity_index];
 
                 // Since we added entities from the scenario in-order,
                 // the entity index in scenario should match the entity index in the match state
-                bot_squad.entities.push_back(state->match_state.entities.get_id_of(entity_index));
+                squad_entity_list.push_back(state->match_state.entities.get_id_of(entity_index));
                 squad_average_position += scenario->entities[entity_index].cell;
             }
 
             // TODO: allow us to set squad target pos?
-            GOLD_ASSERT(!bot_squad.entities.empty());
-            bot_squad.target_cell = squad_average_position / bot_squad.entities.size();
+            GOLD_ASSERT(!squad_entity_list.empty());
+            ivec2 squad_target_cell = squad_average_position / squad_entity_list.size();
+            state->bots[player_id].squads.push_back(bot_squad_create(state->bots[player_id], squad_type, squad_target_cell, squad_entity_list));
         }
     }
 
@@ -1464,7 +1471,7 @@ void match_shell_update(MatchShellState* state) {
     }
 
     // Check win conditions
-    if (!state->replay_mode && state->scenario_triggers.empty()) {
+    if (!state->replay_mode) {
         bool player_has_buildings[MAX_PLAYERS];
         bool player_has_entities[MAX_PLAYERS];
         memset(player_has_buildings, 0, sizeof(player_has_buildings));
@@ -1478,7 +1485,6 @@ void match_shell_update(MatchShellState* state) {
             player_has_entities[entity.player_id] |= entity.health != 0;
         }
 
-        bool opposing_player_just_lost = false;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if (!state->match_state.players[player_id].active) {
                 continue;
@@ -1494,15 +1500,23 @@ void match_shell_update(MatchShellState* state) {
                 sprintf(defeat_message, "%s has been defeated.", state->match_state.players[player_id].name);
                 match_shell_add_chat_message(state, FONT_HACK_WHITE, "", defeat_message, CHAT_MESSAGE_DURATION);
 
-                if (player_id == network_get_player_id()) {
-                    state->mode = MATCH_SHELL_MODE_MATCH_OVER_DEFEAT;
-                } else {
-                    opposing_player_just_lost = true;
+                if (player_id == network_get_player_id() ||
+                        (state->match_state.players[network_get_player_id()].active && 
+                        !match_shell_is_at_least_one_opponent_in_match(state))) {
+                    state->match_over_timer = MATCH_OVER_TIMER_DURATION;
                 }
             }
         }
-        if (opposing_player_just_lost && !match_shell_is_at_least_one_opponent_in_match(state)) {
-            state->mode = MATCH_SHELL_MODE_MATCH_OVER_VICTORY;
+    }
+
+    if (state->match_over_timer != MATCH_OVER_TIMER_NOT_STARTED) {
+        state->match_over_timer--;
+        if (state->match_over_timer == 0) {
+            if (state->match_state.players[network_get_player_id()].active) {
+                state->mode = MATCH_SHELL_MODE_MATCH_OVER_VICTORY;
+            } else {
+                state->mode = MATCH_SHELL_MODE_MATCH_OVER_DEFEAT;
+            }
         }
     }
 }
@@ -2238,6 +2252,23 @@ bool match_shell_is_trigger_condition_met(const MatchShellState* state, const Tr
         }
         case TRIGGER_CONDITION_TYPE_AREA_DISCOVERED: {
             return match_shell_is_cell_rect_revealed(state, condition.area_discovered.cell, condition.area_discovered.cell_size);
+        }
+        case TRIGGER_CONDITION_TYPE_FULL_BUNKER: {
+            return match_find_entity(state->match_state, [state](const Entity& entity, EntityId /*entity_id*/) {
+                if (entity.player_id != network_get_player_id() ||
+                        entity.type != ENTITY_BUNKER ||
+                        entity.mode != MODE_BUILDING_FINISHED ||
+                        entity.garrisoned_units.size() < entity_get_data(ENTITY_BUNKER).garrison_capacity) {
+                    return false;
+                }
+                for (EntityId garrisoned_unit_id : entity.garrisoned_units) {
+                    const Entity& garrisoned_unit = state->match_state.entities.get_by_id(garrisoned_unit_id);
+                    if (garrisoned_unit.type != ENTITY_COWBOY) {
+                        return false;
+                    }
+                }
+                return true;
+            }) != ID_NULL;
         }
         case TRIGGER_CONDITION_TYPE_COUNT:
             GOLD_ASSERT(false);

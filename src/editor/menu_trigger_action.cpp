@@ -252,7 +252,7 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
             }
 
             // Message
-            if (menu.action.chat.type == TRIGGER_ACTION_CHAT_TYPE_NEW_OBJECTIVE) {
+            if (menu.action.chat.type == TRIGGER_ACTION_CHAT_TYPE_OBJECTIVES_COMPLETE) {
                 sprintf(menu.action.chat.message, "");
             } else {
                 strncpy(menu.action.chat.message, menu.chat_message_value.c_str(), TRIGGER_ACTION_CHAT_MESSAGE_BUFFER_LENGTH - 1);

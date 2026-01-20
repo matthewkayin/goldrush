@@ -110,6 +110,7 @@ struct MatchShellState {
     // Simulation timers
     uint32_t match_timer;
     uint32_t disconnect_timer;
+    uint32_t match_over_timer;
     bool is_paused;
 
     // Inputs
