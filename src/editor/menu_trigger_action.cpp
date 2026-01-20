@@ -20,7 +20,15 @@ static const UiSliderParams ACTION_WAIT_SECONDS_SLIDER_PARAMS = (UiSliderParams)
     .display = UI_SLIDER_DISPLAY_RAW_VALUE,
     .size = UI_SLIDER_SIZE_NORMAL,
     .min = 1,
-    .max = 60,
+    .max = 20,
+    .step = 1
+};
+
+static const UiSliderParams CAMERA_PAN_DURATION_SLIDER_PARAMS = (UiSliderParams) {
+    .display = UI_SLIDER_DISPLAY_RAW_VALUE,
+    .size = UI_SLIDER_SIZE_NORMAL,
+    .min = 1,
+    .max = 10,
     .step = 1
 };
 
@@ -187,8 +195,21 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
 
                 break;
             }
+            case TRIGGER_ACTION_TYPE_CAMERA_PAN: {
+                char prompt[64];
+                sprintf(prompt, "Cell: <%i, %i>", menu.action.camera_pan.cell.x, menu.action.camera_pan.cell.y);
+                if (editor_menu_prompt_and_button(ui, prompt, "Edit", MENU_RECT)) {
+                    menu.request = EDITOR_MENU_TRIGGER_ACTION_REQUEST_CAMERA_PAN_CELL;
+                }
+
+                editor_menu_slider(ui, "Duration:", &menu.action.camera_pan.duration_seconds, CAMERA_PAN_DURATION_SLIDER_PARAMS, MENU_RECT);
+
+                break;
+            }
             case TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD:
             case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES:
+            case TRIGGER_ACTION_TYPE_CAMERA_RETURN:
+            case TRIGGER_ACTION_TYPE_CAMERA_FREE:
                 break;
             case TRIGGER_ACTION_TYPE_COUNT: {
                 GOLD_ASSERT(false);
@@ -279,6 +300,8 @@ void editor_menu_trigger_action_set_request_cell(EditorMenuTriggerAction& menu, 
         menu.action.spawn_units.spawn_cell = cell;
     } else if (menu.request == EDITOR_MENU_TRIGGER_ACTION_REQUEST_TARGET_CELL) {
         menu.action.spawn_units.target_cell = cell;
+    } else if (menu.request == EDITOR_MENU_TRIGGER_ACTION_REQUEST_CAMERA_PAN_CELL) {
+        menu.action.camera_pan.cell = cell;
     }
     menu.request = EDITOR_MENU_TRIGGER_ACTION_REQUEST_NONE;
 }
@@ -338,8 +361,15 @@ void editor_menu_trigger_action_set_action_type(EditorMenuTriggerAction& menu, T
             action.highlight_entity.entity_index = INDEX_INVALID;
             break;
         }
+        case TRIGGER_ACTION_TYPE_CAMERA_PAN: {
+            action.camera_pan.cell = ivec2(10, 10);
+            action.camera_pan.duration_seconds = 1;
+            break;
+        }
         case TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD:
         case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES:
+        case TRIGGER_ACTION_TYPE_CAMERA_RETURN:
+        case TRIGGER_ACTION_TYPE_CAMERA_FREE:
             break;
         case TRIGGER_ACTION_TYPE_COUNT: 
             GOLD_ASSERT(false);

@@ -57,6 +57,9 @@ enum TriggerActionType {
     TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD,
     TRIGGER_ACTION_TYPE_SET_LOSE_CONDITION,
     TRIGGER_ACTION_TYPE_HIGHLIGHT_ENTITY,
+    TRIGGER_ACTION_TYPE_CAMERA_PAN,
+    TRIGGER_ACTION_TYPE_CAMERA_RETURN,
+    TRIGGER_ACTION_TYPE_CAMERA_FREE,
     TRIGGER_ACTION_TYPE_COUNT
 };
 
@@ -115,6 +118,11 @@ struct TriggerActionHighlightEntity {
     uint32_t entity_index;
 };
 
+struct TriggerActionCameraPan {
+    ivec2 cell;
+    uint32_t duration_seconds;
+};
+
 struct TriggerAction {
     TriggerActionType type;
     union {
@@ -127,6 +135,7 @@ struct TriggerAction {
         TriggerActionSpawnUnits spawn_units;
         TriggerActionSetLoseCondition set_lose_condition;
         TriggerActionHighlightEntity highlight_entity;
+        TriggerActionCameraPan camera_pan;
     };
 };
 STATIC_ASSERT(sizeof(TriggerAction) == 108ULL);

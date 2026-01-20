@@ -40,6 +40,12 @@ const char* trigger_action_type_str(TriggerActionType type) {
             return "Set Lose Cnd";
         case TRIGGER_ACTION_TYPE_HIGHLIGHT_ENTITY:
             return "Highlight";
+        case TRIGGER_ACTION_TYPE_CAMERA_PAN:
+            return "Cam Pan";
+        case TRIGGER_ACTION_TYPE_CAMERA_RETURN:
+            return "Cam Return";
+        case TRIGGER_ACTION_TYPE_CAMERA_FREE:
+            return "Cam Free";
         case TRIGGER_ACTION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
@@ -117,6 +123,15 @@ int trigger_action_sprintf(char* str_ptr, const TriggerAction& action) {
         }
         case TRIGGER_ACTION_TYPE_HIGHLIGHT_ENTITY: {
             return sprintf(str_ptr, "Highlight %u", action.highlight_entity.entity_index);
+        }
+        case TRIGGER_ACTION_TYPE_CAMERA_PAN: {
+            return sprintf(str_ptr, "Cam Pan %u", action.camera_pan.duration_seconds);
+        }
+        case TRIGGER_ACTION_TYPE_CAMERA_RETURN: {
+            return sprintf(str_ptr, "Cam Return");
+        }
+        case TRIGGER_ACTION_TYPE_CAMERA_FREE: {
+            return sprintf(str_ptr, "Cam Free");
         }
         case TRIGGER_ACTION_TYPE_COUNT: {
             GOLD_ASSERT(false);

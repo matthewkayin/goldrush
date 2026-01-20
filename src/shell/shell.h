@@ -58,6 +58,14 @@ enum MatchShellMode {
     MATCH_SHELL_MODE_DESYNC
 };
 
+enum CameraMode {
+    CAMERA_MODE_FREE,
+    CAMERA_MODE_MINIMAP_DRAG,
+    CAMERA_MODE_PAN,
+    CAMERA_MODE_PAN_HOLD,
+    CAMERA_MODE_PAN_RETURN
+};
+
 struct Alert {
     MinimapPixel pixel;
     ivec2 cell;
@@ -73,7 +81,8 @@ enum FireCellRender {
 
 enum TriggerActionResultType {
     TRIGGER_ACTION_RESULT_CONTINUE,
-    TRIGGER_ACTION_RESULT_WAIT
+    TRIGGER_ACTION_RESULT_WAIT,
+    TRIGGER_ACTION_RESULT_WAIT_FOR_CAMERA_PAN
 };
 
 struct TriggerActionResultWait {
@@ -121,8 +130,12 @@ struct MatchShellState {
     Bot bots[MAX_PLAYERS];
 
     // Camera
+    CameraMode camera_mode;
     ivec2 camera_offset;
-    bool is_minimap_dragging;
+    ivec2 camera_pan_return_offset;
+    ivec2 camera_pan_offset;
+    uint32_t camera_pan_timer;
+    uint32_t camera_pan_duration;
     ivec2 camera_hotkeys[MATCH_SHELL_CAMERA_HOTKEY_COUNT];
 
     // Selection
@@ -251,6 +264,11 @@ bool match_shell_is_targeting(const MatchShellState* state);
 // Camera
 void match_shell_clamp_camera(MatchShellState* state);
 void match_shell_center_camera_on_cell(MatchShellState* state, ivec2 cell);
+bool match_shell_is_camera_free(const MatchShellState* state);
+bool match_shell_is_camera_panning(const MatchShellState* state);
+void match_shell_end_camera_pan(MatchShellState* state);
+void match_shell_begin_camera_pan(MatchShellState* state, ivec2 to, uint32_t pan_duration);
+void match_shell_begin_camera_return(MatchShellState* state);
 
 // Selection
 std::vector<EntityId> match_shell_create_selection(const MatchShellState* state, Rect select_rect);

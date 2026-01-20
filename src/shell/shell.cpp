@@ -94,6 +94,7 @@ static const uint32_t REPLAY_FOG_EVERYONE = 1U;
 
 // Camera
 static const int CAMERA_DRAG_MARGIN = 4;
+static const uint32_t CAMERA_PAN_RETURN_DURATION = 60U;
 
 // Selection
 static const uint32_t MATCH_SHELL_DOUBLE_CLICK_DURATION = 30U;
@@ -155,7 +156,8 @@ MatchShellState* match_shell_base_init() {
 
     // Camera
     state->camera_offset = ivec2(0, 0);
-    state->is_minimap_dragging = false;
+    state->camera_pan_timer = 0;
+    state->camera_mode = CAMERA_MODE_FREE;
     for (int index = 0; index < MATCH_SHELL_CAMERA_HOTKEY_COUNT; index++) {
         state->camera_hotkeys[index] = ivec2(-1, -1);
     }
@@ -601,7 +603,8 @@ void match_shell_update(MatchShellState* state) {
         .x = MENU_BUTTON_POSITION.x, .y = MENU_BUTTON_POSITION.y,
         .w = menu_button_sprite_info.frame_width, .h = menu_button_sprite_info.frame_height
     };
-    if (!(state->is_minimap_dragging || match_shell_is_selecting(state)) && 
+    if (match_shell_is_camera_free(state) && 
+            !match_shell_is_selecting(state) && 
             // Menu button doesn't work for defeat / victory / desync screens
             !(state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT || state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY || state->mode == MATCH_SHELL_MODE_DESYNC) &&
             ((menu_button_rect.has_point(input_get_mouse_position()) && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) || input_is_action_just_pressed(INPUT_ACTION_MATCH_MENU))) {
@@ -620,8 +623,8 @@ void match_shell_update(MatchShellState* state) {
     // Menu
     ui_begin(state->ui);
     if (match_shell_is_in_menu(state)) {
-        if (state->is_minimap_dragging) {
-            state->is_minimap_dragging = false;
+        if (state->camera_mode == CAMERA_MODE_MINIMAP_DRAG) {
+            state->camera_mode = CAMERA_MODE_FREE;
         }
 
         state->ui.input_enabled = state->options_menu.mode == OPTIONS_MENU_CLOSED;
@@ -762,7 +765,7 @@ void match_shell_update(MatchShellState* state) {
     }
 
     // Camera drag
-    if (!match_shell_is_selecting(state) && !state->is_minimap_dragging) {
+    if (!match_shell_is_selecting(state) && match_shell_is_camera_free(state) && state->camera_pan_timer == 0) {
         ivec2 camera_drag_direction = ivec2(0, 0);
         if (input_get_mouse_position().x < CAMERA_DRAG_MARGIN) {
             camera_drag_direction.x = -1;
@@ -783,17 +786,18 @@ void match_shell_update(MatchShellState* state) {
             !match_shell_is_targeting(state) &&
             !match_shell_is_selecting(state) &&
             input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
-            !match_shell_is_in_menu(state)) {
-        state->is_minimap_dragging = true;
+            !match_shell_is_in_menu(state) &&
+            state->camera_pan_timer == 0) {
+        state->camera_mode = CAMERA_MODE_MINIMAP_DRAG;
     } 
 
     // End minimap drag
-    if (state->is_minimap_dragging && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
-        state->is_minimap_dragging = false;
+    if (state->camera_mode == CAMERA_MODE_MINIMAP_DRAG && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
+        state->camera_mode = CAMERA_MODE_FREE;
     }
 
     // During minimap drag
-    if (state->is_minimap_dragging) {
+    if (state->camera_mode == CAMERA_MODE_MINIMAP_DRAG) {
         ivec2 minimap_pos = ivec2(
             std::clamp(input_get_mouse_position().x - MINIMAP_RECT.x, 0, MINIMAP_RECT.w),
             std::clamp(input_get_mouse_position().y - MINIMAP_RECT.y, 0, MINIMAP_RECT.h));
@@ -806,7 +810,7 @@ void match_shell_update(MatchShellState* state) {
     // Idle miner hotkey
     const std::vector<EntityId> idle_miners = match_shell_find_idle_miners(state);
     if (!state->replay_mode && 
-            !state->is_minimap_dragging && 
+            match_shell_is_camera_free(state) &&
             !match_shell_is_selecting(state) && 
             !idle_miners.empty() &&
             match_shell_has_pressed_idle_miner_button()) {
@@ -833,7 +837,8 @@ void match_shell_update(MatchShellState* state) {
     if (!match_shell_is_mouse_in_ui() && 
             !(match_shell_has_pressed_idle_miner_button() && !idle_miners.empty()) &&
             (state->mode == MATCH_SHELL_MODE_NONE || match_shell_is_in_hotkey_submenu(state)) &&
-            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
+            state->camera_pan_timer == 0) {
         state->select_origin = input_get_mouse_position() + state->camera_offset;
     }
     // End selecting
@@ -1291,6 +1296,38 @@ void match_shell_update(MatchShellState* state) {
     if (state->control_group_double_tap_timer != 0) {
         state->control_group_double_tap_timer--;
     }
+    if (state->camera_mode == CAMERA_MODE_PAN || state->camera_mode == CAMERA_MODE_PAN_RETURN) {
+        state->camera_pan_timer--;
+
+        ivec2 start_pos, end_pos;
+        if (state->camera_mode == CAMERA_MODE_PAN) {
+            start_pos = state->camera_pan_return_offset;
+            end_pos = state->camera_pan_offset;
+        } else {
+            start_pos = state->camera_pan_offset;
+            end_pos = state->camera_pan_return_offset;
+        }
+
+        if (state->camera_pan_timer == 0) {
+            state->camera_offset = end_pos;
+            state->camera_mode = state->camera_mode == CAMERA_MODE_PAN
+                ? CAMERA_MODE_PAN_HOLD
+                : CAMERA_MODE_FREE;
+        } else {
+            float percent = 
+                (float)(state->camera_pan_duration - state->camera_pan_timer) / 
+                (float)state->camera_pan_duration;
+            log_debug("camera pan update timer %u duration %u start <%i, %i> end <%i, %i> percent %f offset <%i, %i>",
+                state->camera_pan_timer,
+                state->camera_pan_duration,
+                start_pos.x, start_pos.y,
+                end_pos.x, end_pos.y,
+                percent,
+                state->camera_offset.x, state->camera_offset.y);
+            ivec2 difference = end_pos - start_pos;
+            state->camera_offset = start_pos + ivec2((int)((float)difference.x * percent), (int)((float)difference.y * percent));
+        }
+    }
     for (int sound = 0; sound < SOUND_COUNT; sound++) {
         if (state->sound_cooldown_timers[sound] != 0) {
             state->sound_cooldown_timers[sound]--;
@@ -1522,7 +1559,7 @@ void match_shell_update(MatchShellState* state) {
 }
 
 void match_shell_handle_input(MatchShellState* state) {
-    if (state->is_minimap_dragging || match_shell_is_selecting(state)) {
+    if (!match_shell_is_camera_free(state) || match_shell_is_selecting(state)) {
         return;
     }
 
@@ -1758,7 +1795,8 @@ void match_shell_handle_input(MatchShellState* state) {
     // Building queue click
     if (state->selection.size() == 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
             !spectator_mode &&
-            !(state->is_minimap_dragging || match_shell_is_selecting(state))) {
+            match_shell_is_camera_free(state) &&
+            !match_shell_is_selecting(state)) {
         const Entity& building = state->match_state.entities.get_by_id(state->selection[0]);
         const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
         for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
@@ -1825,8 +1863,8 @@ void match_shell_handle_input(MatchShellState* state) {
         bool is_action_pressed = input_is_action_just_pressed(action_required);
         // Check that a move command can be executed in the current UI state
         bool is_movement_allowed = state->mode != MATCH_SHELL_MODE_BUILDING_PLACE && 
-                                  !state->is_minimap_dragging && 
-                                  match_shell_get_selection_type(state, state->selection) 
+                                    match_shell_is_camera_free(state) &&
+                                    match_shell_get_selection_type(state, state->selection) 
                                         == MATCH_SHELL_SELECTION_UNITS;
         // Check that the mouse is either in the world or in the minimap
         bool is_mouse_in_position = !match_shell_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position());
@@ -1841,7 +1879,8 @@ void match_shell_handle_input(MatchShellState* state) {
     if (input_is_action_just_pressed(INPUT_ACTION_RIGHT_CLICK) && 
             match_shell_get_selection_type(state, state->selection) == MATCH_SHELL_SELECTION_BUILDINGS &&
             !spectator_mode &&
-            !(state->is_minimap_dragging || match_shell_is_selecting(state) || match_shell_is_targeting(state)) &&
+            match_shell_is_camera_free(state) &&
+            !(match_shell_is_selecting(state) || match_shell_is_targeting(state)) &&
             (!match_shell_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position()))) {
         // Check to make sure that all buildings can rally
         for (EntityId id : state->selection) {
@@ -2295,6 +2334,8 @@ bool match_shell_trigger_action_instance_should_continue(const MatchShellState* 
             return true;
         case TRIGGER_ACTION_RESULT_WAIT:
             return state->match_timer >= instance.result.wait.resume_time;
+        case TRIGGER_ACTION_RESULT_WAIT_FOR_CAMERA_PAN:
+            return state->camera_pan_timer == 0;
     }
 }
 
@@ -2463,6 +2504,24 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
             state->highlight_entity_id = state->match_state.entities.get_id_of(action.highlight_entity.entity_index);
             break;
         }
+        case TRIGGER_ACTION_TYPE_CAMERA_PAN: {
+            match_shell_begin_camera_pan(state, action.camera_pan.cell, action.camera_pan.duration_seconds * 60U);
+
+            return (TriggerActionResult) {
+                .type = TRIGGER_ACTION_RESULT_WAIT_FOR_CAMERA_PAN
+            };
+        }
+        case TRIGGER_ACTION_TYPE_CAMERA_RETURN: {
+            match_shell_begin_camera_return(state);
+
+            return (TriggerActionResult) {
+                .type = TRIGGER_ACTION_RESULT_WAIT_FOR_CAMERA_PAN
+            };
+        }
+        case TRIGGER_ACTION_TYPE_CAMERA_FREE: {
+            match_shell_end_camera_pan(state);
+            break;
+        }
         case TRIGGER_ACTION_TYPE_COUNT: {
             GOLD_ASSERT(false);
             break;
@@ -2539,6 +2598,40 @@ void match_shell_center_camera_on_cell(MatchShellState* state, ivec2 cell) {
     state->camera_offset.x = (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
     state->camera_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / 2);
     match_shell_clamp_camera(state);
+}
+
+bool match_shell_is_camera_free(const MatchShellState* state) {
+    return state->camera_mode == CAMERA_MODE_FREE;
+}
+
+bool match_shell_is_camera_panning(const MatchShellState* state) {
+    return state->camera_mode == CAMERA_MODE_PAN || 
+        state->camera_mode == CAMERA_MODE_PAN_HOLD ||
+        state->camera_mode == CAMERA_MODE_PAN_RETURN;
+}
+
+void match_shell_end_camera_pan(MatchShellState* state) {
+    state->camera_mode = CAMERA_MODE_FREE;
+}
+
+void match_shell_begin_camera_pan(MatchShellState* state, ivec2 to, uint32_t pan_duration) {
+    // Convert to cell into camera offset
+    state->camera_pan_offset.x = (to.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
+    state->camera_pan_offset.y = (to.y * TILE_SIZE) + (TILE_SIZE / 2) - ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / 2);
+    state->camera_pan_offset.x = std::clamp(state->camera_pan_offset.x, 0, (state->match_state.map.width * TILE_SIZE) - SCREEN_WIDTH);
+    state->camera_pan_offset.y = std::clamp(state->camera_pan_offset.y, 0, (state->match_state.map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
+    log_debug("begin camera pan offset %i,%i", state->camera_pan_offset.x, state->camera_pan_offset.y);
+
+    state->camera_pan_return_offset = state->camera_offset;
+    state->camera_pan_timer = pan_duration;
+    state->camera_pan_duration = pan_duration;
+
+    state->camera_mode = CAMERA_MODE_PAN;
+}
+
+void match_shell_begin_camera_return(MatchShellState* state) {
+    state->camera_pan_timer = CAMERA_PAN_RETURN_DURATION;
+    state->camera_mode = CAMERA_MODE_PAN_RETURN;
 }
 
 // SELECTION
@@ -4101,7 +4194,7 @@ void match_shell_render(const MatchShellState* state) {
         int hframe = 0;
         if (!match_shell_does_player_meet_hotkey_requirements(state->match_state, hotkey)) {
             hframe = 2;
-        } else if (!(state->is_minimap_dragging || match_shell_is_selecting(state)) && hotkey_rect.has_point(input_get_mouse_position())) {
+        } else if (match_shell_is_camera_free(state) && !match_shell_is_selecting(state) && hotkey_rect.has_point(input_get_mouse_position())) {
             hframe = 1;
             hotkey_position.y--;
         }
@@ -4111,7 +4204,8 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // UI Tooltip
-    if (!(state->is_minimap_dragging || match_shell_is_selecting(state) || match_shell_is_in_menu(state))) {
+    if (match_shell_is_camera_free(state) && 
+            !(match_shell_is_selecting(state) || match_shell_is_in_menu(state))) {
         uint32_t hotkey_hovered_index;
         for (hotkey_hovered_index = 0; hotkey_hovered_index < HOTKEY_GROUP_SIZE; hotkey_hovered_index++) {
             Rect hotkey_rect = (Rect) {
@@ -4132,7 +4226,17 @@ void match_shell_render(const MatchShellState* state) {
 
         const Rect idle_miner_rect = match_shell_get_idle_miner_button_rect();
         if (idle_miner_rect.has_point(input_get_mouse_position())) {
-            hotkey = INPUT_HOTKEY_IDLE_MINER;
+            // Determine if we actually have idle miners before rendering the tooltip
+            bool has_idle_miners = false;
+            for (const Entity& entity : state->match_state.entities) {
+                if (entity.player_id == network_get_player_id() && entity_is_idle_miner(entity)) {
+                    has_idle_miners = true;
+                    break;
+                }
+            }
+            if (has_idle_miners) {
+                hotkey = INPUT_HOTKEY_IDLE_MINER;
+            }
         }
 
         if (hotkey != INPUT_HOTKEY_NONE) {
@@ -4306,8 +4410,10 @@ void match_shell_render(const MatchShellState* state) {
                         break;
                     }
                 }
-                bool hovered = !(state->is_minimap_dragging || match_shell_is_selecting(state)) && 
-                                    icon_rect.has_point(input_get_mouse_position());
+                bool hovered = 
+                    match_shell_is_camera_free(state) && 
+                    !match_shell_is_selecting(state) && 
+                    icon_rect.has_point(input_get_mouse_position());
                 render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
                 render_sprite_frame(item_sprite, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
             }
@@ -4452,8 +4558,12 @@ void match_shell_render(const MatchShellState* state) {
             .x = MENU_BUTTON_POSITION.x, .y = MENU_BUTTON_POSITION.y,
             .w = sprite_info.frame_width, .h = sprite_info.frame_height
         };
-        bool hovered = state->mode == MATCH_SHELL_MODE_MENU || state->mode == MATCH_SHELL_MODE_MENU_SURRENDER || (
-                            !(state->is_minimap_dragging || match_shell_is_selecting(state)) && menu_button_rect.has_point(input_get_mouse_position()));
+        bool hovered = 
+            state->mode == MATCH_SHELL_MODE_MENU || 
+            state->mode == MATCH_SHELL_MODE_MENU_SURRENDER || 
+                (match_shell_is_camera_free(state) && 
+                !(match_shell_is_selecting(state)) && 
+                menu_button_rect.has_point(input_get_mouse_position()));
         render_sprite_frame(SPRITE_UI_BUTTON_BURGER, ivec2((int)hovered, 0), MENU_BUTTON_POSITION, RENDER_SPRITE_NO_CULL, 0);
     }
 
@@ -4739,8 +4849,10 @@ void match_shell_render_entity_select_rings_and_healthbars(const MatchShellState
 
 void match_shell_render_entity_icon(const MatchShellState* state, const Entity& entity, Rect icon_rect) {
     const EntityData& entity_data = entity_get_data(entity.type);
-    bool icon_hovered = !(state->is_minimap_dragging || match_shell_is_selecting(state)) &&
-                            icon_rect.has_point(input_get_mouse_position());
+    bool icon_hovered = 
+        match_shell_is_camera_free(state) &&
+        !match_shell_is_selecting(state) &&
+        icon_rect.has_point(input_get_mouse_position());
 
     render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
     render_sprite_frame(entity_get_icon(state->match_state, entity.type, entity.player_id), ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);

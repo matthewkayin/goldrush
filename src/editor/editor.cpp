@@ -816,7 +816,8 @@ void editor_update() {
                         break;
                     }
                     case EDITOR_MENU_TRIGGER_ACTION_REQUEST_SPAWN_CELL:
-                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_TARGET_CELL: {
+                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_TARGET_CELL:
+                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_CAMERA_PAN_CELL: {
                         editor_set_tool(EDITOR_TOOL_REQUEST_CELL);
                         break;
                     }
@@ -2487,9 +2488,20 @@ void editor_render() {
         }
     }
 
-    // Player spawn rect
+    // Camera rect
+    ivec2 camera_cell = ivec2(-1, -1);
     if (state.tool == EDITOR_TOOL_PLAYER_SPAWN) {
-        ivec2 camera_offset = editor_get_player_spawn_camera_offset(state.scenario->player_spawn);
+        camera_cell = state.scenario->player_spawn;
+    }
+    if (state.tool == EDITOR_TOOL_REQUEST_CELL) {
+        EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
+        if (menu.request == EDITOR_MENU_TRIGGER_ACTION_REQUEST_CAMERA_PAN_CELL &&
+                editor_is_hovered_cell_valid()) {
+            camera_cell = editor_get_hovered_cell();
+        }
+    }
+    if (camera_cell.x != -1) {
+        ivec2 camera_offset = editor_get_player_spawn_camera_offset(camera_cell);
         const Rect rendered_rect = (Rect) {
             .x = camera_offset.x + CANVAS_RECT.x - state.camera_offset.x,
             .y = camera_offset.y + CANVAS_RECT.y - state.camera_offset.y,
