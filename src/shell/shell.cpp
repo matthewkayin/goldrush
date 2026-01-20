@@ -2327,10 +2327,10 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
     switch (action.type) {
         case TRIGGER_ACTION_TYPE_CHAT: {
             match_shell_add_chat_message(state, 
-                match_shell_trigger_action_chat_get_prefix_font(action.chat.prefix_type), 
+                match_shell_trigger_action_chat_get_font(action.chat.type), 
                 action.chat.prefix, 
                 action.chat.message, 
-                strcmp(action.chat.prefix, "Hint:") == 0
+                action.chat.type == TRIGGER_ACTION_CHAT_TYPE_HINT
                     ? CHAT_MESSAGE_HINT_DURATION 
                     : CHAT_MESSAGE_DURATION);
             return (TriggerActionResult) {
@@ -2450,15 +2450,15 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
     }
 }
 
-FontName match_shell_trigger_action_chat_get_prefix_font(TriggerActionChatPrefixType type) {
+FontName match_shell_trigger_action_chat_get_font(TriggerActionChatType type) {
     switch (type) {
-        case TRIGGER_ACTION_CHAT_PREFIX_TYPE_NONE:
+        case TRIGGER_ACTION_CHAT_TYPE_MESSAGE:
             return FONT_HACK_WHITE;
-        case TRIGGER_ACTION_CHAT_PREFIX_TYPE_GOLD:
+        case TRIGGER_ACTION_CHAT_TYPE_NEW_OBJECTIVE:
             return FONT_HACK_GOLD;
-        case TRIGGER_ACTION_CHAT_PREFIX_TYPE_BLUE:
+        case TRIGGER_ACTION_CHAT_TYPE_HINT:
             return FONT_HACK_PLAYER0;
-        case TRIGGER_ACTION_CHAT_PREFIX_TYPE_COUNT:
+        case TRIGGER_ACTION_CHAT_TYPE_COUNT:
             GOLD_ASSERT(false);
             return FONT_HACK_WHITE;
     }

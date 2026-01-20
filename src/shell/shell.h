@@ -234,7 +234,7 @@ bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const 
 bool match_shell_trigger_action_instance_should_continue(const MatchShellState* state, const TriggerActionInstance& instance);
 bool match_shell_trigger_action_instance_is_finished(const MatchShellState* state, const TriggerActionInstance& instance);
 TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& effect);
-FontName match_shell_trigger_action_chat_get_prefix_font(TriggerActionChatPrefixType type);
+FontName match_shell_trigger_action_chat_get_font(TriggerActionChatPrefixType type);
 
 
 // State queries

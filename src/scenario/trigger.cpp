@@ -42,15 +42,15 @@ const char* trigger_action_type_str(TriggerActionType type) {
     }
 }
 
-const char* trigger_action_chat_prefix_type_str(TriggerActionChatPrefixType type) {
+const char* trigger_action_chat_type_str(TriggerActionChatType type) {
     switch (type) {
-        case TRIGGER_ACTION_CHAT_PREFIX_TYPE_NONE:
-            return "None";
-        case TRIGGER_ACTION_CHAT_PREFIX_TYPE_GOLD:
-            return "Gold";
-        case TRIGGER_ACTION_CHAT_PREFIX_TYPE_BLUE:
-            return "Blue";
-        case TRIGGER_ACTION_CHAT_PREFIX_TYPE_COUNT:
+        case TRIGGER_ACTION_CHAT_TYPE_MESSAGE:
+            return "Message";
+        case TRIGGER_ACTION_CHAT_TYPE_NEW_OBJECTIVE:
+            return "New Obj";
+        case TRIGGER_ACTION_CHAT_TYPE_HINT:
+            return "Hint";
+        case TRIGGER_ACTION_CHAT_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
     }
@@ -77,17 +77,7 @@ int trigger_condition_sprintf(char* str_ptr, const TriggerCondition& condition) 
 int trigger_action_sprintf(char* str_ptr, const TriggerAction& action) {  
     switch (action.type) {
         case TRIGGER_ACTION_TYPE_CHAT: {
-            switch (action.chat.prefix_type) {
-                case TRIGGER_ACTION_CHAT_PREFIX_TYPE_NONE:
-                    return sprintf(str_ptr, "Chat: None");
-                case TRIGGER_ACTION_CHAT_PREFIX_TYPE_GOLD:
-                    return sprintf(str_ptr, "Chat: Obj");
-                case TRIGGER_ACTION_CHAT_PREFIX_TYPE_BLUE:
-                    return sprintf(str_ptr, "Chat: Hint");
-                default:
-                    GOLD_ASSERT(false);
-                    return 0;
-            }
+            return sprintf(str_ptr, "Chat: %s", trigger_action_chat_type_str(action.chat.type));
         }
         case TRIGGER_ACTION_TYPE_ADD_OBJECTIVE: {
             return sprintf(str_ptr, "Add Obj %u", action.add_objective.objective_index);
@@ -126,7 +116,7 @@ int trigger_action_sprintf(char* str_ptr, const TriggerAction& action) {
 TriggerAction trigger_action_init() {
     TriggerAction new_action;
     new_action.type = TRIGGER_ACTION_TYPE_CHAT;
-    new_action.chat.prefix_type = TRIGGER_ACTION_CHAT_PREFIX_TYPE_NONE;
+    new_action.chat.type = TRIGGER_ACTION_CHAT_TYPE_MESSAGE;
     sprintf(new_action.chat.prefix, "");
     sprintf(new_action.chat.message, "");
 

@@ -58,15 +58,15 @@ enum TriggerActionType {
     TRIGGER_ACTION_TYPE_COUNT
 };
 
-enum TriggerActionChatPrefixType {
-    TRIGGER_ACTION_CHAT_PREFIX_TYPE_NONE,
-    TRIGGER_ACTION_CHAT_PREFIX_TYPE_GOLD,
-    TRIGGER_ACTION_CHAT_PREFIX_TYPE_BLUE,
-    TRIGGER_ACTION_CHAT_PREFIX_TYPE_COUNT
+enum TriggerActionChatType {
+    TRIGGER_ACTION_CHAT_TYPE_MESSAGE,
+    TRIGGER_ACTION_CHAT_TYPE_NEW_OBJECTIVE,
+    TRIGGER_ACTION_CHAT_TYPE_HINT,
+    TRIGGER_ACTION_CHAT_TYPE_COUNT
 };
 
 struct TriggerActionChat {
-    TriggerActionChatPrefixType prefix_type;
+    TriggerActionChatType type;
     char prefix[TRIGGER_ACTION_CHAT_PREFIX_BUFFER_LENGTH];
     char message[TRIGGER_ACTION_CHAT_MESSAGE_BUFFER_LENGTH];
 };
@@ -132,7 +132,7 @@ struct Trigger {
 
 const char* trigger_condition_type_str(TriggerConditionType type);
 const char* trigger_action_type_str(TriggerActionType type);
-const char* trigger_action_chat_prefix_type_str(TriggerActionChatPrefixType type);
+const char* trigger_action_chat_type_str(TriggerActionChatType type);
 int trigger_condition_sprintf(char* str_ptr, const TriggerCondition& condition);
 int trigger_action_sprintf(char* str_ptr, const TriggerAction& action);
 

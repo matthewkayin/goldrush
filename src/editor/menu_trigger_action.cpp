@@ -46,8 +46,8 @@ EditorMenuTriggerAction editor_menu_trigger_action_open(const Scenario* scenario
         menu.objective_items.push_back(std::string(text));
     }
 
-    for (uint32_t message_type = 0; message_type < TRIGGER_ACTION_CHAT_PREFIX_TYPE_COUNT; message_type++) {
-        menu.message_type_items.push_back(trigger_action_chat_prefix_type_str((TriggerActionChatPrefixType)message_type));
+    for (uint32_t chat_type = 0; chat_type < TRIGGER_ACTION_CHAT_TYPE_COUNT; chat_type++) {
+        menu.message_type_items.push_back(trigger_action_chat_type_str((TriggerActionChatType)chat_type));
     }
 
     for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
@@ -83,12 +83,9 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
 
         switch (menu.action.type) {
             case TRIGGER_ACTION_TYPE_CHAT: {
-                uint32_t prefix_type = menu.action.chat.prefix_type;
-                if (editor_menu_dropdown(ui, "Prefix Type:", &prefix_type, menu.message_type_items, MENU_RECT)) {
-                    menu.action.chat.prefix_type = (TriggerActionChatPrefixType)prefix_type;
-                }
-                if (menu.action.chat.prefix_type != TRIGGER_ACTION_CHAT_PREFIX_TYPE_NONE) {
-                    ui_text_input(ui, "Prefix: ", ivec2(MENU_RECT.w - 32, 24), &menu.chat_prefix_value, TRIGGER_ACTION_CHAT_PREFIX_BUFFER_LENGTH - 1);
+                uint32_t type = menu.action.chat.type;
+                if (editor_menu_dropdown(ui, "Type:", &type, menu.message_type_items, MENU_RECT)) {
+                    menu.action.chat.type = (TriggerActionChatType)type;
                 }
                 ui_text_input(ui, "Message: ", ivec2(MENU_RECT.w - 32, 24), &menu.chat_message_value, TRIGGER_ACTION_CHAT_MESSAGE_BUFFER_LENGTH - 1);
 
@@ -215,11 +212,25 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
 
     if (mode == EDITOR_MENU_MODE_SUBMIT) {
         if (menu.action.type == TRIGGER_ACTION_TYPE_CHAT) {
-            if (menu.action.chat.prefix_type == TRIGGER_ACTION_CHAT_PREFIX_TYPE_NONE) {
-                sprintf(menu.action.chat.prefix, "");
-            } else {
-                strncpy(menu.action.chat.prefix, menu.chat_prefix_value.c_str(), TRIGGER_ACTION_CHAT_PREFIX_BUFFER_LENGTH - 1);
+            switch (menu.action.chat.type) {
+                case TRIGGER_ACTION_CHAT_TYPE_MESSAGE: {
+                    sprintf(menu.action.chat.prefix, "");
+                    break;
+                }
+                case TRIGGER_ACTION_CHAT_TYPE_NEW_OBJECTIVE: {
+                    sprintf(menu.action.chat.prefix, "New Objective:");
+                    break;
+                }
+                case TRIGGER_ACTION_CHAT_TYPE_HINT: {
+                    sprintf(menu.action.chat.prefix, "Hint:");
+                    break;
+                }
+                case TRIGGER_ACTION_CHAT_TYPE_COUNT: {
+                    GOLD_ASSERT(false);
+                    break;
+                }
             }
+
             strncpy(menu.action.chat.message, menu.chat_message_value.c_str(), TRIGGER_ACTION_CHAT_MESSAGE_BUFFER_LENGTH - 1);
         }
     }
@@ -253,7 +264,7 @@ void editor_menu_trigger_action_set_action_type(EditorMenuTriggerAction& menu, T
 
     switch (action_type) {
         case TRIGGER_ACTION_TYPE_CHAT: {
-            action.chat.prefix_type = TRIGGER_ACTION_CHAT_PREFIX_TYPE_NONE;
+            action.chat.type = TRIGGER_ACTION_CHAT_TYPE_MESSAGE;
             sprintf(action.chat.prefix, "");
             sprintf(action.chat.message, "");
             break;
