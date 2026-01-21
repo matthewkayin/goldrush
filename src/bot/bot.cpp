@@ -32,6 +32,7 @@ static const uint32_t LANDMINE_MAX_PER_BASE = 6U;
 Bot bot_empty() {
     Bot bot;
 
+    memset(&bot.config, 0, sizeof(bot.config));
     bot.player_id = PLAYER_NONE;
 
     bot.unit_comp = BOT_UNIT_COMP_NONE;

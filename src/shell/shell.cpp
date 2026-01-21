@@ -263,7 +263,6 @@ MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
     }
 
     // Init bots
-    // memset(state->bots, 0, sizeof(state->bots));
     Difficulty difficulty = (Difficulty)network_get_match_setting(MATCH_SETTING_DIFFICULTY);
     BotConfig bot_config = bot_config_init_from_difficulty(difficulty);
     int bot_lcg_seed = lcg_seed;

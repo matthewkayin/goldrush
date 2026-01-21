@@ -254,8 +254,10 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot 
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const Bot& bot = bots[player_id];
 
-        // Player ID
+        // Config
         desync_write_value<BotConfig>(bot.config);
+
+        // Player ID
         desync_write_value<uint8_t>(bot.player_id);
 
         // Is entity reserved
@@ -519,9 +521,11 @@ void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2) {
 
     // Bots
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        // Config
+        state_buffer_offset += desync_compare_value<BotConfig>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+
         // Player ID
         state_buffer_offset += desync_compare_value<uint8_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
-        state_buffer_offset += desync_compare_value<Difficulty>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
 
         // Is entity reserved
         state_buffer_offset += desync_compare_unordered_map<EntityId, bool>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
