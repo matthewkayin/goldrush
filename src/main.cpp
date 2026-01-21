@@ -184,6 +184,11 @@ int gold_main(int argc, char** argv) {
     #ifdef GOLD_DEBUG
         bool should_render_debug_info = false;
         uint64_t debug_playback_speed = 1;
+        #ifndef GOLD_DEBUG_DESYNC
+            if (launch_mode == LAUNCH_MODE_TEST_HOST || launch_mode == LAUNCH_MODE_TEST_JOIN) {
+                debug_playback_speed = 4;
+            }
+        #endif
 
         GameState state = game_debug_init(window, launch_mode);
 

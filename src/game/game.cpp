@@ -286,7 +286,7 @@ void game_test_set_mode(GameState& state, GameMode mode) {
 
     if (mode == GAME_MODE_MATCH) {
         #ifdef GOLD_TEST_MODE_SEED
-            int lcg_seed = GOLD_TEST_MODE_SEED
+            int lcg_seed = GOLD_TEST_MODE_SEED;
         #else
             int lcg_seed = rand();
         #endif
