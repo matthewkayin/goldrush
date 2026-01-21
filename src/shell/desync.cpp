@@ -440,7 +440,7 @@ void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2) {
     // Map region connections
     size_t region_connections_size;
     state_buffer_offset += desync_compare_value<size_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset, &region_connections_size);
-    for (size_t index = 0; index < region_connection_indices_size; index++) {
+    for (size_t index = 0; index < region_connections_size; index++) {
         state_buffer_offset += desync_compare_vector<ivec2>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
         state_buffer_offset += desync_compare_unordered_map<int, int>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
     }
