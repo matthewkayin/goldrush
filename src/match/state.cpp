@@ -42,9 +42,15 @@ MatchState match_base_init(int32_t lcg_seed, int map_width, int map_height, Matc
     state.fire_cells = std::vector<int>((size_t)(map_width * map_height), 0);
 
     // Init fog and detection for each team
+    log_debug("Init fog %u,%u", map_width, map_height);
     for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
         state.fog[team] = std::vector<int>((size_t)(map_width * map_height), FOG_HIDDEN);
         state.detection[team] = std::vector<int>((size_t)(map_width * map_height), 0);
+        for (int i = 0; i < map_width * map_height; i++) {
+            if (state.fog[team][i] != FOG_HIDDEN) {
+                log_warn("FOG %u index %i = %i", team, i, state.fog[team][i]);
+            }
+        }
     }
 
     return state;
@@ -3498,6 +3504,8 @@ void match_fog_update(MatchState& state, uint32_t player_team, ivec2 cell, int c
     * This function does a raytrace from the cell center outwards to determine what this unit can see
     * Raytracing is done using Bresenham's Line Generation Algorithm (https://www.geeksforgeeks.org/bresenhams-line-generation-algorithm/)
     */
+
+    log_debug("fog update team %u cell <%i, %i> cell_size %i sight %i has_detection %i cell_layer %u increment %i", player_team, cell.x, cell.y, cell_size, sight, (int)has_detection, cell_layer, (int)increment);
 
     ivec2 search_corners[4] = {
         cell - ivec2(sight, sight),
