@@ -4468,6 +4468,10 @@ void match_shell_render(const MatchShellState* state) {
         bool should_render_gold, should_render_population, should_render_name;
         match_shell_should_render_player_resources(state, player_id, &should_render_gold, &should_render_population, &should_render_name);
 
+        if (!(should_render_gold || should_render_population || should_render_name)) {
+            continue;
+        }
+
         int render_x = SCREEN_WIDTH;
         const ivec2 text_shadow_offset = ivec2(1, 1);
 
