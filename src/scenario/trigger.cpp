@@ -46,6 +46,8 @@ const char* trigger_action_type_str(TriggerActionType type) {
             return "Cam Return";
         case TRIGGER_ACTION_TYPE_CAMERA_FREE:
             return "Cam Free";
+        case TRIGGER_ACTION_TYPE_SOUND:
+            return "Sound";
         case TRIGGER_ACTION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
@@ -132,6 +134,9 @@ int trigger_action_sprintf(char* str_ptr, const TriggerAction& action) {
         }
         case TRIGGER_ACTION_TYPE_CAMERA_FREE: {
             return sprintf(str_ptr, "Cam Free");
+        }
+        case TRIGGER_ACTION_TYPE_SOUND: {
+            return sprintf(str_ptr, "Sfx: %s", sound_get_name(action.sound.sound));
         }
         case TRIGGER_ACTION_TYPE_COUNT: {
             GOLD_ASSERT(false);

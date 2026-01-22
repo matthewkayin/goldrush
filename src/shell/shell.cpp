@@ -2519,6 +2519,10 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
             match_shell_end_camera_pan(state);
             break;
         }
+        case TRIGGER_ACTION_TYPE_SOUND: {
+            sound_play(action.sound.sound);
+            break;
+        }
         case TRIGGER_ACTION_TYPE_COUNT: {
             GOLD_ASSERT(false);
             break;

@@ -28,6 +28,7 @@ struct EditorMenuTriggerAction {
     std::vector<std::string> objective_items;
     std::vector<std::string> message_type_items;
     std::vector<std::string> spawn_units_player_items;
+    std::vector<std::string> sound_dropdown_items;
     std::string chat_prefix_value;
     std::string chat_message_value;
 };

@@ -60,6 +60,7 @@ enum TriggerActionType {
     TRIGGER_ACTION_TYPE_CAMERA_PAN,
     TRIGGER_ACTION_TYPE_CAMERA_RETURN,
     TRIGGER_ACTION_TYPE_CAMERA_FREE,
+    TRIGGER_ACTION_TYPE_SOUND,
     TRIGGER_ACTION_TYPE_COUNT
 };
 
@@ -123,6 +124,10 @@ struct TriggerActionCameraPan {
     uint32_t duration_seconds;
 };
 
+struct TriggerActionSound {
+    SoundName sound;
+};
+
 struct TriggerAction {
     TriggerActionType type;
     union {
@@ -136,6 +141,7 @@ struct TriggerAction {
         TriggerActionSetLoseCondition set_lose_condition;
         TriggerActionHighlightEntity highlight_entity;
         TriggerActionCameraPan camera_pan;
+        TriggerActionSound sound;
     };
 };
 STATIC_ASSERT(sizeof(TriggerAction) == 108ULL);

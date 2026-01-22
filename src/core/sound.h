@@ -41,6 +41,7 @@ enum SoundName {
 
 bool sound_init();
 void sound_quit();
+const char* sound_get_name(SoundName sound);
 void sound_set_sfx_volume(uint32_t volume);
 void sound_set_mus_volume(uint32_t volume);
 

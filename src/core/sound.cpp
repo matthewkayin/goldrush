@@ -269,6 +269,10 @@ void sound_quit() {
     log_info("Quit sound.");
 }
 
+const char* sound_get_name(SoundName sound) {
+    return SOUND_PARAMS.at(sound).path;
+}
+
 void sound_set_sfx_volume(uint32_t volume) {
     for (int stream = 0; stream < SFX_STREAM_COUNT; stream++) {
         SDL_SetAudioStreamGain(state.streams[stream], (float)volume / 100.0f);

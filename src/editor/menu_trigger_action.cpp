@@ -64,6 +64,10 @@ EditorMenuTriggerAction editor_menu_trigger_action_open(const Scenario* scenario
         menu.spawn_units_player_items.push_back(std::string(text));
     }
 
+    for (uint32_t sound = 0; sound < SOUND_COUNT; sound++) {
+        menu.sound_dropdown_items.push_back(std::string(sound_get_name((SoundName)sound)));
+    }
+
     if (action.type == TRIGGER_ACTION_TYPE_CHAT) {
         menu.chat_prefix_value = std::string(action.chat.prefix);
         menu.chat_message_value = std::string(action.chat.message);
@@ -203,6 +207,14 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
                 }
 
                 editor_menu_slider(ui, "Duration:", &menu.action.camera_pan.duration_seconds, CAMERA_PAN_DURATION_SLIDER_PARAMS, MENU_RECT);
+
+                break;
+            }
+            case TRIGGER_ACTION_TYPE_SOUND: {
+                uint32_t selection = menu.action.sound.sound;
+                if (editor_menu_dropdown(ui, "Sound:", &selection, menu.sound_dropdown_items, MENU_RECT, 9)) {
+                    menu.action.sound.sound = (SoundName)selection;
+                }
 
                 break;
             }
@@ -364,6 +376,10 @@ void editor_menu_trigger_action_set_action_type(EditorMenuTriggerAction& menu, T
         case TRIGGER_ACTION_TYPE_CAMERA_PAN: {
             action.camera_pan.cell = ivec2(10, 10);
             action.camera_pan.duration_seconds = 1;
+            break;
+        }
+        case TRIGGER_ACTION_TYPE_SOUND: {
+            action.sound.sound = (SoundName)0;
             break;
         }
         case TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD:
