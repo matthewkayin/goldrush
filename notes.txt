@@ -1,7 +1,0 @@
-- klondike (alaska?)
-  - generate forest suitability map (low frequency noise)
-  - generate forest patches within suitable areas
-  - place trees with poisson disk
-- test steam multiplayer
-- bug on current seed where bot cannot find building placement location for type saloon
-- increase the brightness on blue player color

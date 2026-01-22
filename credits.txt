@@ -98,6 +98,7 @@ jwsounddesign
 https://freesound.org/people/jwsounddesign/
 
 Alarm Bell (modified)
+Lucky Guitar
 SergeQuadrado
 https://freesound.org/people/SergeQuadrado/
 
@@ -149,3 +150,8 @@ https://freesound.org/people/heltonyan/
 selected ricochets (no bang) from craigsmith's freesound 486071
 Timbre
 https://freesound.org/people/Timbre/
+
+
+Western stand-off sound
+Tune Tank
+https://tunetank.com

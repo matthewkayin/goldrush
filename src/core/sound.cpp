@@ -143,6 +143,10 @@ static const std::unordered_map<SoundName, SoundParams> SOUND_PARAMS = {
     { SOUND_RICOCHET, (SoundParams) {
         .path = "ricochet",
         .variants = 5
+    }},
+    { SOUND_OBJECTIVE_COMPLETE, (SoundParams) {
+        .path = "lucky_guitar",
+        .variants = 1
     }}
 };
 

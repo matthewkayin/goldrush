@@ -1346,7 +1346,6 @@ void match_shell_update(MatchShellState* state) {
             Entity& selected_entity = state->match_state.entities.get_by_id(state->selection[selection_index]);
             if (!match_shell_can_keep_selecting_entity(state, selected_entity)) {
                 state->selection.erase(state->selection.begin() + selection_index);
-                log_debug("erased selection");
             } else {
                 selection_index++;
             }
@@ -2393,6 +2392,12 @@ ivec2 match_shell_trigger_action_spawn_units_find_spawn_cell(const MatchShellSta
 TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& action) {
     switch (action.type) {
         case TRIGGER_ACTION_TYPE_CHAT: {
+            if (action.chat.type == TRIGGER_ACTION_CHAT_TYPE_OBJECTIVES_COMPLETE) {
+                sound_play(SOUND_OBJECTIVE_COMPLETE);
+            } else {
+                sound_play(SOUND_UI_CLICK);
+            }
+
             match_shell_add_chat_message(state, 
                 match_shell_trigger_action_chat_get_font(action.chat.type), 
                 action.chat.prefix, 
