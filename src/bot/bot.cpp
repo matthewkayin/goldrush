@@ -61,7 +61,7 @@ Bot bot_init(const MatchState& state, uint8_t player_id, BotConfig config, BotOp
             BotDesiredSquad desired_squad;
             desired_squad.type = BOT_SQUAD_TYPE_ATTACK;
             desired_squad.entity_count[ENTITY_WAGON] = 1;
-            desired_squad.entity_count[ENTITY_BANDIT] = 2;
+            desired_squad.entity_count[ENTITY_BANDIT] = 4;
 
             bot.desired_squads.push_back(desired_squad);
 
@@ -1992,6 +1992,13 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
             continue;
         }
 
+        // If the units are in the process of being ferried, don't add them to the infantry list
+        // (If infantry are unable to garrison, they will be added to the cavalry list and be A-moved
+        // so filtering them out of the list here prevents that from happening)
+        if (entity.target.type == TARGET_ENTITY) {
+            continue;
+        }
+
         distant_infantry.push_back(entity_id);
     }
 
@@ -2303,6 +2310,7 @@ MatchInput bot_squad_garrison_into_carrier(const MatchState& state, const BotSqu
         
         // Don't garrison units which cannot garrison
         if (entity_garrison_size == ENTITY_CANNOT_GARRISON) {
+            log_warn("BOT %u squad_garrison_into_carrier, entity_id %u has garrison ENTITY_CANNOT_GARRISON. We should not be adding ungarrisonable entitites to the infantry list.");
             continue;
         }
 
@@ -2372,12 +2380,13 @@ bool bot_squad_carrier_has_en_route_infantry(const MatchState& state, const BotS
         *en_route_infantry_center = *en_route_infantry_center / en_route_infantry_count;
     }
 
-    return en_route_infantry_center != 0;
+    return en_route_infantry_count != 0;
 }
 
 MatchInput bot_squad_move_carrier_toward_en_route_infantry(const MatchState& state, const Entity& carrier, EntityId carrier_id, ivec2 en_route_infantry_center) {
     // If the carrier is already close to the infantry, then don't worry about moving
-    if (ivec2::manhattan_distance(carrier.cell, en_route_infantry_center) < BOT_NEAR_DISTANCE) {
+    ivec2 carrier_cell = carrier.target.type == TARGET_CELL ? carrier.target.cell : carrier.cell;
+    if (ivec2::manhattan_distance(carrier_cell, en_route_infantry_center) < BOT_NEAR_DISTANCE) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
@@ -2393,9 +2402,6 @@ MatchInput bot_squad_move_carrier_toward_en_route_infantry(const MatchState& sta
     ivec2 path_midpoint = path_to_infantry_center[path_to_infantry_center.size() / 2];
 
     // If the carrier is already walking close to the path midpoint, then don't bother moving
-    ivec2 carrier_cell = carrier.target.type == TARGET_CELL
-        ? carrier.target.cell 
-        : carrier.cell;
     if (ivec2::manhattan_distance(carrier_cell, path_midpoint) < BOT_NEAR_DISTANCE) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
@@ -2409,7 +2415,7 @@ MatchInput bot_squad_move_carrier_toward_en_route_infantry(const MatchState& sta
     input.move.entity_count = 1;
     input.move.entity_ids[0] = carrier_id;
 
-    log_debug("BOT %u, squad_move_carrier_toward_en_route_infantry.", carrier.player_id, carrier.player_id);
+    log_debug("BOT %u, squad_move_carrier_toward_en_route_infantry. carrier.cell <%i, %i> carrier_cell <%i, %i> infantry center <%i, %i>", carrier.player_id, carrier.cell.x, carrier.cell.y, carrier_cell.x, carrier_cell.y, en_route_infantry_center.x, en_route_infantry_center.y);
     return input;
 }
 
@@ -2652,7 +2658,7 @@ MatchInput bot_squad_move_distant_units_to_target(const MatchState& state, const
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
-    log_debug("BOT squad_move_distant_units_to_target");
+    log_debug("BOT %u squad_move_distant_units_to_target. entity count %u", state.entities.get_by_id(input.move.entity_ids[0]).player_id, input.move.entity_count);
     return input;
 }
 
@@ -3719,8 +3725,7 @@ std::vector<EntityType> bot_entity_types_production_buildings() {
 // MISC
 
 EntityId bot_find_threatened_in_progress_building(const MatchState& state, const Bot& bot) {
-    
-        return match_find_entity(state, [&state, &bot](const Entity& building, EntityId /*building_id*/) {
+    return match_find_entity(state, [&state, &bot](const Entity& building, EntityId /*building_id*/) {
         if (building.mode != MODE_BUILDING_IN_PROGRESS ||
                 building.player_id != bot.player_id) {
             return false;
@@ -3742,7 +3747,7 @@ EntityId bot_find_threatened_in_progress_building(const MatchState& state, const
             }
         }
 
-        if (nearby_enemy_score == 0) {
+        if (nearby_enemy_score < BOT_UNIT_SCORE) {
             return false;
         }
         if (building.health > 100 && nearby_enemy_score < 3 * BOT_UNIT_SCORE) {
@@ -3753,6 +3758,7 @@ EntityId bot_find_threatened_in_progress_building(const MatchState& state, const
             return false;
         }
 
+        log_debug("BOT %u find_threatened_in_progress_building ally score %u enemy score %u", nearby_ally_score, nearby_enemy_score);
         return true;
     });
 }

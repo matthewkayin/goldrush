@@ -1316,13 +1316,6 @@ void match_shell_update(MatchShellState* state) {
             float percent = 
                 (float)(state->camera_pan_duration - state->camera_pan_timer) / 
                 (float)state->camera_pan_duration;
-            log_debug("camera pan update timer %u duration %u start <%i, %i> end <%i, %i> percent %f offset <%i, %i>",
-                state->camera_pan_timer,
-                state->camera_pan_duration,
-                start_pos.x, start_pos.y,
-                end_pos.x, end_pos.y,
-                percent,
-                state->camera_offset.x, state->camera_offset.y);
             ivec2 difference = end_pos - start_pos;
             state->camera_offset = start_pos + ivec2((int)((float)difference.x * percent), (int)((float)difference.y * percent));
         }
