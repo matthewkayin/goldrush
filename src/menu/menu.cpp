@@ -83,6 +83,8 @@ static const uint32_t LOBBYLIST_PAGE_SIZE = 9;
 static const std::vector<std::string> PLAYER_COLOR_STRS = { "Blue", "Red", "Green", "Purple" };
 static const std::vector<std::string> LOBBY_TYPE_STRS = { "Public", "Invite Only" };
 
+static const uint32_t MATCH_LOAD_COUNTDOWN_DURATION = 5U * 60U;
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-parameter"
 SDL_EnumerationResult menu_on_replay_file_found(void* state_ptr, const char* dirname, const char* filename) {
@@ -120,6 +122,7 @@ MenuState* menu_init() {
     state->lobbylist_page = 0;
     state->lobbylist_item_selected = MENU_ITEM_NONE;
     state->lobby_privacy = NETWORK_LOBBY_PRIVACY_PUBLIC;
+    state->match_load_countdown_timer = 0;
 
     state->mode = MENU_MODE_MAIN;
 #ifndef GOLD_STEAM
@@ -199,6 +202,10 @@ void menu_handle_network_event(MenuState* state, NetworkEvent event) {
             network_send_chat(message);
             return;
         }
+        case NETWORK_EVENT_MATCH_LOAD_COUNTDOWN: {
+            menu_set_mode(state, MENU_MODE_LOAD_MATCH_COUNTDOWN);
+            return;
+        }
         #ifdef GOLD_STEAM
         case NETWORK_EVENT_STEAM_INVITE: {
             log_info("Menu received steam invite invite");
@@ -258,7 +265,8 @@ void menu_update(MenuState* state) {
     state->ui.input_enabled = 
         state->mode != MENU_MODE_OPTIONS && 
         state->mode != MENU_MODE_REPLAY_RENAME &&
-        state->mode != MENU_MODE_REPLAY_CONFIRM_CLEAR; 
+        state->mode != MENU_MODE_REPLAY_CONFIRM_CLEAR &&
+        state->mode != MENU_MODE_LOAD_MATCH_COUNTDOWN; 
 #ifndef GOLD_STEAM
     if (state->mode == MENU_MODE_USERNAME) {
         state->ui.input_enabled = false;
@@ -435,7 +443,7 @@ void menu_update(MenuState* state) {
             }
         ui_end_container(state->ui);
     // End lobbylist
-    } else if (state->mode == MENU_MODE_LOBBY || state->mode == MENU_MODE_SKIRMISH_LOBBY) {
+    } else if (state->mode == MENU_MODE_LOBBY || state->mode == MENU_MODE_SKIRMISH_LOBBY || state->mode == MENU_MODE_LOAD_MATCH_COUNTDOWN) {
         // Playerlist
         ui_frame_rect(state->ui, PLAYERLIST_RECT);
         ivec2 lobby_name_text_size = render_get_text_size(FONT_HACK_GOLD, network_get_lobby_name());
@@ -603,7 +611,12 @@ void menu_update(MenuState* state) {
                         }
                     }
 
-                    menu_set_mode(state, MENU_MODE_LOAD_MATCH);
+                    #ifdef GOLD_DEBUG
+                        menu_set_mode(state, MENU_MODE_LOAD_MATCH);
+                    #else
+                        network_begin_load_match_countdown();
+                        menu_set_mode(state, MENU_MODE_LOAD_MATCH_COUNTDOWN);
+                    #endif
                 }
             } else {
                 if (ui_button(state->ui, "Ready")) {
@@ -778,6 +791,13 @@ void menu_update(MenuState* state) {
             menu_set_mode(state, MENU_MODE_REPLAYS);
         }
     }
+
+    if (state->mode == MENU_MODE_LOAD_MATCH_COUNTDOWN && state->match_load_countdown_timer != 0) {
+        state->match_load_countdown_timer--;
+        if (state->match_load_countdown_timer == 0 && network_is_host()) {
+            menu_set_mode(state, MENU_MODE_LOAD_MATCH);
+        }
+    }
 }
 
 void menu_set_mode(MenuState* state, MenuMode mode) {
@@ -804,6 +824,10 @@ void menu_set_mode(MenuState* state, MenuMode mode) {
         state->chat.clear();
     } else if (mode == MENU_MODE_CREATE_LOBBY) {
         state->lobby_name = std::string(network_get_username()) + "'s Game";
+    } else if (mode == MENU_MODE_LOAD_MATCH_COUNTDOWN) {
+        menu_add_chat_message(state, "The standoff is about to start...");
+        sound_play(SOUND_MATCH_START);
+        state->match_load_countdown_timer = MATCH_LOAD_COUNTDOWN_DURATION;
     }
 #ifndef GOLD_STEAM
     if (mode == MENU_MODE_USERNAME) {
@@ -932,7 +956,7 @@ void menu_render(const MenuState* state) {
     const SpriteInfo& sprite_wagon_info = render_get_sprite_info(SPRITE_UNIT_WAGON);
     // Wagon color defaults to blue
     int wagon_recolor_id = 0;
-    if (state->mode == MENU_MODE_LOBBY || state->mode == MENU_MODE_SKIRMISH_LOBBY) { 
+    if (state->mode == MENU_MODE_LOBBY || state->mode == MENU_MODE_SKIRMISH_LOBBY || state->mode == MENU_MODE_LOAD_MATCH_COUNTDOWN) { 
         // If we are in lobby, wagon color is player color
         wagon_recolor_id = network_get_player(network_get_player_id()).recolor_id;
     }

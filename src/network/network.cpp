@@ -660,6 +660,12 @@ void network_remove_bot(uint8_t player_id) {
     network_host_flush(state.host);
 }
 
+void network_begin_load_match_countdown() {
+    uint8_t message = NETWORK_MESSAGE_LOAD_MATCH_COUNTDOWN;
+    network_host_broadcast(state.host, &message, sizeof(message));
+    network_host_flush(state.host);
+}
+
 void network_begin_loading_match(int32_t lcg_seed, const Noise* noise) {
     if (state.backend == NETWORK_BACKEND_LAN) {
         network_lan_scanner_destroy();
@@ -1055,6 +1061,12 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
 
             state.players[incoming_message.player_id].status = NETWORK_PLAYER_STATUS_NONE;
 
+            break;
+        }
+        case NETWORK_MESSAGE_LOAD_MATCH_COUNTDOWN: {
+            state.events.push((NetworkEvent) {
+                .type = NETWORK_EVENT_MATCH_LOAD_COUNTDOWN
+            });
             break;
         }
         case NETWORK_MESSAGE_LOAD_MATCH: {

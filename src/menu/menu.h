@@ -33,6 +33,7 @@ enum MenuMode {
     MENU_MODE_REPLAY_CONFIRM_CLEAR,
     MENU_MODE_EXIT,
     MENU_MODE_OPTIONS,
+    MENU_MODE_LOAD_MATCH_COUNTDOWN,
     MENU_MODE_LOAD_MATCH,
     MENU_MODE_LOAD_REPLAY,
     MENU_MODE_COUNT
@@ -47,6 +48,7 @@ struct MenuState {
     int parallax_cloud_x;
     int parallax_timer;
     int parallax_cactus_offset;
+    uint32_t match_load_countdown_timer;
 
 #ifndef GOLD_STEAM
     std::string username;
