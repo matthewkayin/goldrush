@@ -9,6 +9,7 @@ const uint32_t BOT_CONFIG_SHOULD_ATTACK = 1U << 1U;
 const uint32_t BOT_CONFIG_SHOULD_HARASS = 1U << 2U;
 const uint32_t BOT_CONFIG_SHOULD_RETREAT = 1U << 3U;
 const uint32_t BOT_CONFIG_SHOULD_SCOUT = 1U << 4U;
+const uint32_t BOT_CONFIG_FLAG_COUNT = 5;
 
 const uint32_t BOT_TARGET_BASE_COUNT_MATCH_ENEMY = UINT32_MAX;
 
@@ -25,3 +26,8 @@ STATIC_ASSERT(sizeof(BotConfig) == 40ULL);
 
 BotConfig bot_config_init();
 BotConfig bot_config_init_from_difficulty(Difficulty difficulty);
+
+#ifdef GOLD_DEBUG
+const char* bot_config_flag_str(uint32_t flag);
+uint32_t bot_config_flag_from_str(const char* str);
+#endif

@@ -2095,6 +2095,8 @@ void editor_save(const char* path) {
         full_path += ".scn";
     }
     bool success = scenario_save_file(state.scenario, full_path.c_str());
+    std::string json_path = full_path.substr(0, full_path.find(".scn")) + ".json"; 
+    scenario_save_json(state.scenario, json_path.c_str());
     if (success) {
         state.scenario_path = full_path;
         state.scenario_is_saved = true;

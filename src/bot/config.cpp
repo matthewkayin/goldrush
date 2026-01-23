@@ -63,3 +63,35 @@ BotConfig bot_config_init_from_difficulty(Difficulty difficulty) {
 
     return config;
 }
+
+#ifdef GOLD_DEBUG
+const char* bot_config_flag_str(uint32_t flag) {
+    switch (flag) {
+        case BOT_CONFIG_SHOULD_ATTACK_FIRST:
+            return "attack_first";
+        case BOT_CONFIG_SHOULD_ATTACK:
+            return "attack";
+        case BOT_CONFIG_SHOULD_HARASS:
+            return "harass";
+        case BOT_CONFIG_SHOULD_RETREAT:
+            return "retreat";
+        case BOT_CONFIG_SHOULD_SCOUT:
+            return "scout";
+    }
+
+    GOLD_ASSERT(false);
+    return "";
+}
+
+uint32_t bot_config_flag_from_str(const char* str) {
+    for (uint32_t index = 0; index < BOT_CONFIG_FLAG_COUNT; index++) {
+        uint32_t flag = 1U << index;
+        if (strcmp(bot_config_flag_str(flag), str) == 0) {
+            return flag;
+        }
+    }
+
+    GOLD_ASSERT(false);
+    return BOT_CONFIG_FLAG_COUNT;
+}
+#endif

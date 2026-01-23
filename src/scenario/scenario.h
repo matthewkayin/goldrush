@@ -69,4 +69,5 @@ uint8_t scenario_get_noise_map_value(Scenario* scenario, ivec2 cell);
 void scenario_set_noise_map_value(Scenario* scenario, ivec2 cell, uint8_t value);
 
 bool scenario_save_file(const Scenario* scenario, const char* path);
+bool scenario_save_json(const Scenario* scenario, const char* path);
 Scenario* scenario_open_file(const char* path);
