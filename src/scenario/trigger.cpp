@@ -127,7 +127,7 @@ int trigger_action_sprintf(char* str_ptr, const TriggerAction& action) {
             return sprintf(str_ptr, "Highlight %u", action.highlight_entity.entity_index);
         }
         case TRIGGER_ACTION_TYPE_CAMERA_PAN: {
-            return sprintf(str_ptr, "Cam Pan %u", action.camera_pan.duration_seconds);
+            return sprintf(str_ptr, "Cam Pan %.1f", (float)action.camera_pan.duration / 60.0);
         }
         case TRIGGER_ACTION_TYPE_CAMERA_RETURN: {
             return sprintf(str_ptr, "Cam Return");

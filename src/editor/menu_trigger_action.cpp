@@ -27,9 +27,9 @@ static const UiSliderParams ACTION_WAIT_SECONDS_SLIDER_PARAMS = (UiSliderParams)
 static const UiSliderParams CAMERA_PAN_DURATION_SLIDER_PARAMS = (UiSliderParams) {
     .display = UI_SLIDER_DISPLAY_RAW_VALUE,
     .size = UI_SLIDER_SIZE_NORMAL,
-    .min = 1,
-    .max = 10,
-    .step = 1
+    .min = 15U,
+    .max = 5U * 60U,
+    .step = 15U
 };
 
 static const std::vector<std::string> YES_NO_ITEMS = { "No", "Yes" };
@@ -206,7 +206,7 @@ void editor_menu_trigger_action_update(EditorMenuTriggerAction& menu, UI& ui, Ed
                     menu.request = EDITOR_MENU_TRIGGER_ACTION_REQUEST_CAMERA_PAN_CELL;
                 }
 
-                editor_menu_slider(ui, "Duration:", &menu.action.camera_pan.duration_seconds, CAMERA_PAN_DURATION_SLIDER_PARAMS, MENU_RECT);
+                editor_menu_slider(ui, "Duration:", &menu.action.camera_pan.duration, CAMERA_PAN_DURATION_SLIDER_PARAMS, MENU_RECT);
 
                 break;
             }
@@ -375,7 +375,7 @@ void editor_menu_trigger_action_set_action_type(EditorMenuTriggerAction& menu, T
         }
         case TRIGGER_ACTION_TYPE_CAMERA_PAN: {
             action.camera_pan.cell = ivec2(10, 10);
-            action.camera_pan.duration_seconds = 1;
+            action.camera_pan.duration = 60U;
             break;
         }
         case TRIGGER_ACTION_TYPE_SOUND: {

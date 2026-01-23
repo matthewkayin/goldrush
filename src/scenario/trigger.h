@@ -121,7 +121,7 @@ struct TriggerActionHighlightEntity {
 
 struct TriggerActionCameraPan {
     ivec2 cell;
-    uint32_t duration_seconds;
+    uint32_t duration;
 };
 
 struct TriggerActionSound {

@@ -2502,7 +2502,7 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
             break;
         }
         case TRIGGER_ACTION_TYPE_CAMERA_PAN: {
-            match_shell_begin_camera_pan(state, action.camera_pan.cell, action.camera_pan.duration_seconds * 60U);
+            match_shell_begin_camera_pan(state, action.camera_pan.cell, action.camera_pan.duration);
 
             return (TriggerActionResult) {
                 .type = TRIGGER_ACTION_RESULT_WAIT_FOR_CAMERA_PAN
@@ -2621,17 +2621,17 @@ void match_shell_begin_camera_pan(MatchShellState* state, ivec2 to, uint32_t pan
     state->camera_pan_offset.y = (to.y * TILE_SIZE) + (TILE_SIZE / 2) - ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / 2);
     state->camera_pan_offset.x = std::clamp(state->camera_pan_offset.x, 0, (state->match_state.map.width * TILE_SIZE) - SCREEN_WIDTH);
     state->camera_pan_offset.y = std::clamp(state->camera_pan_offset.y, 0, (state->match_state.map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
-    log_debug("begin camera pan offset %i,%i", state->camera_pan_offset.x, state->camera_pan_offset.y);
 
     state->camera_pan_return_offset = state->camera_offset;
     state->camera_pan_timer = pan_duration;
-    state->camera_pan_duration = pan_duration;
+    state->camera_pan_duration = state->camera_pan_timer;
 
     state->camera_mode = CAMERA_MODE_PAN;
 }
 
 void match_shell_begin_camera_return(MatchShellState* state) {
     state->camera_pan_timer = CAMERA_PAN_RETURN_DURATION;
+    state->camera_pan_duration = state->camera_pan_timer;
     state->camera_mode = CAMERA_MODE_PAN_RETURN;
 }
 
