@@ -84,10 +84,10 @@ void scenario_free(Scenario* scenario);
 ScenarioSquad scenario_squad_init();
 bool scenario_squads_are_equal(const ScenarioSquad& a, const ScenarioSquad& b);
 const char* scenario_squad_type_str(ScenarioSquadType type);
+ScenarioSquadType scenario_squad_type_from_str(const char* str);
 
 uint8_t scenario_get_noise_map_value(Scenario* scenario, ivec2 cell);
 void scenario_set_noise_map_value(Scenario* scenario, ivec2 cell, uint8_t value);
 
-bool scenario_save_file(const Scenario* scenario, const char* path);
-bool scenario_save_json(const Scenario* scenario, const char* path);
-Scenario* scenario_open_file(const char* path);
+bool scenario_save_file(const Scenario* scenario, const char* json_full_path, const char* map_short_path);
+Scenario* scenario_open_file(const char* path, std::string* map_short_path);

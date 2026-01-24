@@ -87,5 +87,6 @@ struct EntityData {
 };
 
 const EntityData& entity_get_data(EntityType type);
+EntityType entity_type_from_str(const char* str);
 bool entity_is_unit(EntityType type);
 bool entity_is_building(EntityType type);

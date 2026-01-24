@@ -91,7 +91,6 @@ uint32_t bot_config_flag_from_str(const char* str) {
         }
     }
 
-    GOLD_ASSERT(false);
     return BOT_CONFIG_FLAG_COUNT;
 }
 #endif

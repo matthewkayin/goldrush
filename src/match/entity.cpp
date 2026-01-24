@@ -653,6 +653,17 @@ const EntityData& entity_get_data(EntityType type) {
     return ENTITY_DATA.at(type);
 }
 
+EntityType entity_type_from_str(const char* str) {
+    uint32_t entity_type;
+    for (entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+        if (strcmp(str, ENTITY_DATA.at((EntityType)entity_type).name) == 0) {
+            break;
+        }
+    }
+
+    return (EntityType)entity_type;
+}
+
 bool entity_is_unit(EntityType type) {
     return type > ENTITY_GOLDMINE && type < ENTITY_HALL;
 }

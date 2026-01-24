@@ -1,0 +1,751 @@
+{
+    "map": "map.dat",
+    "player_spawn": {
+        "x": 7.000000,
+        "y": 84.000000
+    },
+    "players": [
+        {
+            "name": "Player",
+            "starting_gold": 600.000000,
+            "allowed_upgrades": [],
+            "allowed_entities": [
+                "Gold Mine",
+                "Miner",
+                "Cowboy",
+                "Bandit",
+                "Town Hall",
+                "House",
+                "Saloon",
+                "Bunker"
+            ]
+        },
+        {
+            "name": "Bandits",
+            "starting_gold": 50.000000,
+            "flags": [],
+            "target_base_count": 0.000000,
+            "macro_cycle_cooldown": 0.000000,
+            "allowed_upgrades": [],
+            "allowed_entities": [
+                "Gold Mine",
+                "Miner",
+                "Cowboy",
+                "Bandit",
+                "Town Hall",
+                "House",
+                "Saloon",
+                "Bunker"
+            ]
+        },
+        {
+            "name": "Enemy 2",
+            "starting_gold": 50.000000,
+            "flags": [
+                "attack_first",
+                "attack",
+                "harass",
+                "retreat"
+            ],
+            "target_base_count": 4294967295.000000,
+            "macro_cycle_cooldown": 0.000000,
+            "allowed_upgrades": [
+                "Wagon Armor",
+                "Land Mines",
+                "Bayonets",
+                "Private Eye",
+                "Stakeout",
+                "Serrated Knives",
+                "Tailwind",
+                "Iron Sights"
+            ],
+            "allowed_entities": [
+                "Gold Mine",
+                "Miner",
+                "Cowboy",
+                "Bandit",
+                "Wagon",
+                "Jockey",
+                "Sapper",
+                "Pyro",
+                "Soldier",
+                "Cannoneer",
+                "Detective",
+                "Balloon",
+                "Town Hall",
+                "House",
+                "Saloon",
+                "Bunker",
+                "Workshop",
+                "Blacksmith",
+                "Chicken Coop",
+                "Barracks",
+                "Sheriff's Office",
+                "Land Mine"
+            ]
+        },
+        {
+            "name": "Enemy 3",
+            "starting_gold": 50.000000,
+            "flags": [
+                "attack_first",
+                "attack",
+                "harass",
+                "retreat"
+            ],
+            "target_base_count": 4294967295.000000,
+            "macro_cycle_cooldown": 0.000000,
+            "allowed_upgrades": [
+                "Wagon Armor",
+                "Land Mines",
+                "Bayonets",
+                "Private Eye",
+                "Stakeout",
+                "Serrated Knives",
+                "Tailwind",
+                "Iron Sights"
+            ],
+            "allowed_entities": [
+                "Gold Mine",
+                "Miner",
+                "Cowboy",
+                "Bandit",
+                "Wagon",
+                "Jockey",
+                "Sapper",
+                "Pyro",
+                "Soldier",
+                "Cannoneer",
+                "Detective",
+                "Balloon",
+                "Town Hall",
+                "House",
+                "Saloon",
+                "Bunker",
+                "Workshop",
+                "Blacksmith",
+                "Chicken Coop",
+                "Barracks",
+                "Sheriff's Office",
+                "Land Mine"
+            ]
+        }
+    ],
+    "entities": [
+        {
+            "type": "Gold Mine",
+            "player_id": 4.000000,
+            "gold_held": 7500.000000,
+            "cell": {
+                "x": 9.000000,
+                "y": 4.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 39.000000,
+                "y": 24.000000
+            }
+        },
+        {
+            "type": "Gold Mine",
+            "player_id": 4.000000,
+            "gold_held": 7500.000000,
+            "cell": {
+                "x": 74.000000,
+                "y": 65.000000
+            }
+        },
+        {
+            "type": "Town Hall",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 66.000000,
+                "y": 64.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 38.000000,
+                "y": 24.000000
+            }
+        },
+        {
+            "type": "Wagon",
+            "player_id": 0.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 6.000000,
+                "y": 84.000000
+            }
+        },
+        {
+            "type": "Miner",
+            "player_id": 0.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 5.000000,
+                "y": 84.000000
+            }
+        },
+        {
+            "type": "Miner",
+            "player_id": 0.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 5.000000,
+                "y": 85.000000
+            }
+        },
+        {
+            "type": "Miner",
+            "player_id": 0.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 8.000000,
+                "y": 85.000000
+            }
+        },
+        {
+            "type": "Miner",
+            "player_id": 0.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 8.000000,
+                "y": 84.000000
+            }
+        },
+        {
+            "type": "Bunker",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 38.000000,
+                "y": 22.000000
+            }
+        },
+        {
+            "type": "Saloon",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 63.000000,
+                "y": 59.000000
+            }
+        },
+        {
+            "type": "Saloon",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 52.000000,
+                "y": 66.000000
+            }
+        },
+        {
+            "type": "House",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 58.000000,
+                "y": 58.000000
+            }
+        },
+        {
+            "type": "House",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 57.000000,
+                "y": 69.000000
+            }
+        },
+        {
+            "type": "House",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 62.000000,
+                "y": 70.000000
+            }
+        },
+        {
+            "type": "House",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 52.000000,
+                "y": 61.000000
+            }
+        },
+        {
+            "type": "Bunker",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 72.000000,
+                "y": 60.000000
+            }
+        },
+        {
+            "type": "Bunker",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 46.000000,
+                "y": 63.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 71.000000,
+                "y": 60.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 72.000000,
+                "y": 59.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 73.000000,
+                "y": 59.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 74.000000,
+                "y": 60.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 45.000000,
+                "y": 63.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 46.000000,
+                "y": 62.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 47.000000,
+                "y": 62.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 48.000000,
+                "y": 63.000000
+            }
+        },
+        {
+            "type": "Bandit",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 54.000000,
+                "y": 61.000000
+            }
+        },
+        {
+            "type": "Bandit",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 57.000000,
+                "y": 59.000000
+            }
+        },
+        {
+            "type": "Bandit",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 58.000000,
+                "y": 60.000000
+            }
+        },
+        {
+            "type": "Bandit",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 54.000000,
+                "y": 62.000000
+            }
+        },
+        {
+            "type": "Bandit",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 61.000000,
+                "y": 62.000000
+            }
+        },
+        {
+            "type": "Bandit",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 64.000000,
+                "y": 62.000000
+            }
+        },
+        {
+            "type": "Bandit",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 63.000000,
+                "y": 62.000000
+            }
+        },
+        {
+            "type": "Bandit",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 65.000000,
+                "y": 63.000000
+            }
+        },
+        {
+            "type": "Bandit",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 53.000000,
+                "y": 69.000000
+            }
+        },
+        {
+            "type": "Bandit",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 54.000000,
+                "y": 69.000000
+            }
+        },
+        {
+            "type": "Bandit",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 51.000000,
+                "y": 71.000000
+            }
+        },
+        {
+            "type": "Bandit",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 57.000000,
+                "y": 71.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 62.000000,
+                "y": 61.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 55.000000,
+                "y": 68.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 51.000000,
+                "y": 68.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 59.000000,
+                "y": 60.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 66.000000,
+                "y": 44.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 66.000000,
+                "y": 43.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 49.000000,
+                "y": 46.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 49.000000,
+                "y": 45.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 51.000000,
+                "y": 42.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 40.000000,
+                "y": 24.000000
+            }
+        },
+        {
+            "type": "Cowboy",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 40.000000,
+                "y": 23.000000
+            }
+        },
+        {
+            "type": "Miner",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 70.000000,
+                "y": 65.000000
+            }
+        },
+        {
+            "type": "Miner",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 70.000000,
+                "y": 66.000000
+            }
+        },
+        {
+            "type": "Miner",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 70.000000,
+                "y": 67.000000
+            }
+        },
+        {
+            "type": "Miner",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 71.000000,
+                "y": 65.000000
+            }
+        },
+        {
+            "type": "Miner",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 71.000000,
+                "y": 66.000000
+            }
+        },
+        {
+            "type": "Miner",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 71.000000,
+                "y": 67.000000
+            }
+        },
+        {
+            "type": "Miner",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 72.000000,
+                "y": 66.000000
+            }
+        },
+        {
+            "type": "Miner",
+            "player_id": 1.000000,
+            "gold_held": 0.000000,
+            "cell": {
+                "x": 72.000000,
+                "y": 67.000000
+            }
+        }
+    ],
+    "squads": [
+        {
+            "name": "Squad 1",
+            "player_id": 1.000000,
+            "type": "Defend",
+            "entities": [
+                10.000000,
+                4.000000,
+                1.000000,
+                48.000000,
+                49.000000
+            ]
+        },
+        {
+            "name": "Squad 2",
+            "player_id": 1.000000,
+            "type": "Defend",
+            "entities": [
+                45.000000,
+                46.000000,
+                47.000000
+            ]
+        },
+        {
+            "name": "Squad 3",
+            "player_id": 1.000000,
+            "type": "Defend",
+            "entities": [
+                44.000000,
+                43.000000
+            ]
+        },
+        {
+            "name": "Squad 4",
+            "player_id": 1.000000,
+            "type": "Defend",
+            "entities": [
+                17.000000,
+                19.000000,
+                20.000000,
+                21.000000,
+                22.000000
+            ]
+        },
+        {
+            "name": "Squad 5",
+            "player_id": 1.000000,
+            "type": "Defend",
+            "entities": [
+                31.000000,
+                39.000000,
+                33.000000,
+                32.000000,
+                34.000000
+            ]
+        },
+        {
+            "name": "Squad 6",
+            "player_id": 1.000000,
+            "type": "Defend",
+            "entities": [
+                28.000000,
+                29.000000,
+                42.000000,
+                30.000000,
+                27.000000
+            ]
+        },
+        {
+            "name": "Squad 7",
+            "player_id": 1.000000,
+            "type": "Defend",
+            "entities": [
+                37.000000,
+                41.000000,
+                35.000000,
+                36.000000,
+                40.000000,
+                38.000000
+            ]
+        },
+        {
+            "name": "Squad 8",
+            "player_id": 1.000000,
+            "type": "Defend",
+            "entities": [
+                18.000000,
+                23.000000,
+                24.000000,
+                26.000000
+            ]
+        }
+    ]
+}

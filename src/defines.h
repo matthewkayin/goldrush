@@ -44,6 +44,12 @@ STATIC_ASSERT(sizeof(int) == sizeof(int32_t));
     #define GOLD_STEAM_APP_ID 3831190U
 #endif
 
+#ifdef PLATFORM_WIN32
+    #define GOLD_PATH_SEPARATOR '\\'
+#else
+    #define GOLD_PATH_SEPARATOR '/'
+#endif
+
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 360
 #define UPDATES_PER_SECOND 60

@@ -77,7 +77,7 @@ static const std::unordered_map<InputAction, std::vector<std::string>> TOOLBAR_S
 };
 
 static const SDL_DialogFileFilter EDITOR_FILE_FILTERS[] = {
-    { "Scenario Files", "scn" }
+    { "JSON files", "json" }
 };
 
 static const uint32_t TOOL_ENTITY_ROW_SIZE = 4;
@@ -142,6 +142,7 @@ struct EditorState {
 
     Scenario* scenario;
     std::string scenario_path;
+    std::string scenario_map_short_path;
     bool scenario_is_saved;
     UI ui;
     int ui_toolbar_id;
@@ -233,6 +234,7 @@ std::vector<ivec2> editor_tool_fog_reveal_get_preview_cells();
 std::string editor_get_scenario_folder_path();
 static void SDLCALL editor_save_callback(void* user_data, const char* const* filelist, int filter);
 static void SDLCALL editor_open_callback(void* user_data, const char* const* filelist, int filter);
+void editor_set_scenario_paths_to_defaults();
 void editor_save(const char* path);
 
 // Render
@@ -255,7 +257,7 @@ void editor_init(SDL_Window* window) {
 
     state.ui = ui_init();
     state.scenario = scenario_init_blank(MAP_TYPE_TOMBSTONE, MAP_SIZE_SMALL);
-    state.scenario_path = "";
+    editor_set_scenario_paths_to_defaults();
     state.scenario_is_saved = false;
     log_debug("Initialized document");
 
@@ -716,8 +718,7 @@ void editor_update() {
                     } else {
                         state.scenario = scenario_init_blank(map_type, map_size);
                     }
-                    state.scenario_path = "";
-                    state.scenario_is_saved = false;
+                    editor_set_scenario_paths_to_defaults();
                 }
 
                 break;
@@ -2082,11 +2083,7 @@ std::vector<ivec2> editor_tool_fog_reveal_get_preview_cells() {
 std::string editor_get_scenario_folder_path() {
     std::string base_path = SDL_GetBasePath();
     // The substring is to remove the trailing "bin/"
-    #ifdef PLATFORM_WIN32
-        return base_path.substr(0, base_path.size() - 4) + "res\\scenario\\";
-    #else
-        return base_path.substr(0, base_path.size() - 4) + "res/scenario/";
-    #endif
+    return base_path.substr(0, base_path.size() - 4) + "res" + GOLD_PATH_SEPARATOR + "scenario" + GOLD_PATH_SEPARATOR;
 }
 
 static void SDLCALL editor_save_callback(void* /*user_data*/, const char* const* filelist, int /*filter*/) {
@@ -2104,12 +2101,17 @@ static void SDLCALL editor_save_callback(void* /*user_data*/, const char* const*
     editor_save(*filelist);
 }
 
+void editor_set_scenario_paths_to_defaults() {
+    state.scenario_path = "";
+    state.scenario_map_short_path = "map.dat";
+}
+
 void editor_save(const char* path) {
     std::string full_path = std::string(path);
-    if (!string_ends_with(full_path, ".scn")) {
-        full_path += ".scn";
+    if (!string_ends_with(full_path, ".json")) {
+        full_path += ".json";
     }
-    bool success = scenario_save_file(state.scenario, full_path.c_str());
+    bool success = scenario_save_file(state.scenario, full_path.c_str(), state.scenario_map_short_path.c_str());
     if (success) {
         state.scenario_path = full_path;
         state.scenario_is_saved = true;
@@ -2128,7 +2130,8 @@ static void SDLCALL editor_open_callback(void* /*user_data*/, const char* const*
         return;
     }
 
-    Scenario* opened_scenario = scenario_open_file(*filelist);
+    std::string map_short_path;
+    Scenario* opened_scenario = scenario_open_file(*filelist, &map_short_path);
     if (opened_scenario == NULL) {
         return;
     }
@@ -2136,6 +2139,7 @@ static void SDLCALL editor_open_callback(void* /*user_data*/, const char* const*
     editor_free_current_document();
     state.scenario = opened_scenario;
     state.scenario_path = std::string(*filelist);
+    state.scenario_map_short_path = map_short_path;
     state.scenario_is_saved = true;
 }
 

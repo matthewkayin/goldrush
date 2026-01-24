@@ -41,3 +41,20 @@ void filesystem_create_required_folders() {
         SDL_CreateDirectory(path.c_str());
     }
 }
+
+std::string filesystem_get_path_folder(const char* path) {
+    std::string folder_path = std::string(path);
+
+    size_t last_slash_index = folder_path.size();
+    for (size_t index = 0; index < folder_path.size(); index++) {
+        if (folder_path[index] == GOLD_PATH_SEPARATOR) {
+            last_slash_index = index;
+        }
+    }
+
+    if (last_slash_index == folder_path.size()) {
+        return std::string() + GOLD_PATH_SEPARATOR;
+    }
+
+    return folder_path.substr(0, last_slash_index) + GOLD_PATH_SEPARATOR;
+}
