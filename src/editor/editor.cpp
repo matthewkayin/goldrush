@@ -11,6 +11,7 @@
 #include "editor/menu_trigger_condition.h"
 #include "editor/menu_trigger_action.h"
 #include "editor/menu_objective.h"
+#include "editor/menu_variables.h"
 #include "editor/menu.h"
 #include "editor/action.h"
 #include "core/logger.h"
@@ -54,7 +55,7 @@ static const Rect CANVAS_RECT = (Rect) {
 
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save", "Save As" },
-    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players", "Objectives", },
+    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players", "Objectives", "Variables" },
     { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads", "Player Spawn", "Triggers" },
 };
 
@@ -117,7 +118,8 @@ enum EditorMenuType {
     EDITOR_MENU_TYPE_EDIT_SQUAD,
     EDITOR_MENU_TYPE_TRIGGER_CONDITION,
     EDITOR_MENU_TYPE_TRIGGER_ACTION,
-    EDITOR_MENU_TYPE_OBJECTIVE
+    EDITOR_MENU_TYPE_OBJECTIVE,
+    EDITOR_MENU_TYPE_VARIABLES
 };
 
 struct EditorMenu {
@@ -130,7 +132,8 @@ struct EditorMenu {
         EditorMenuEditSquad,
         EditorMenuTriggerCondition,
         EditorMenuTriggerAction,
-        EditorMenuObjective
+        EditorMenuObjective,
+        EditorMenuVariables
     > menu;
 };
 
@@ -847,6 +850,12 @@ void editor_update() {
 
                 break;
             }
+            case EDITOR_MENU_TYPE_VARIABLES: {
+                EditorMenuVariables& menu = std::get<EditorMenuVariables>(state.menu.menu);
+                editor_menu_variables_update(menu, state.ui, state.menu.mode, state.scenario);
+
+                break;
+            }
             case EDITOR_MENU_TYPE_FILE:
                 break;
             case EDITOR_MENU_TYPE_NONE:
@@ -1297,6 +1306,12 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
                 .type = EDITOR_MENU_TYPE_OBJECTIVE,
                 .mode = EDITOR_MENU_MODE_OPEN,
                 .menu = editor_menu_objective_open(state.scenario)
+            };
+        } else if (action == "Variables") {
+            state.menu = (EditorMenu) {
+                .type = EDITOR_MENU_TYPE_VARIABLES,
+                .mode = EDITOR_MENU_MODE_OPEN,
+                .menu = editor_menu_variables_open(state.scenario)
             };
         }
     } else if (column == "Tool") {

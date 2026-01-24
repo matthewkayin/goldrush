@@ -248,6 +248,11 @@ bool scenario_save_file(const Scenario* scenario, const char* path) {
     fwrite(&objectives_size, 1, sizeof(size_t), file);
     fwrite(&scenario->objectives[0], 1, objectives_size * sizeof(Objective), file);
 
+    // Variables
+    size_t variables_size = scenario->variables.size();
+    fwrite(&variables_size, 1, sizeof(size_t), file);
+    fwrite(&scenario->variables[0], 1, variables_size * sizeof(ScenarioVariable), file);
+
     fclose(file);
     log_info("Map file %s saved successfully.", path);
     return true;
@@ -369,6 +374,12 @@ Scenario* scenario_open_file(const char* path) {
     fread(&objectives_size, 1, sizeof(size_t), file);
     scenario->objectives = std::vector<Objective>(objectives_size);
     fread(&scenario->objectives[0], 1, objectives_size * sizeof(Objective), file);
+
+    // Variables
+    size_t variables_size;
+    fread(&variables_size, 1, sizeof(size_t), file);
+    scenario->variables = std::vector<ScenarioVariable>(variables_size);
+    fread(&scenario->variables[0], 1, variables_size * sizeof(ScenarioVariable), file);
 
     fclose(file);
     log_info("Loaded map file %s.", path);

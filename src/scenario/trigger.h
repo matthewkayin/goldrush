@@ -16,6 +16,7 @@ enum TriggerConditionType {
     TRIGGER_CONDITION_TYPE_OBJECTIVE_COMPLETE,
     TRIGGER_CONDITION_TYPE_AREA_DISCOVERED,
     TRIGGER_CONDITION_TYPE_FULL_BUNKER,
+    TRIGGER_CONDITION_TYPE_SQUAD_REMOVED,
     TRIGGER_CONDITION_TYPE_COUNT
 };
 
@@ -33,12 +34,18 @@ struct TriggerConditionAreaDiscovered {
     int cell_size;
 };
 
+struct TriggerConditionSquadRemoved {
+    uint8_t player_id;
+    uint32_t squad_id;
+};
+
 struct TriggerCondition {
     TriggerConditionType type;
     union {
         TriggerConditionEntityCount entity_count;
         TriggerConditionObjectiveComplete objective_complete;
         TriggerConditionAreaDiscovered area_discovered;
+        TriggerConditionSquadRemoved squad_removed;
     };
 };
 STATIC_ASSERT(sizeof(TriggerCondition) == 16ULL);
@@ -61,6 +68,7 @@ enum TriggerActionType {
     TRIGGER_ACTION_TYPE_CAMERA_RETURN,
     TRIGGER_ACTION_TYPE_CAMERA_FREE,
     TRIGGER_ACTION_TYPE_SOUND,
+    TRIGGER_ACTION_TYPE_SET_VARIABLE,
     TRIGGER_ACTION_TYPE_COUNT
 };
 
@@ -128,6 +136,23 @@ struct TriggerActionSound {
     SoundName sound;
 };
 
+enum TriggerActionSetVariableValueType {
+    TRIGGER_ACTION_SET_VARIABLE_VALUE_TYPE_LAST_CREATED_SQUAD_ID,
+    TRIGGER_ACTION_SET_VARIABLE_VALUE_TYPE_COUNT
+};
+
+struct TriggerActionSetVariableValueLastCreatedSquadId {
+    uint8_t player_id;
+};
+
+struct TriggerActionSetVariable {
+    uint32_t variable_index;
+    TriggerActionSetVariableValueType value_type;
+    union {
+        TriggerActionSetVariableValueLastCreatedSquadId last_created_squad_id;
+    };
+};
+
 struct TriggerAction {
     TriggerActionType type;
     union {
@@ -142,6 +167,7 @@ struct TriggerAction {
         TriggerActionHighlightEntity highlight_entity;
         TriggerActionCameraPan camera_pan;
         TriggerActionSound sound;
+        TriggerActionSetVariable set_variable;
     };
 };
 STATIC_ASSERT(sizeof(TriggerAction) == 108ULL);
@@ -156,6 +182,7 @@ struct Trigger {
 const char* trigger_condition_type_str(TriggerConditionType type);
 const char* trigger_action_type_str(TriggerActionType type);
 const char* trigger_action_chat_type_str(TriggerActionChatType type);
+const char* trigger_action_set_variable_value_type_str(TriggerActionSetVariableValueType type);
 int trigger_condition_sprintf(char* str_ptr, const TriggerCondition& condition);
 int trigger_action_sprintf(char* str_ptr, const TriggerAction& action);
 

@@ -43,6 +43,7 @@ enum BotSquadType {
 };
 
 struct BotSquad {
+    uint32_t id;
     BotSquadType type;
     ivec2 target_cell;
     std::vector<EntityId> entities;
@@ -89,6 +90,7 @@ struct Bot {
     uint32_t macro_cycle_count;
 
     // Squads
+    uint32_t next_squad_id;
     std::vector<BotSquad> squads;
     uint32_t next_landmine_time;
 
@@ -170,7 +172,7 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
 
 // Squads
 
-BotSquad bot_squad_create(Bot& bot, BotSquadType type, ivec2 target_cell, const std::vector<EntityId>& entity_list);
+uint32_t bot_squad_create(Bot& bot, BotSquadType type, ivec2 target_cell, const std::vector<EntityId>& entity_list);
 void bot_squad_dissolve(Bot& bot, BotSquad& squad);
 void bot_squad_remove_entity_by_id(Bot& bot, BotSquad& squad, EntityId entity_id);
 MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, uint32_t match_timer);

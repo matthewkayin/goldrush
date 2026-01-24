@@ -10,6 +10,7 @@
 #include "bot/config.h"
 
 #define SCENARIO_SQUAD_MAX_ENTITIES SELECTION_LIMIT
+#define SCENARIO_VARIABLE_NAME_BUFFER_LENGTH 32
 
 struct ScenarioPlayer {
     char name[MAX_USERNAME_LENGTH + 1];
@@ -37,6 +38,24 @@ struct ScenarioSquad {
     uint32_t entities[SCENARIO_SQUAD_MAX_ENTITIES];
 };
 
+enum ScenarioVariableType {
+    SCENARIO_VARIABLE_TYPE_SQUAD,
+    SCENARIO_VARIABLE_TYPE_COUNT
+};
+
+struct ScenarioVariableSquad {
+    uint8_t player_id;
+    uint32_t squad_id;
+};
+
+struct ScenarioVariable {
+    char name[SCENARIO_VARIABLE_NAME_BUFFER_LENGTH];
+    ScenarioVariableType type;
+    union {
+        ScenarioVariableSquad squad;
+    };
+};
+
 struct Scenario {
     Map map;
     Noise* noise;
@@ -54,6 +73,7 @@ struct Scenario {
     std::vector<ScenarioSquad> squads;
     std::vector<Trigger> triggers;
     std::vector<Objective> objectives;
+    std::vector<ScenarioVariable> variables;
 };
 
 Scenario* scenario_init_blank(MapType map_type, MapSize map_size);

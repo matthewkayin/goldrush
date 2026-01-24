@@ -10,6 +10,8 @@ const char* trigger_condition_type_str(TriggerConditionType type) {
             return "Area Discvrd";
         case TRIGGER_CONDITION_TYPE_FULL_BUNKER:
             return "Full Bunker";
+        case TRIGGER_CONDITION_TYPE_SQUAD_REMOVED:
+            return "Squad Removed";
         case TRIGGER_CONDITION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
@@ -48,6 +50,8 @@ const char* trigger_action_type_str(TriggerActionType type) {
             return "Cam Free";
         case TRIGGER_ACTION_TYPE_SOUND:
             return "Sound";
+        case TRIGGER_ACTION_TYPE_SET_VARIABLE:
+            return "Set Variable";
         case TRIGGER_ACTION_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
@@ -70,6 +74,16 @@ const char* trigger_action_chat_type_str(TriggerActionChatType type) {
     }
 }
 
+const char* trigger_action_set_variable_value_type_str(TriggerActionSetVariableValueType type) {
+    switch (type) {
+        case TRIGGER_ACTION_SET_VARIABLE_VALUE_TYPE_LAST_CREATED_SQUAD_ID:
+            return "Last Squad ID";
+        case TRIGGER_ACTION_SET_VARIABLE_VALUE_TYPE_COUNT:
+            GOLD_ASSERT(false);
+            return "";
+    }
+}
+
 int trigger_condition_sprintf(char* str_ptr, const TriggerCondition& condition) {
     switch (condition.type) {
         case TRIGGER_CONDITION_TYPE_ENTITY_COUNT: {
@@ -84,6 +98,9 @@ int trigger_condition_sprintf(char* str_ptr, const TriggerCondition& condition) 
         }
         case TRIGGER_CONDITION_TYPE_FULL_BUNKER: {
             return sprintf(str_ptr, "Full Bunker");
+        }
+        case TRIGGER_CONDITION_TYPE_SQUAD_REMOVED: {
+            return sprintf(str_ptr, "Sqd %u:%u Rm", condition.squad_removed.player_id, condition.squad_removed.squad_id);
         }
         case TRIGGER_CONDITION_TYPE_COUNT:
             GOLD_ASSERT(false);
@@ -137,6 +154,9 @@ int trigger_action_sprintf(char* str_ptr, const TriggerAction& action) {
         }
         case TRIGGER_ACTION_TYPE_SOUND: {
             return sprintf(str_ptr, "Sfx: %s", sound_get_name(action.sound.sound));
+        }
+        case TRIGGER_ACTION_TYPE_SET_VARIABLE: {
+            return sprintf(str_ptr, "Set Variable");
         }
         case TRIGGER_ACTION_TYPE_COUNT: {
             GOLD_ASSERT(false);

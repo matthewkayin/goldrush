@@ -411,7 +411,7 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
             // TODO: allow us to set squad target pos?
             GOLD_ASSERT(!squad_entity_list.empty());
             ivec2 squad_target_cell = squad_average_position / squad_entity_list.size();
-            state->bots[player_id].squads.push_back(bot_squad_create(state->bots[player_id], squad_type, squad_target_cell, squad_entity_list));
+            bot_squad_create(state->bots[player_id], squad_type, squad_target_cell, squad_entity_list);
         }
     }
 
@@ -2479,12 +2479,12 @@ TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const 
                 break;
             }
 
-            state->bots[action.spawn_units.player_id].squads.push_back(
-                bot_squad_create(
-                    state->bots[action.spawn_units.player_id], 
-                    BOT_SQUAD_TYPE_ATTACK, 
-                    action.spawn_units.target_cell, 
-                    squad_entity_list));
+            uint32_t squad_id = bot_squad_create(
+                state->bots[action.spawn_units.player_id], 
+                BOT_SQUAD_TYPE_ATTACK, 
+                action.spawn_units.target_cell, 
+                squad_entity_list);
+            log_debug("Trigger created squad. Bot player_id %u squad_id %u", action.spawn_units.player_id, squad_id);
 
             break;
         }

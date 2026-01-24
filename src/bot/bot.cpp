@@ -29,6 +29,9 @@ static const uint32_t BOT_HARASS_SQUAD_MAX_SIZE = 8U;
 // Landmines
 static const uint32_t LANDMINE_MAX_PER_BASE = 6U;
 
+// This function zeroes out everything that doesn't have a default constructor
+// It is used to initialize unused bots, i.e. bots that will not be initialized with bot_init()
+// This is so that the desync detector does not yell at us when these unused bots are out of sync
 Bot bot_empty() {
     Bot bot;
 
@@ -40,6 +43,7 @@ Bot bot_empty() {
     bot.macro_cycle_timer = 0;
     bot.macro_cycle_count = 0;
 
+    bot.next_squad_id = 0;
     bot.next_landmine_time = 0;
 
     bot.scout_id = ID_NULL;
@@ -168,7 +172,8 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
     while (squad_index < bot.squads.size()) {
         MatchInput input = bot_squad_update(state, bot, bot.squads[squad_index], match_timer);
         if (bot.squads[squad_index].entities.empty()) {
-            bot.squads[squad_index] = bot.squads[bot.squads.size() - 1];
+            log_debug("BOT %u, removing squad %u", bot.player_id, bot.squads[squad_index].id);
+            bot.squads[squad_index] = bot.squads.back();
             bot.squads.pop_back();
         } else {
             squad_index++;
@@ -262,8 +267,7 @@ void bot_strategy_update(const MatchState& state, Bot& bot) {
                 std::vector<EntityId> entity_list = bot_create_entity_list_from_entity_count(state, bot, bot.desired_squads[desired_squad_index].entity_count);
                 BotSquadType type = bot.desired_squads[desired_squad_index].type;
                 ivec2 target_cell = bot_squad_choose_target_cell(state, bot, type, entity_list);
-                BotSquad squad = bot_squad_create(bot, type, target_cell, entity_list);
-                bot.squads.push_back(squad);
+                bot_squad_create(bot, type, target_cell, entity_list);
 
                 // Subtract squad units from unreserved entity count
                 unreserved_entity_count = unreserved_entity_count.subtract(bot.desired_squads[desired_squad_index].entity_count);
@@ -353,7 +357,7 @@ void bot_strategy_update(const MatchState& state, Bot& bot) {
     if (bot_should_attack(state, bot)) {
         std::vector<EntityId> army = bot_create_entity_list_from_entity_count(state, bot, unreserved_army_count);
         ivec2 target_cell = bot_squad_get_attack_target_cell(state, bot, army);
-        bot.squads.push_back(bot_squad_create(bot, BOT_SQUAD_TYPE_ATTACK, target_cell, army));
+        bot_squad_create(bot, BOT_SQUAD_TYPE_ATTACK, target_cell, army);
     }
 }
 
@@ -608,8 +612,8 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
         ivec2 unreserved_army_center = bot_entity_list_get_center(state, unreserved_army);
         if (defending_score + unreserved_army_score >= enemy_score &&
                 ivec2::manhattan_distance(unreserved_army_center, location) < BOT_MEDIUM_DISTANCE) {
-            bot.squads.push_back(bot_squad_create(bot, BOT_SQUAD_TYPE_RESERVES, location, unreserved_army));
-            log_debug("BOT %u defend_location, send in unreserved army %u", bot.player_id, unreserved_army.size());
+            uint32_t squad_id = bot_squad_create(bot, BOT_SQUAD_TYPE_RESERVES, location, unreserved_army);
+            log_debug("BOT %u defend_location, send in unreserved army %u, squad %u", bot.player_id, unreserved_army.size(), squad_id);
             return;
         }
     }
@@ -660,8 +664,8 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
             !unreserved_army.empty() &&
             unreserved_army_score > bot.base_info.at(least_defended_enemy_base_goldmine_id).defense_score) {
         ivec2 counterattack_squad_target_cell = bot_squad_get_attack_target_cell(state, bot, unreserved_army);
-        bot.squads.push_back(bot_squad_create(bot, BOT_SQUAD_TYPE_ATTACK, counterattack_squad_target_cell, unreserved_army));
-        log_debug("BOT %u defend_location, counterattack %u", bot.player_id, unreserved_army.size());
+        uint32_t squad_id = bot_squad_create(bot, BOT_SQUAD_TYPE_ATTACK, counterattack_squad_target_cell, unreserved_army);
+        log_debug("BOT %u defend_location, counterattack %u with squad %u", bot.player_id, unreserved_army.size(), squad_id);
         return;
     }
 
@@ -674,8 +678,8 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
             ivec2::manhattan_distance(entity.cell, location) < BOT_NEAR_DISTANCE;
     });
     if (should_defend_with_workers && !workers.empty()) {
-        bot.squads.push_back(bot_squad_create(bot, BOT_SQUAD_TYPE_RESERVES, location, workers));
-        log_debug("BOT %u defend_location, worker defense", bot.player_id);
+        uint32_t squad_id = bot_squad_create(bot, BOT_SQUAD_TYPE_RESERVES, location, workers);
+        log_debug("BOT %u defend_location, worker defense, squad %u", bot.player_id, squad_id);
         return;
     }
 }
@@ -1744,21 +1748,23 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
 
 // SQUADS
 
-BotSquad bot_squad_create(Bot& bot, BotSquadType type, ivec2 target_cell, const std::vector<EntityId>& entity_list) {
+uint32_t bot_squad_create(Bot& bot, BotSquadType type, ivec2 target_cell, const std::vector<EntityId>& entity_list) {
     if (entity_list.empty()) {
         log_warn("BOT %u squad_create, entity_list is empty.", bot.player_id);
     }
     GOLD_ASSERT(!entity_list.empty());
 
     BotSquad squad;
+    squad.id = bot.next_squad_id;
     squad.type = type;
     squad.target_cell = target_cell;
     squad.entities.reserve(entity_list.size());
+    bot.next_squad_id++;
 
     {
         char debug_buffer[1024];
         char* debug_ptr = debug_buffer;
-        debug_ptr += sprintf(debug_ptr, "BOT %u squad_create, type ", bot.player_id);
+        debug_ptr += sprintf(debug_ptr, "BOT %u squad_create, id %u type ", bot.player_id, squad.id);
         switch (type) {
             case BOT_SQUAD_TYPE_ATTACK:
                 debug_ptr += sprintf(debug_ptr, "ATTACK");
@@ -1787,7 +1793,8 @@ BotSquad bot_squad_create(Bot& bot, BotSquadType type, ivec2 target_cell, const 
         bot_reserve_entity(bot, entity_id, false);
     }
 
-    return squad;
+    bot.squads.push_back(squad);
+    return squad.id;
 }
 
 void bot_squad_dissolve(Bot& bot, BotSquad& squad) {
