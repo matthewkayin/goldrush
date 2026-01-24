@@ -11,7 +11,6 @@
 #include "menu/menu.h"
 #include "shell/desync.h"
 #include "profile/profile.h"
-#include "util/json.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_ttf.h>
 #include <ctime>
