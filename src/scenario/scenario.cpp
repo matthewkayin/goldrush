@@ -185,7 +185,7 @@ void scenario_set_noise_map_value(Scenario* scenario, ivec2 cell, uint8_t value)
     scenario_bake_map(scenario);
 }
 
-bool scenario_save_file(const Scenario* scenario, const char* json_full_path, const char* map_short_path) {
+bool scenario_save_file(const Scenario* scenario, const char* json_full_path, const char* map_short_path, const char* script_short_path) {
     const std::string json_path_string = std::string(json_full_path);
     const std::string folder_path = json_path_string.substr(0, json_path_string.size() - 5) + "/";
 
@@ -224,6 +224,7 @@ bool scenario_save_file(const Scenario* scenario, const char* json_full_path, co
     Json* scenario_json = json_object();
     {
         json_object_set_string(scenario_json, "map", map_short_path);
+        json_object_set_string(scenario_json, "script", script_short_path);
 
         // Player spawn
         json_object_set(scenario_json, "player_spawn", json_from_ivec2(scenario->player_spawn));
@@ -336,7 +337,7 @@ bool scenario_save_file(const Scenario* scenario, const char* json_full_path, co
     return json_save_success;
 }
 
-Scenario* scenario_open_file(const char* json_path, std::string* map_short_path) {
+Scenario* scenario_open_file(const char* json_path, std::string* map_short_path, std::string* script_short_path) {
     const std::string folder_path = filesystem_get_path_folder(json_path);
 
     Json* scenario_json = NULL;
@@ -414,6 +415,9 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path)
             fclose(map_file);
             map_file = NULL;
         }
+
+        // Grab script short path
+        *script_short_path = std::string(json_object_get_string(scenario_json, "script"));
 
         // Player spawn
         scenario->player_spawn = json_to_ivec2(json_object_get(scenario_json, "player_spawn"));

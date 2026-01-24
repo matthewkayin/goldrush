@@ -12,7 +12,6 @@
 #include "render/ysort.h"
 #include "shell/hotkey.h"
 #include "scenario/scenario.h"
-#include "scenario/objective.h"
 
 #define MATCH_SHELL_CONTROL_GROUP_COUNT 10
 #define MATCH_SHELL_CONTROL_GROUP_NONE -1
@@ -77,29 +76,6 @@ enum FireCellRender {
     FIRE_CELL_DO_NOT_RENDER,
     FIRE_CELL_RENDER_BELOW,
     FIRE_CELL_RENDER_ABOVE
-};
-
-enum TriggerActionResultType {
-    TRIGGER_ACTION_RESULT_CONTINUE,
-    TRIGGER_ACTION_RESULT_WAIT,
-    TRIGGER_ACTION_RESULT_WAIT_FOR_CAMERA_PAN
-};
-
-struct TriggerActionResultWait {
-    uint32_t resume_time;
-};
-
-struct TriggerActionResult {
-    TriggerActionResultType type;
-    union {
-        TriggerActionResultWait wait;
-    };
-};
-
-struct TriggerActionInstance {
-    uint32_t trigger_index;
-    uint32_t action_index;
-    TriggerActionResult result;
 };
 
 #ifdef GOLD_DEBUG
@@ -180,16 +156,10 @@ struct MatchShellState {
     uint32_t displayed_gold_amounts[MAX_PLAYERS];
 
     // Scenario triggers
-    std::vector<Trigger> scenario_triggers;
-    std::vector<TriggerActionInstance> trigger_action_instances;
     uint32_t scenario_allowed_upgrades;
     bool scenario_allowed_entities[ENTITY_TYPE_COUNT];
     bool scenario_show_enemy_gold;
     bool scenario_lose_on_buildings_destroyed;
-
-    // Scenario objective
-    std::vector<Objective> scenario_objectives;
-    std::vector<uint32_t> current_objective_indices;
 
     // Replay file (write)
     FILE* replay_file;
@@ -245,14 +215,6 @@ bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyB
 
 // Triggers
 uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type);
-bool match_shell_is_trigger_condition_met(const MatchShellState* state, const TriggerCondition& condition);
-bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const std::vector<TriggerCondition>& conditions);
-bool match_shell_trigger_action_instance_should_continue(const MatchShellState* state, const TriggerActionInstance& instance);
-bool match_shell_trigger_action_instance_is_finished(const MatchShellState* state, const TriggerActionInstance& instance);
-TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& effect);
-TriggerActionResult match_shell_trigger_action_result_wait(const MatchShellState* state, uint32_t seconds);
-FontName match_shell_trigger_action_chat_get_font(TriggerActionChatType type);
-
 
 // State queries
 bool match_shell_is_mouse_in_ui();

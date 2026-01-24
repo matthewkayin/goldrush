@@ -34,7 +34,6 @@ static const size_t CHAT_MAX_LENGTH = 64;
 static const uint32_t CHAT_MESSAGE_DURATION = 3U * 60U;
 static const uint32_t CHAT_MAX_LINES = 8;
 static const uint32_t CHAT_CURSOR_BLINK_DURATION = 30;
-static const uint32_t CHAT_MESSAGE_HINT_DURATION = 5U * 60U;
 
 // UI panel rects
 static const Rect BOTTOM_PANEL_RECT = (Rect) {
@@ -417,12 +416,6 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
 
     // Init input queues
     match_shell_init_input_queues(state);
-
-    // Triggers
-    state->scenario_triggers = scenario->triggers;
-
-    // Objectives
-    state->scenario_objectives = scenario->objectives;
 
     // Player spawn
     match_shell_center_camera_on_cell(state, scenario->player_spawn);
@@ -1241,41 +1234,6 @@ void match_shell_update(MatchShellState* state) {
     state->match_state.events.clear();
 
     // Scenario triggers
-    for (uint32_t trigger_index = 0; trigger_index < state->scenario_triggers.size(); trigger_index++) {
-        Trigger& trigger = state->scenario_triggers[trigger_index];
-        if (!trigger.is_active) {
-            continue;
-        }
-
-        if (match_shell_are_trigger_conditions_met(state, trigger.conditions)) {
-            state->trigger_action_instances.push_back((TriggerActionInstance) {
-                .trigger_index = trigger_index,
-                .action_index = 0,
-                .result = (TriggerActionResult) {
-                    .type = TRIGGER_ACTION_RESULT_CONTINUE
-                }
-            });
-            trigger.is_active = false;
-        }
-    }
-
-    // Trigger actions
-    {
-        uint32_t instance_index = 0;
-        while (instance_index < state->trigger_action_instances.size()) {
-            TriggerActionInstance& instance = state->trigger_action_instances[instance_index];
-            while (match_shell_trigger_action_instance_should_continue(state, instance)) {
-                const TriggerAction& action = state->scenario_triggers[instance.trigger_index].actions[instance.action_index];
-                instance.result = match_shell_do_trigger_action(state, action);
-                instance.action_index++;
-            }
-            if (match_shell_trigger_action_instance_is_finished(state, instance)) {
-                state->trigger_action_instances.erase(state->trigger_action_instances.begin() + instance_index);
-            } else {
-                instance_index++;
-            }
-        }
-    }
 
     // Update timers and animations
     if (animation_is_playing(state->move_animation)) {
@@ -2270,70 +2228,6 @@ uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8
     return count;
 }
 
-bool match_shell_is_trigger_condition_met(const MatchShellState* state, const TriggerCondition& condition) {
-    switch (condition.type) {
-        case TRIGGER_CONDITION_TYPE_ENTITY_COUNT: {
-            uint32_t count = 
-                match_shell_get_player_entity_count(state, network_get_player_id(), condition.entity_count.entity_type);
-            return count >= condition.entity_count.entity_count;
-        }
-        case TRIGGER_CONDITION_TYPE_OBJECTIVE_COMPLETE: {
-            return state->scenario_objectives[condition.objective_complete.objective_index].is_complete;
-        }
-        case TRIGGER_CONDITION_TYPE_AREA_DISCOVERED: {
-            return match_shell_is_cell_rect_revealed(state, condition.area_discovered.cell, condition.area_discovered.cell_size);
-        }
-        case TRIGGER_CONDITION_TYPE_FULL_BUNKER: {
-            return match_find_entity(state->match_state, [state](const Entity& entity, EntityId /*entity_id*/) {
-                if (entity.player_id != network_get_player_id() ||
-                        entity.type != ENTITY_BUNKER ||
-                        entity.mode != MODE_BUILDING_FINISHED ||
-                        entity.garrisoned_units.size() < entity_get_data(ENTITY_BUNKER).garrison_capacity) {
-                    return false;
-                }
-                for (EntityId garrisoned_unit_id : entity.garrisoned_units) {
-                    const Entity& garrisoned_unit = state->match_state.entities.get_by_id(garrisoned_unit_id);
-                    if (garrisoned_unit.type != ENTITY_COWBOY) {
-                        return false;
-                    }
-                }
-                return true;
-            }) != ID_NULL;
-        }
-        case TRIGGER_CONDITION_TYPE_COUNT:
-            GOLD_ASSERT(false);
-            return false;
-    }
-}
-
-bool match_shell_are_trigger_conditions_met(const MatchShellState* state, const std::vector<TriggerCondition>& conditions) {
-    for (const TriggerCondition& condition : conditions) {
-        if (!match_shell_is_trigger_condition_met(state, condition)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-bool match_shell_trigger_action_instance_should_continue(const MatchShellState* state, const TriggerActionInstance& instance) {
-    if (match_shell_trigger_action_instance_is_finished(state, instance)) {
-        return false;
-    }
-    switch (instance.result.type) {
-        case TRIGGER_ACTION_RESULT_CONTINUE: 
-            return true;
-        case TRIGGER_ACTION_RESULT_WAIT:
-            return state->match_timer >= instance.result.wait.resume_time;
-        case TRIGGER_ACTION_RESULT_WAIT_FOR_CAMERA_PAN:
-            return state->camera_pan_timer == 0;
-    }
-}
-
-bool match_shell_trigger_action_instance_is_finished(const MatchShellState* state, const TriggerActionInstance& instance) {
-    return instance.action_index >= state->scenario_triggers[instance.trigger_index].actions.size();
-}
-
 ivec2 match_shell_trigger_action_spawn_units_find_spawn_cell(const MatchShellState* state, EntityType entity_type, ivec2 spawn_cell, ivec2 target_cell) {
     const EntityData& entity_data = entity_get_data(entity_type);
 
@@ -2389,160 +2283,7 @@ ivec2 match_shell_trigger_action_spawn_units_find_spawn_cell(const MatchShellSta
     return ivec2(-1, -1);
 }
 
-TriggerActionResult match_shell_do_trigger_action(MatchShellState* state, const TriggerAction& action) {
-    switch (action.type) {
-        case TRIGGER_ACTION_TYPE_CHAT: {
-            if (action.chat.type == TRIGGER_ACTION_CHAT_TYPE_OBJECTIVES_COMPLETE) {
-                sound_play(SOUND_OBJECTIVE_COMPLETE);
-            } else {
-                sound_play(SOUND_UI_CLICK);
-            }
-
-            match_shell_add_chat_message(state, 
-                match_shell_trigger_action_chat_get_font(action.chat.type), 
-                action.chat.prefix, 
-                action.chat.message, 
-                action.chat.type == TRIGGER_ACTION_CHAT_TYPE_HINT
-                    ? CHAT_MESSAGE_HINT_DURATION 
-                    : CHAT_MESSAGE_DURATION);
-            if (action.chat.type == TRIGGER_ACTION_CHAT_TYPE_NEW_OBJECTIVE) {
-                return match_shell_trigger_action_result_wait(state, 2);
-            } else if (action.chat.type == TRIGGER_ACTION_CHAT_TYPE_OBJECTIVES_COMPLETE) {
-                return match_shell_trigger_action_result_wait(state, 5);
-            }
-
-            break;
-        }
-        case TRIGGER_ACTION_TYPE_ADD_OBJECTIVE: {
-            state->current_objective_indices.push_back(action.add_objective.objective_index);
-            break;
-        }
-        case TRIGGER_ACTION_TYPE_COMPLETE_OBJECTIVE: {
-            state->scenario_objectives[action.finish_objective.objective_index].is_complete = true;
-            break;
-        }
-        case TRIGGER_ACTION_TYPE_CLEAR_OBJECTIVES: {
-            state->current_objective_indices.clear();
-            break;
-        }
-        case TRIGGER_ACTION_TYPE_WAIT: {
-            return match_shell_trigger_action_result_wait(state, action.wait.seconds);
-        }
-        case TRIGGER_ACTION_TYPE_FOG_REVEAL: {
-            FogReveal fog_reveal = (FogReveal) {
-                .team = state->match_state.players[network_get_player_id()].team,
-                .cell = action.fog.cell,
-                .cell_size = action.fog.cell_size,
-                .sight = action.fog.sight,
-                .timer = 60U * action.fog.duration_seconds
-            };
-
-            match_fog_update(
-                state->match_state, 
-                fog_reveal.team,
-                fog_reveal.cell,
-                fog_reveal.cell_size, 
-                fog_reveal.sight,
-                false, 
-                CELL_LAYER_SKY, // This makes us ignore elevation
-                true);
-            state->match_state.fog_reveals.push_back(fog_reveal);
-
-            break;
-        }
-        case TRIGGER_ACTION_TYPE_ALERT: {
-            state->alerts.push_back((Alert) {
-                .pixel = MINIMAP_PIXEL_GOLD,
-                .cell = action.alert.cell,
-                .cell_size = action.alert.cell_size,
-                .timer = ALERT_TOTAL_DURATION
-            });
-
-            break;
-        }
-        case TRIGGER_ACTION_TYPE_SPAWN_UNITS: {
-            std::vector<EntityId> squad_entity_list;
-
-            for (uint32_t index = 0; index < action.spawn_units.entity_count; index++) {
-                EntityType entity_type = action.spawn_units.entity_types[index];
-                ivec2 entity_cell = match_shell_trigger_action_spawn_units_find_spawn_cell(state, entity_type, action.spawn_units.spawn_cell, action.spawn_units.target_cell);
-                if (entity_cell.x == -1) {
-                    log_warn("Couldn't find a place to spawn unit with type %u spawn cell <%i, %i>.", entity_type, action.spawn_units.spawn_cell.x, action.spawn_units.spawn_cell.y);
-                    break;
-                }
-
-                EntityId entity_id = entity_create(state->match_state, entity_type, entity_cell, action.spawn_units.player_id);
-                squad_entity_list.push_back(entity_id);
-            }
-
-            if (squad_entity_list.empty()) {
-                break;
-            }
-
-            uint32_t squad_id = bot_squad_create(
-                state->bots[action.spawn_units.player_id], 
-                BOT_SQUAD_TYPE_ATTACK, 
-                action.spawn_units.target_cell, 
-                squad_entity_list);
-            log_debug("Trigger created squad. Bot player_id %u squad_id %u", action.spawn_units.player_id, squad_id);
-
-            break;
-        }
-        case TRIGGER_ACTION_TYPE_SHOW_ENEMY_GOLD: {
-            state->scenario_show_enemy_gold = true;
-            break;
-        }
-        case TRIGGER_ACTION_TYPE_SET_LOSE_CONDITION: {
-            state->scenario_lose_on_buildings_destroyed = action.set_lose_condition.lose_on_buildings_destroyed;
-            break;
-        }
-        case TRIGGER_ACTION_TYPE_HIGHLIGHT_ENTITY: {
-            state->highlight_animation = animation_create(ANIMATION_UI_HIGHLIGHT_ENTITY);
-            state->highlight_entity_id = state->match_state.entities.get_id_of(action.highlight_entity.entity_index);
-            break;
-        }
-        case TRIGGER_ACTION_TYPE_CAMERA_PAN: {
-            match_shell_begin_camera_pan(state, action.camera_pan.cell, action.camera_pan.duration);
-
-            return (TriggerActionResult) {
-                .type = TRIGGER_ACTION_RESULT_WAIT_FOR_CAMERA_PAN
-            };
-        }
-        case TRIGGER_ACTION_TYPE_CAMERA_RETURN: {
-            match_shell_begin_camera_return(state);
-
-            return (TriggerActionResult) {
-                .type = TRIGGER_ACTION_RESULT_WAIT_FOR_CAMERA_PAN
-            };
-        }
-        case TRIGGER_ACTION_TYPE_CAMERA_FREE: {
-            match_shell_end_camera_pan(state);
-            break;
-        }
-        case TRIGGER_ACTION_TYPE_SOUND: {
-            sound_play(action.sound.sound);
-            break;
-        }
-        case TRIGGER_ACTION_TYPE_COUNT: {
-            GOLD_ASSERT(false);
-            break;
-        }
-    }
-
-    return (TriggerActionResult) {
-        .type = TRIGGER_ACTION_RESULT_CONTINUE
-    };
-}
-
-TriggerActionResult match_shell_trigger_action_result_wait(const MatchShellState* state, uint32_t seconds) {
-    return (TriggerActionResult) {
-        .type = TRIGGER_ACTION_RESULT_WAIT,
-        .wait = (TriggerActionResultWait) {
-            .resume_time = state->match_timer + (60U * seconds)
-        }
-    };
-}
-
+/*
 FontName match_shell_trigger_action_chat_get_font(TriggerActionChatType type) {
     switch (type) {
         case TRIGGER_ACTION_CHAT_TYPE_MESSAGE:
@@ -2557,6 +2298,7 @@ FontName match_shell_trigger_action_chat_get_font(TriggerActionChatType type) {
             return FONT_HACK_WHITE;
     }
 }
+*/
 
 // STATE QUERIES
 
@@ -4519,7 +4261,8 @@ void match_shell_render(const MatchShellState* state) {
         resource_base_y += population_icon_sprite_info.frame_height;
     }
 
-        // Objectives
+    // Objectives
+    /*
     if (!state->current_objective_indices.empty()) {
         const SpriteInfo& menu_button_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_BURGER);
         ivec2 objectives_text_pos = MENU_BUTTON_POSITION + ivec2(1, menu_button_sprite_info.frame_height + 4);
@@ -4555,6 +4298,7 @@ void match_shell_render(const MatchShellState* state) {
             objectives_text_pos.y += checkbox_sprite_info.frame_height + 4;
         }
     }
+    */
 
     // Menu button icon
     {

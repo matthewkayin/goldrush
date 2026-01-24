@@ -1,8 +1,6 @@
 #pragma once
 
 #include "defines.h"
-#include "scenario/objective.h"
-#include "scenario/trigger.h"
 #include "match/noise.h"
 #include "match/state.h"
 #include "match/map.h"
@@ -71,9 +69,6 @@ struct Scenario {
     ScenarioEntity entities[MATCH_MAX_ENTITIES];
 
     std::vector<ScenarioSquad> squads;
-    std::vector<Trigger> triggers;
-    std::vector<Objective> objectives;
-    std::vector<ScenarioVariable> variables;
 };
 
 Scenario* scenario_init_blank(MapType map_type, MapSize map_size);
@@ -89,5 +84,5 @@ ScenarioSquadType scenario_squad_type_from_str(const char* str);
 uint8_t scenario_get_noise_map_value(Scenario* scenario, ivec2 cell);
 void scenario_set_noise_map_value(Scenario* scenario, ivec2 cell, uint8_t value);
 
-bool scenario_save_file(const Scenario* scenario, const char* json_full_path, const char* map_short_path);
-Scenario* scenario_open_file(const char* path, std::string* map_short_path);
+bool scenario_save_file(const Scenario* scenario, const char* json_full_path, const char* map_short_path, const char* script_short_path);
+Scenario* scenario_open_file(const char* path, std::string* map_short_path, std::string* script_short_path);

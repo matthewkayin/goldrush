@@ -1,5 +1,6 @@
 {
     "map": "map.dat",
+    "script": "script.lua",
     "player_spawn": {
         "x": 7.000000,
         "y": 84.000000

@@ -7,11 +7,6 @@
 #include "editor/menu_file.h"
 #include "editor/menu_players.h"
 #include "editor/menu_edit_squad.h"
-#include "editor/menu_rename_trigger.h"
-#include "editor/menu_trigger_condition.h"
-#include "editor/menu_trigger_action.h"
-#include "editor/menu_objective.h"
-#include "editor/menu_variables.h"
 #include "editor/menu.h"
 #include "editor/action.h"
 #include "core/logger.h"
@@ -55,8 +50,8 @@ static const Rect CANVAS_RECT = (Rect) {
 
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save", "Save As" },
-    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players", "Objectives", "Variables" },
-    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads", "Player Spawn", "Triggers" },
+    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players" },
+    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads", "Player Spawn" },
 };
 
 static const std::unordered_map<InputAction, std::vector<std::string>> TOOLBAR_SHORTCUTS = {
@@ -83,7 +78,6 @@ static const SDL_DialogFileFilter EDITOR_FILE_FILTERS[] = {
 static const uint32_t TOOL_ENTITY_ROW_SIZE = 4;
 static const uint32_t TOOL_ADD_ENTITY_VISIBLE_ROW_COUNT = 4;
 static const uint32_t TOOL_SQUADS_VISIBLE_ROW_COUNT = 3;
-static const uint32_t TOOL_TRIGGERS_VISIBLE_ROW_COUNT = 8;
 
 enum EditorTool {
     EDITOR_TOOL_BRUSH,
@@ -95,12 +89,6 @@ enum EditorTool {
     EDITOR_TOOL_EDIT_ENTITY,
     EDITOR_TOOL_SQUADS,
     EDITOR_TOOL_PLAYER_SPAWN,
-    EDITOR_TOOL_TRIGGERS,
-    EDITOR_TOOL_FOG_REVEAL,
-    EDITOR_TOOL_ALERT,
-    EDITOR_TOOL_REQUEST_CELL,
-    EDITOR_TOOL_REQUEST_AREA,
-    EDITOR_TOOL_REQUEST_ENTITY
 };
 
 struct EditorClipboard {
@@ -114,12 +102,7 @@ enum EditorMenuType {
     EDITOR_MENU_TYPE_NEW,
     EDITOR_MENU_TYPE_FILE,
     EDITOR_MENU_TYPE_PLAYERS,
-    EDITOR_MENU_TYPE_RENAME_TRIGGER,
-    EDITOR_MENU_TYPE_EDIT_SQUAD,
-    EDITOR_MENU_TYPE_TRIGGER_CONDITION,
-    EDITOR_MENU_TYPE_TRIGGER_ACTION,
-    EDITOR_MENU_TYPE_OBJECTIVE,
-    EDITOR_MENU_TYPE_VARIABLES
+    EDITOR_MENU_TYPE_EDIT_SQUAD
 };
 
 struct EditorMenu {
@@ -128,12 +111,7 @@ struct EditorMenu {
     std::variant<
         EditorMenuNew,
         EditorMenuPlayers,
-        EditorMenuRenameTrigger,
-        EditorMenuEditSquad,
-        EditorMenuTriggerCondition,
-        EditorMenuTriggerAction,
-        EditorMenuObjective,
-        EditorMenuVariables
+        EditorMenuEditSquad
     > menu;
 };
 
@@ -143,6 +121,7 @@ struct EditorState {
     Scenario* scenario;
     std::string scenario_path;
     std::string scenario_map_short_path;
+    std::string scenario_script_short_path;
     bool scenario_is_saved;
     UI ui;
     int ui_toolbar_id;
@@ -187,7 +166,6 @@ static EditorState state;
 // Update
 void editor_free_current_document();
 bool editor_is_in_menu();
-bool editor_is_using_subtool();
 bool editor_is_toolbar_open();
 void editor_clamp_camera();
 void editor_center_camera_on_cell(ivec2 cell);
@@ -298,8 +276,7 @@ void editor_update() {
     state.ui.input_enabled = 
         !state.is_minimap_dragging && 
         state.camera_drag_mouse_position.x == -1 &&
-        !editor_is_in_menu() &&
-        !editor_is_using_subtool();
+        !editor_is_in_menu();
 
     // Toolbar
     ui_small_frame_rect(state.ui, TOOLBAR_RECT);
@@ -312,10 +289,7 @@ void editor_update() {
     {
         ui_begin_column(state.ui, ivec2(SIDEBAR_RECT.x + 4, SIDEBAR_RECT.y + 4), 4);
             char tool_text[64];
-            const uint32_t tool_index = editor_is_using_subtool()
-                ? EDITOR_TOOL_TRIGGERS
-                : state.tool;
-            sprintf(tool_text, "%s Tool", TOOLBAR_OPTIONS[2][tool_index + 1].c_str());
+            sprintf(tool_text, "%s Tool", TOOLBAR_OPTIONS[2][state.tool + 1].c_str());
             ui_text(state.ui, FONT_HACK_GOLD, tool_text);
 
             switch (state.tool) {
@@ -487,171 +461,6 @@ void editor_update() {
                 }
                 case EDITOR_TOOL_PLAYER_SPAWN:
                     break;
-                case EDITOR_TOOL_TRIGGERS:
-                case EDITOR_TOOL_FOG_REVEAL: 
-                case EDITOR_TOOL_ALERT:
-                case EDITOR_TOOL_REQUEST_CELL:
-                case EDITOR_TOOL_REQUEST_AREA:
-                case EDITOR_TOOL_REQUEST_ENTITY: {
-                    // Trigger selection dropdown
-                    ui_begin_row(state.ui, ivec2(0, 0), 2);
-                        std::vector<std::string> trigger_dropdown_items;
-                        for (uint32_t trigger_index = 0; trigger_index < state.scenario->triggers.size(); trigger_index++) {
-                            trigger_dropdown_items.push_back(std::string(state.scenario->triggers[trigger_index].name));
-                        }
-                        ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.tool_value, trigger_dropdown_items, false, 9);
-                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_PLUS, false, false)) {
-                            editor_do_action((EditorAction) {
-                                .type = EDITOR_ACTION_ADD_TRIGGER
-                            });
-                            state.tool_value = state.scenario->triggers.size() - 1;
-                        }
-                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, state.scenario->triggers.empty(), false)) {
-                            state.menu = (EditorMenu) {
-                                .type = EDITOR_MENU_TYPE_RENAME_TRIGGER,
-                                .mode = EDITOR_MENU_MODE_OPEN,
-                                .menu = editor_menu_rename_trigger_open(state.scenario->triggers[state.tool_value])
-                            };
-                        }
-                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, state.scenario->triggers.empty(), false)) {
-                            editor_do_action((EditorAction) {
-                                .type = EDITOR_ACTION_REMOVE_TRIGGER,
-                                .data = (EditorActionRemoveTrigger) {
-                                    .index = state.tool_value,
-                                    .value = state.scenario->triggers[state.tool_value]
-                                }
-                            });
-                            state.tool_value = 0;
-                        }
-                    ui_end_container(state.ui);
-
-                    std::vector<std::function<void()>> scrollable_ui_funcs;
-
-                    // Trigger conditions
-                    if (!state.scenario->triggers.empty()) {
-                        const Trigger& trigger = state.scenario->triggers[state.tool_value];
-
-                        scrollable_ui_funcs.push_back([]() { 
-                            ui_text(state.ui, FONT_HACK_GOLD, "Conditions");
-                        });
-
-                        for (uint32_t condition_index = 0; condition_index < trigger.conditions.size(); condition_index++) {
-                            const TriggerCondition& condition = trigger.conditions[condition_index];
-
-                            scrollable_ui_funcs.push_back([condition, condition_index]() {
-                                ui_begin_row(state.ui, ivec2(0, 0), 2);
-                                    char condition_str[128];
-                                    trigger_condition_sprintf(condition_str, condition);
-                                    ui_slim_button(state.ui, condition_str, true);
-
-                                    if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, false, false)) {
-                                        state.menu = (EditorMenu) {
-                                            .type = EDITOR_MENU_TYPE_TRIGGER_CONDITION,
-                                            .mode = EDITOR_MENU_MODE_OPEN,
-                                            .menu = editor_menu_trigger_condition_open(state.scenario, condition, condition_index)
-                                        };
-                                    }
-
-                                    if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, false, false)) {
-                                        editor_do_action((EditorAction) {
-                                            .type = EDITOR_ACTION_REMOVE_TRIGGER_CONDITION,
-                                            .data = (EditorActionRemoveTriggerCondition) {
-                                                .trigger_index = state.tool_value,
-                                                .condition_index = condition_index,
-                                                .value = condition
-                                            }
-                                        });
-                                    }
-                                ui_end_container(state.ui);
-                            });
-                        }
-
-                        scrollable_ui_funcs.push_back([]() {
-                            if (ui_slim_button(state.ui, "+ Condition")) {
-                                editor_do_action((EditorAction) {
-                                    .type = EDITOR_ACTION_ADD_TRIGGER_CONDITION,
-                                    .data = (EditorActionAddTriggerCondition) {
-                                        .trigger_index = state.tool_value
-                                    }
-                                });
-                            }
-                        });
-
-                        scrollable_ui_funcs.push_back([]() {
-                            ui_text(state.ui, FONT_HACK_GOLD, "Actions");
-                        });
-                        
-                        const size_t actions_size = trigger.actions.size();
-                        const uint32_t trigger_index = state.tool_value;
-                        for (uint32_t action_index = 0; action_index < trigger.actions.size(); action_index++) {
-                            const TriggerAction& action = trigger.actions[action_index];
-
-                            scrollable_ui_funcs.push_back([trigger_index, &trigger, action, action_index, actions_size]() {
-                                ui_begin_row(state.ui, ivec2(0, 0), 2);
-                                    char action_str[64];
-                                    trigger_action_sprintf(action_str, action);
-                                    ui_slim_button(state.ui, action_str, true);
-
-                                    const bool is_shift_pressed = input_is_action_pressed(INPUT_ACTION_SHIFT);
-                                    const bool is_disabled = is_shift_pressed
-                                        ? action_index == actions_size - 1
-                                        : action_index == 0;
-                                    if (ui_sprite_button(state.ui, is_shift_pressed ? SPRITE_UI_EDITOR_DOWN : SPRITE_UI_EDITOR_UP, is_disabled, false)) {
-                                        editor_do_action((EditorAction) {
-                                            .type = EDITOR_ACTION_SWAP_TRIGGER_ACTIONS,
-                                            .data = (EditorActionSwapTriggerActions) {
-                                                .trigger_index = trigger_index,
-                                                .index_a = action_index,
-                                                .index_b = is_shift_pressed 
-                                                    ? action_index + 1 
-                                                    : action_index - 1,
-                                                .action_a = action,
-                                                .action_b = is_shift_pressed 
-                                                    ? trigger.actions[action_index + 1] 
-                                                    : trigger.actions[action_index - 1]
-                                            }
-                                        });
-                                    }
-
-                                    if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, false, false)) {
-                                        state.menu = (EditorMenu) {
-                                            .type = EDITOR_MENU_TYPE_TRIGGER_ACTION,
-                                            .mode = EDITOR_MENU_MODE_OPEN,
-                                            .menu = editor_menu_trigger_action_open(state.scenario, action, action_index)
-                                        };
-                                    }
-                                    if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, false, false)) {
-                                        editor_do_action((EditorAction) {
-                                            .type = EDITOR_ACTION_REMOVE_TRIGGER_ACTION,
-                                            .data = (EditorActionRemoveTriggerAction) {
-                                                .trigger_index = state.tool_value,
-                                                .action_index = action_index,
-                                                .value = action
-                                            }
-                                        });
-                                    }
-                                ui_end_container(state.ui);
-                            });
-                        }
-
-                        scrollable_ui_funcs.push_back([]() {
-                            if (ui_slim_button(state.ui, "+ Action")) {
-                                editor_do_action((EditorAction) {
-                                    .type = EDITOR_ACTION_ADD_TRIGGER_ACTION,
-                                    .data = (EditorActionAddTriggerAction) {
-                                        .trigger_index = state.tool_value
-                                    }
-                                });
-                            }
-                        });
-
-                        for (uint32_t index = state.tool_scroll; index < std::min(state.tool_scroll + TOOL_TRIGGERS_VISIBLE_ROW_COUNT, (uint32_t)scrollable_ui_funcs.size()); index++) {
-                            scrollable_ui_funcs[index]();
-                        }
-                    }
-
-                    break;
-                }
             }
         ui_end_container(state.ui);
     }
@@ -757,103 +566,6 @@ void editor_update() {
                         });
                     }
                 }
-
-                break;
-            }
-            case EDITOR_MENU_TYPE_RENAME_TRIGGER: {
-                EditorMenuRenameTrigger& menu = std::get<EditorMenuRenameTrigger>(state.menu.menu);
-                editor_menu_rename_trigger_update(menu, state.ui, state.menu.mode);
-
-                if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
-                    EditorActionRenameTrigger rename_trigger;
-                    rename_trigger.index = state.tool_value;
-                    strncpy(rename_trigger.previous_name, state.scenario->triggers[state.tool_value].name, TRIGGER_NAME_BUFFER_LENGTH);
-                    strncpy(rename_trigger.new_name, menu.trigger_name.c_str(), TRIGGER_NAME_BUFFER_LENGTH);
-                    editor_do_action((EditorAction) {
-                        .type = EDITOR_ACTION_RENAME_TRIGGER,
-                        .data = rename_trigger
-                    });
-                }
-
-                break;
-            }
-            case EDITOR_MENU_TYPE_TRIGGER_CONDITION: {
-                EditorMenuTriggerCondition& menu = std::get<EditorMenuTriggerCondition>(state.menu.menu);
-                editor_menu_trigger_condition_update(menu, state.ui, state.menu.mode);
-                
-                switch (menu.request) {
-                    case EDITOR_MENU_TRIGGER_CONDITION_REQUEST_NONE:
-                        break;
-                    case EDITOR_MENU_TRIGGER_CONDITION_REQUEST_AREA: {
-                        editor_set_tool(EDITOR_TOOL_REQUEST_AREA);
-                        break;
-                    }
-                }
-
-                if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
-                    editor_do_action((EditorAction) {
-                        .type = EDITOR_ACTION_EDIT_TRIGGER_CONDITION,
-                        .data = (EditorActionEditTriggerCondition) {
-                            .trigger_index = state.tool_value,
-                            .condition_index = menu.condition_index,
-                            .previous_value = state.scenario->triggers[state.tool_value].conditions[menu.condition_index],
-                            .new_value = menu.condition
-                        }
-                    });
-                }
-
-                break;
-            }
-            case EDITOR_MENU_TYPE_TRIGGER_ACTION: {
-                EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
-                editor_menu_trigger_action_update(menu, state.ui, state.menu.mode);
-
-                switch (menu.request) {
-                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_NONE:
-                        break;
-                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_FOG_REVEAL: {
-                        editor_set_tool(EDITOR_TOOL_FOG_REVEAL);
-                        break;
-                    }
-                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_ALERT: {
-                        editor_set_tool(EDITOR_TOOL_ALERT);
-                        break;
-                    }
-                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_SPAWN_CELL:
-                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_TARGET_CELL:
-                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_CAMERA_PAN_CELL: {
-                        editor_set_tool(EDITOR_TOOL_REQUEST_CELL);
-                        break;
-                    }
-                    case EDITOR_MENU_TRIGGER_ACTION_REQUEST_ENTITY: {
-                        editor_set_tool(EDITOR_TOOL_REQUEST_ENTITY);
-                        break;
-                    }
-                }
-
-                if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
-                    editor_do_action((EditorAction) {
-                        .type = EDITOR_ACTION_EDIT_TRIGGER_ACTION,
-                        .data = (EditorActionEditTriggerAction) {
-                            .trigger_index = state.tool_value,
-                            .action_index = menu.action_index,
-                            .previous_value = state.scenario->triggers[state.tool_value].actions[menu.action_index],
-                            .new_value = menu.action
-                        }
-                    });
-                }
-
-                break;
-            }
-            case EDITOR_MENU_TYPE_OBJECTIVE: {
-                EditorMenuObjective& menu = std::get<EditorMenuObjective>(state.menu.menu);
-                editor_menu_objective_update(menu, state.ui, state.menu.mode, state.scenario);
-
-                break;
-            }
-            case EDITOR_MENU_TYPE_VARIABLES: {
-                EditorMenuVariables& menu = std::get<EditorMenuVariables>(state.menu.menu);
-                editor_menu_variables_update(menu, state.ui, state.menu.mode, state.scenario);
 
                 break;
             }
@@ -1096,65 +808,6 @@ void editor_update() {
         });
     }
 
-    // Fog reveal
-    if (state.tool == EDITOR_TOOL_FOG_REVEAL &&
-            editor_can_single_use_tool_be_used() &&
-            editor_is_hovered_cell_valid()) {
-        state.tool_size = std::clamp(state.tool_size + input_get_mouse_scroll(), 1, 13);
-        if (input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
-            EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
-            ivec2 cell;
-            int cell_size;
-            editor_tool_fog_get_hovered_cell(&cell, &cell_size);
-            editor_menu_trigger_action_set_fog_cell(menu, cell, cell_size, state.tool_size);
-            state.tool = EDITOR_TOOL_TRIGGERS;
-        }
-    }
-
-    // Request area
-    if (state.tool == EDITOR_TOOL_REQUEST_AREA &&
-            editor_can_single_use_tool_be_used() &&
-            editor_is_hovered_cell_valid()) {
-        state.tool_size = std::clamp(state.tool_size + input_get_mouse_scroll(), 1, 4);
-        if (input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
-            EditorMenuTriggerCondition& menu = std::get<EditorMenuTriggerCondition>(state.menu.menu);
-            editor_menu_trigger_condition_set_request_area(menu, editor_get_hovered_cell(), state.tool_size);
-            state.tool = EDITOR_TOOL_TRIGGERS;
-        }
-    }
-
-    // Alert
-    if (state.tool == EDITOR_TOOL_ALERT &&
-            editor_can_single_use_tool_be_used() &&
-            editor_is_hovered_cell_valid() && 
-            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
-        EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
-        uint32_t entity_index = editor_get_hovered_entity();
-        const ScenarioEntity& entity = state.scenario->entities[entity_index];
-        editor_menu_trigger_action_set_alert(menu, entity.cell, entity_get_data(entity.type).cell_size);
-        state.tool = EDITOR_TOOL_TRIGGERS;
-    }
-
-    // Request cell (spawn units)
-    if (state.tool == EDITOR_TOOL_REQUEST_CELL &&
-            editor_can_single_use_tool_be_used() &&
-            editor_is_hovered_cell_valid() && 
-            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
-        EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
-        editor_menu_trigger_action_set_request_cell(menu, editor_get_hovered_cell());
-        state.tool = EDITOR_TOOL_TRIGGERS;
-    }
-
-    // Request entity
-    if (state.tool == EDITOR_TOOL_REQUEST_ENTITY &&
-            editor_can_single_use_tool_be_used() &&
-            editor_is_hovered_cell_valid() &&
-            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
-        EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
-        editor_menu_trigger_action_set_request_entity(menu, editor_get_hovered_entity());
-        state.tool = EDITOR_TOOL_TRIGGERS;
-    }
-
     // Entity add
     if (state.tool == EDITOR_TOOL_ADD_ENTITY && 
             editor_can_single_use_tool_be_used() && 
@@ -1220,15 +873,7 @@ void editor_update() {
 }
 
 bool editor_is_in_menu() {
-    return state.menu.type != EDITOR_MENU_TYPE_NONE && !editor_is_using_subtool();
-}
-
-bool editor_is_using_subtool() {
-    return state.tool == EDITOR_TOOL_FOG_REVEAL ||
-        state.tool == EDITOR_TOOL_ALERT || 
-        state.tool == EDITOR_TOOL_REQUEST_CELL ||
-        state.tool == EDITOR_TOOL_REQUEST_AREA ||
-        state.tool == EDITOR_TOOL_REQUEST_ENTITY;
+    return state.menu.type != EDITOR_MENU_TYPE_NONE; 
 }
 
 bool editor_is_toolbar_open() {
@@ -1302,18 +947,6 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
                 .mode = EDITOR_MENU_MODE_OPEN,
                 .menu = editor_menu_players_open(state.scenario)
             };
-        } else if (action == "Objectives") {
-            state.menu = (EditorMenu) {
-                .type = EDITOR_MENU_TYPE_OBJECTIVE,
-                .mode = EDITOR_MENU_MODE_OPEN,
-                .menu = editor_menu_objective_open(state.scenario)
-            };
-        } else if (action == "Variables") {
-            state.menu = (EditorMenu) {
-                .type = EDITOR_MENU_TYPE_VARIABLES,
-                .mode = EDITOR_MENU_MODE_OPEN,
-                .menu = editor_menu_variables_open(state.scenario)
-            };
         }
     } else if (column == "Tool") {
         for (uint32_t index = 1; index < TOOLBAR_OPTIONS[2].size(); index++) {
@@ -1365,26 +998,6 @@ void editor_set_tool(EditorTool tool) {
         }
         case EDITOR_TOOL_PLAYER_SPAWN:
             break;
-        case EDITOR_TOOL_TRIGGERS: {
-            state.tool_value = 0;
-            state.tool_scroll = 0;
-            state.tool_dropdown_scroll = 0;
-            break;
-        }
-        case EDITOR_TOOL_FOG_REVEAL: {
-            EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
-            state.tool_size = menu.action.fog.sight;
-            break;
-        }
-        case EDITOR_TOOL_REQUEST_AREA: {
-            state.tool_size = 1;
-            break;
-        }
-        case EDITOR_TOOL_ALERT:
-        case EDITOR_TOOL_REQUEST_CELL:
-        case EDITOR_TOOL_REQUEST_ENTITY: {
-            break;
-        }
     }
 }
 
@@ -1450,21 +1063,6 @@ bool editor_is_hovered_cell_valid() {
         }
 
         return true;
-    }
-    if (state.tool == EDITOR_TOOL_ALERT) {
-        uint32_t entity_index = editor_get_hovered_entity();
-        if (entity_index == INDEX_INVALID) {
-            return false;
-        }
-    }
-    if (state.tool == EDITOR_TOOL_REQUEST_CELL) {
-        const EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
-        if (menu.request == EDITOR_MENU_TRIGGER_ACTION_REQUEST_SPAWN_CELL && ivec2::manhattan_distance(cell, menu.action.spawn_units.target_cell) < 16) {
-            return false;
-        }
-    }
-    if (state.tool == EDITOR_TOOL_REQUEST_ENTITY) {
-        return editor_get_hovered_entity() != INDEX_INVALID;
     }
     return true;
 }
@@ -1847,9 +1445,6 @@ bool editor_tool_is_scroll_enabled() {
     if (state.tool == EDITOR_TOOL_SQUADS && !state.scenario->squads.empty()) {
         return true;
     }
-    if (state.tool == EDITOR_TOOL_TRIGGERS && !state.scenario->triggers.empty()) {
-        return true;
-    }
     return false;
 }
 
@@ -1868,11 +1463,6 @@ int editor_tool_get_scroll_max() {
             count++;
         }
         return std::max(0, count - (int)TOOL_SQUADS_VISIBLE_ROW_COUNT);
-    }
-    if (state.tool == EDITOR_TOOL_TRIGGERS && !state.scenario->triggers.empty()) {
-        const Trigger& trigger = state.scenario->triggers[state.tool_value];
-        int count = 4 + (int)trigger.conditions.size() + (int)trigger.actions.size();
-        return std::max(0, count - ((int)TOOL_TRIGGERS_VISIBLE_ROW_COUNT - 1));
     }
     return 0;
 }
@@ -2104,6 +1694,7 @@ static void SDLCALL editor_save_callback(void* /*user_data*/, const char* const*
 void editor_set_scenario_paths_to_defaults() {
     state.scenario_path = "";
     state.scenario_map_short_path = "map.dat";
+    state.scenario_script_short_path = "script.lua";
 }
 
 void editor_save(const char* path) {
@@ -2111,7 +1702,7 @@ void editor_save(const char* path) {
     if (!string_ends_with(full_path, ".json")) {
         full_path += ".json";
     }
-    bool success = scenario_save_file(state.scenario, full_path.c_str(), state.scenario_map_short_path.c_str());
+    bool success = scenario_save_file(state.scenario, full_path.c_str(), state.scenario_map_short_path.c_str(), state.scenario_script_short_path.c_str());
     if (success) {
         state.scenario_path = full_path;
         state.scenario_is_saved = true;
@@ -2131,7 +1722,8 @@ static void SDLCALL editor_open_callback(void* /*user_data*/, const char* const*
     }
 
     std::string map_short_path;
-    Scenario* opened_scenario = scenario_open_file(*filelist, &map_short_path);
+    std::string script_short_path;
+    Scenario* opened_scenario = scenario_open_file(*filelist, &map_short_path, &script_short_path);
     if (opened_scenario == NULL) {
         return;
     }
@@ -2140,6 +1732,7 @@ static void SDLCALL editor_open_callback(void* /*user_data*/, const char* const*
     state.scenario = opened_scenario;
     state.scenario_path = std::string(*filelist);
     state.scenario_map_short_path = map_short_path;
+    state.scenario_script_short_path = script_short_path;
     state.scenario_is_saved = true;
 }
 
@@ -2398,16 +1991,6 @@ void editor_render() {
 
         ivec2 cell = editor_get_hovered_cell();
         int cell_size = 1;
-        if (state.tool == EDITOR_TOOL_REQUEST_ENTITY) {
-            uint32_t entity_index = editor_get_hovered_entity();
-            if (entity_index != INDEX_INVALID) {
-                cell = state.scenario->entities[entity_index].cell;
-                cell_size = entity_get_data(state.scenario->entities[entity_index].type).cell_size;
-            }
-        }
-        if (state.tool == EDITOR_TOOL_REQUEST_AREA) {
-            cell_size = state.tool_size;
-        }
         Rect rect = (Rect) {
             .x = ((cell.x * TILE_SIZE) - state.camera_offset.x) + CANVAS_RECT.x,
             .y = ((cell.y * TILE_SIZE) - state.camera_offset.y) + CANVAS_RECT.y,
@@ -2419,8 +2002,7 @@ void editor_render() {
     // Tool fog reveal preview
     if (CANVAS_RECT.has_point(input_get_mouse_position()) &&
             !state.is_minimap_dragging &&
-            state.camera_drag_mouse_position.x == -1 &&
-            state.tool == EDITOR_TOOL_FOG_REVEAL) {
+            state.camera_drag_mouse_position.x == -1) {
         std::vector<ivec2> cells = editor_tool_fog_reveal_get_preview_cells();
         for (ivec2 cell : cells) {
             Rect rect = (Rect) {
@@ -2511,13 +2093,6 @@ void editor_render() {
     ivec2 camera_cell = ivec2(-1, -1);
     if (state.tool == EDITOR_TOOL_PLAYER_SPAWN) {
         camera_cell = state.scenario->player_spawn;
-    }
-    if (state.tool == EDITOR_TOOL_REQUEST_CELL) {
-        EditorMenuTriggerAction& menu = std::get<EditorMenuTriggerAction>(state.menu.menu);
-        if (menu.request == EDITOR_MENU_TRIGGER_ACTION_REQUEST_CAMERA_PAN_CELL &&
-                editor_is_hovered_cell_valid()) {
-            camera_cell = editor_get_hovered_cell();
-        }
     }
     if (camera_cell.x != -1) {
         ivec2 camera_offset = editor_get_player_spawn_camera_offset(camera_cell);
