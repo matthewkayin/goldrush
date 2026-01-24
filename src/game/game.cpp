@@ -73,7 +73,7 @@ void game_set_mode(GameState& state, GameSetModeParams params) {
     if (params.mode == GAME_MODE_MATCH_TEST_SCENARIO) {
         network_set_backend(NETWORK_BACKEND_LAN);
         network_open_lobby("Test Game", NETWORK_LOBBY_PRIVACY_SINGLEPLAYER);
-        state.match_shell_state = match_shell_init_from_scenario(params.match_scenario.scenario);
+        state.match_shell_state = match_shell_init_from_scenario(params.match_scenario.scenario, params.match_scenario.script_path);
         for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
             if (!state.match_shell_state->match_state.players[player_id].active) {
                 continue;
@@ -230,6 +230,7 @@ void game_update(GameState& state) {
                 GameSetModeParams params;
                 params.mode = GAME_MODE_MATCH_TEST_SCENARIO;
                 params.match_scenario.scenario = editor_get_scenario();
+                strncpy(params.match_scenario.script_path, editor_get_scenario_script_path().c_str(), FILENAME_MAX_LENGTH);
                 game_set_mode(state, params);
             }
             break;

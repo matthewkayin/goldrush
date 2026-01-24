@@ -12,6 +12,7 @@
 #include "render/ysort.h"
 #include "shell/hotkey.h"
 #include "scenario/scenario.h"
+#include <luajit/lua.hpp>
 
 #define MATCH_SHELL_CONTROL_GROUP_COUNT 10
 #define MATCH_SHELL_CONTROL_GROUP_NONE -1
@@ -155,11 +156,12 @@ struct MatchShellState {
     // Gold amounts
     uint32_t displayed_gold_amounts[MAX_PLAYERS];
 
-    // Scenario triggers
+    // Scenario 
     uint32_t scenario_allowed_upgrades;
     bool scenario_allowed_entities[ENTITY_TYPE_COUNT];
     bool scenario_show_enemy_gold;
     bool scenario_lose_on_buildings_destroyed;
+    lua_State* scenario_lua_state;
 
     // Replay file (write)
     FILE* replay_file;
@@ -199,7 +201,7 @@ struct MatchShellState {
 
 // Init
 MatchShellState* match_shell_init(int lcg_seed, Noise* noise);
-MatchShellState* match_shell_init_from_scenario(const Scenario* scenario);
+MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const char* script_path);
 MatchShellState* replay_shell_init(const char* replay_path);
 
 // Network event

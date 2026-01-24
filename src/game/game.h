@@ -35,6 +35,7 @@ struct GameSetModeReplayParams {
 
 struct GameSetModeMatchScenarioParams {
     const Scenario* scenario;
+    char script_path[FILENAME_MAX_LENGTH + 1];
 };
 
 struct GameSetModeParams {

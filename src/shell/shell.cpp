@@ -8,6 +8,7 @@
 #include "shell/desync.h"
 #include "profile/profile.h"
 #include <algorithm>
+#include <luajit/lua.hpp>
 
 // Status
 static const uint32_t STATUS_DURATION = 60;
@@ -195,6 +196,7 @@ MatchShellState* match_shell_base_init() {
     // Scenario
     state->scenario_show_enemy_gold = false;
     state->scenario_lose_on_buildings_destroyed = true;
+    state->scenario_lua_state = NULL;
 
     // Replay file
     state->replay_file = NULL;
@@ -287,7 +289,7 @@ MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
     return state;
 }
 
-MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
+MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const char* script_path) {
     MatchShellState* state = match_shell_base_init();
 
     state->mode = MATCH_SHELL_MODE_NOT_STARTED;
@@ -421,6 +423,56 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario) {
     match_shell_center_camera_on_cell(state, scenario->player_spawn);
 
     state->match_state.is_fog_dirty = false;
+
+    // Script
+
+    // Check for script existance
+    {
+        FILE* script_file = fopen(script_path, "r");
+        if (script_file == NULL) {
+            log_error("Could not open script file %s.", script_path);
+            delete state;
+            return NULL;
+        }
+        fclose(script_file);
+    }
+
+    // Init lua state
+    state->scenario_lua_state = luaL_newstate();
+    luaL_openlibs(state->scenario_lua_state);
+
+    int dofile_error = luaL_dofile(state->scenario_lua_state, script_path);
+    if (dofile_error) {
+        log_error("Error loading script file %s. Code %u: %s", script_path, dofile_error, lua_tostring(state->scenario_lua_state, -1));
+        lua_close(state->scenario_lua_state);
+        delete state;
+        return NULL;
+    }
+
+    // Get the scenario_init() function
+    lua_getglobal(state->scenario_lua_state, "scenario_init");
+    if (!lua_isfunction(state->scenario_lua_state, -1)) {
+        log_error("Script %s is missing scenario_init() function.", script_path);
+        lua_pop(state->scenario_lua_state, 1);
+        lua_close(state->scenario_lua_state);
+        delete state;
+        return NULL;
+    }
+
+    // Call scenario_init() 
+    lua_call(state->scenario_lua_state, 0, 0);
+
+    // Check to make sure that scenario_update() exists
+    lua_getglobal(state->scenario_lua_state, "scenario_update");
+    if (!lua_isfunction(state->scenario_lua_state, -1)) {
+        log_error("Script %s is missing scenario_update() function.", script_path);
+        lua_pop(state->scenario_lua_state, 1);
+        lua_close(state->scenario_lua_state);
+        delete state;
+        return NULL;
+    }
+    // Pop scenario_update() off the stack because we are not calling it
+    lua_pop(state->scenario_lua_state, 1);
 
     return state;
 }
@@ -1233,7 +1285,11 @@ void match_shell_update(MatchShellState* state) {
     }
     state->match_state.events.clear();
 
-    // Scenario triggers
+    // Scenario script
+    if (state->scenario_lua_state != NULL) {
+        lua_getglobal(state->scenario_lua_state, "scenario_update");
+        lua_call(state->scenario_lua_state, 0, 0);
+    }
 
     // Update timers and animations
     if (animation_is_playing(state->move_animation)) {
@@ -2210,7 +2266,7 @@ bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyB
     return true;
 }
 
-// TRIGGERS
+// SCENARIO
 
 uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type) {
     uint32_t count = 0;
@@ -2998,6 +3054,9 @@ void match_shell_leave_match(MatchShellState* state, bool exit_program) {
     } else {
         network_disconnect();
         replay_file_close(state->replay_file);
+    }
+    if (state->scenario_lua_state != NULL) {
+        lua_close(state->scenario_lua_state);
     }
     state->mode = exit_program ? MATCH_SHELL_MODE_EXIT_PROGRAM : MATCH_SHELL_MODE_LEAVE_MATCH;
 }

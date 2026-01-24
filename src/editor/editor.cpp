@@ -1756,6 +1756,11 @@ const Scenario* editor_get_scenario() {
     return state.scenario;
 }
 
+std::string editor_get_scenario_script_path() {
+    const std::string folder_path = filesystem_get_path_folder(state.scenario_path.c_str());
+    return folder_path + state.scenario_script_short_path;
+}
+
 void editor_render() {
     std::vector<uint32_t> selection;
 

@@ -40,7 +40,7 @@ ifeq ($(OS),Windows_NT)
 
 # ws2_32 and winmm are linked for enet
 	COMPILER_FLAGS += -Wno-missing-designated-field-initializers
-	LINKER_FLAGS += -L$(LIB_DIR) -lSDL3 -lSDL3_ttf -luser32 -lws2_32 -lwinmm -lenet64 -lsteam_api64 -ldbghelp
+	LINKER_FLAGS += -L$(LIB_DIR) -lSDL3 -lSDL3_ttf -luser32 -lws2_32 -lwinmm -lenet64 -lsteam_api64 -ldbghelp -llua51
 else
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Darwin)
