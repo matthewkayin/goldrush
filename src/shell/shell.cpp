@@ -141,6 +141,9 @@ static const ivec2 RALLY_FLAG_OFFSET = ivec2(-4, -15);
     static const uint32_t DESYNC_FREQUENCY = 60U;
 #endif
 
+// Lua function predeclares
+static int match_shell_lua_log(lua_State* lua_state);
+
 MatchShellState* match_shell_base_init() {
     MatchShellState* state = new MatchShellState();
 
@@ -441,6 +444,9 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
     state->scenario_lua_state = luaL_newstate();
     luaL_openlibs(state->scenario_lua_state);
 
+    // Register globals
+    lua_register(state->scenario_lua_state, "log", match_shell_lua_log);
+
     int dofile_error = luaL_dofile(state->scenario_lua_state, script_path);
     if (dofile_error) {
         log_error("Error loading script file %s. Code %u: %s", script_path, dofile_error, lua_tostring(state->scenario_lua_state, -1));
@@ -460,7 +466,12 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
     }
 
     // Call scenario_init() 
-    lua_call(state->scenario_lua_state, 0, 0);
+    if (lua_pcall(state->scenario_lua_state, 0, 0, 0)) {
+        log_error("Script error: %s", lua_tostring(state->scenario_lua_state, -1));
+        lua_close(state->scenario_lua_state);
+        delete state;
+        return NULL;
+    }
 
     // Check to make sure that scenario_update() exists
     lua_getglobal(state->scenario_lua_state, "scenario_update");
@@ -2267,6 +2278,63 @@ bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyB
 }
 
 // SCENARIO
+
+static int match_shell_lua_log(lua_State* lua_state) {
+#if GOLD_LOG_LEVEL >= LOG_LEVEL_DEBUG
+    int nargs = lua_gettop(lua_state);
+    char buffer[2048];
+    char* buffer_ptr = buffer;
+
+    for (int arg_index = 1; arg_index <= nargs; arg_index++) {
+        int arg_type = lua_type(lua_state, arg_index);
+        switch (arg_type) {
+            case LUA_TNIL: {
+                buffer_ptr += sprintf(buffer_ptr, "nil ");
+                break;
+            }
+            case LUA_TNUMBER: {
+                double value = lua_tonumber(lua_state, arg_index);
+                buffer_ptr += sprintf(buffer_ptr, "%f ", value);
+                break;
+            }
+            case LUA_TBOOLEAN: {
+                bool value = lua_toboolean(lua_state, arg_index);
+                buffer_ptr += sprintf(buffer_ptr, "%s ", value ? "true" : "false");
+                break;
+            }
+            case LUA_TSTRING: {
+                const char* value = lua_tostring(lua_state, arg_index);
+                buffer_ptr += sprintf(buffer_ptr, "%s ", value);
+                break;
+            }
+            case LUA_TTABLE: {
+                buffer_ptr += sprintf(buffer_ptr, "<Table> ");
+                break;
+            }
+            case LUA_TFUNCTION: {
+                buffer_ptr += sprintf(buffer_ptr, "<Function> ");
+                break;
+            }
+            case LUA_TUSERDATA: {
+                buffer_ptr += sprintf(buffer_ptr, "<User Data> ");
+                break;
+            }
+            case LUA_TTHREAD: {
+                buffer_ptr += sprintf(buffer_ptr, "<Thread> ");
+                break;
+            }
+            case LUA_TLIGHTUSERDATA: {
+                buffer_ptr += sprintf(buffer_ptr, "<Light User Data> ");
+                break;
+            }
+        }
+    }
+
+    log_debug("%s", buffer);
+#endif
+
+    return 0;
+}
 
 uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type) {
     uint32_t count = 0;

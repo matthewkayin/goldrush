@@ -1,7 +1,6 @@
 function scenario_init()
-    print("hi")
+    log("hello friends", 5, "again")
 end
 
 function scenario_update()
-    print("update")
 end
