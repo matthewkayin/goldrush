@@ -13,6 +13,8 @@ struct ScriptConstant {
     int value;
 };
 
+void match_shell_script_handle_error(MatchShellState* state);
+
 // Lua function predeclares
 static int script_log(lua_State* lua_state);
 static int script_set_lose_on_buildings_destroyed(lua_State* lua_state);
@@ -78,22 +80,6 @@ bool match_shell_script_init(MatchShellState* state, const char* script_path) {
         return false;
     }
 
-    // Get the scenario_init() function
-    lua_getglobal(state->scenario_lua_state, "scenario_init");
-    if (!lua_isfunction(state->scenario_lua_state, -1)) {
-        log_error("Script %s is missing scenario_init() function.", script_path);
-        lua_pop(state->scenario_lua_state, 1);
-        lua_close(state->scenario_lua_state);
-        return false;
-    }
-
-    // Call scenario_init() 
-    if (lua_pcall(state->scenario_lua_state, 0, 0, 0)) {
-        log_error("%s", lua_tostring(state->scenario_lua_state, -1));
-        lua_close(state->scenario_lua_state);
-        return false;
-    }
-
     // Check to make sure that scenario_update() exists
     lua_getglobal(state->scenario_lua_state, "scenario_update");
     if (!lua_isfunction(state->scenario_lua_state, -1)) {
@@ -105,6 +91,20 @@ bool match_shell_script_init(MatchShellState* state, const char* script_path) {
     // Pop scenario_update() off the stack because we are not calling it
     lua_pop(state->scenario_lua_state, 1);
 
+    // Get the scenario_init() function
+    lua_getglobal(state->scenario_lua_state, "scenario_init");
+    if (!lua_isfunction(state->scenario_lua_state, -1)) {
+        log_error("Script %s is missing scenario_init() function.", script_path);
+        lua_pop(state->scenario_lua_state, 1);
+        lua_close(state->scenario_lua_state);
+        return false;
+    }
+
+    // Call scenario_init() 
+    if (lua_pcall(state->scenario_lua_state, 0, 0, 0)) {
+        match_shell_script_handle_error(state);
+    }
+
     return true;
 }
 
@@ -114,6 +114,29 @@ void match_shell_script_update(MatchShellState* state) {
         log_error("%s", lua_tostring(state->scenario_lua_state, -1));
         match_shell_leave_match(state, false);
     }
+}
+
+void match_shell_script_handle_error(MatchShellState* state) {
+    const char* error_str = lua_tostring(state->scenario_lua_state, -1);
+
+    // Lua is not giving us the short_src so we will
+    // manually look through the string to find the tail end 
+    // (past the path separators)
+
+    size_t index = 0;
+    size_t path_sep_index = 0;
+    while (error_str[index] != '\0') {
+        if (error_str[index] == GOLD_PATH_SEPARATOR) {
+            path_sep_index = index;
+        }
+        index++;
+    }
+    if (path_sep_index != 0) {
+        error_str += path_sep_index + 1;
+    }
+
+    log_error("%s", error_str);
+    match_shell_leave_match(state, false);
 }
 
 MatchShellState* script_get_match_shell_state(lua_State* lua_state) {
@@ -154,24 +177,8 @@ void script_error(lua_State* lua_state, const char* message) {
     lua_getstack(lua_state, 1, &debug);
     lua_getinfo(lua_state, "Sl", &debug);
 
-    // Lua is not giving us the short_src so we will
-    // manually look through the string to find the tail end 
-    // (past the path separators)
-    const char* source_ptr = debug.source;
-    size_t index = 0;
-    size_t path_sep_index = 0;
-    while (source_ptr[index] != '\0') {
-        if (source_ptr[index] == GOLD_PATH_SEPARATOR) {
-            path_sep_index = index;
-        }
-        index++;
-    }
-    if (path_sep_index != 0) {
-        source_ptr = debug.source + path_sep_index + 1;
-    }
-
-    char error_str[256];
-    sprintf(error_str, "%s:%i %s", source_ptr, debug.currentline, message);
+    char error_str[512];
+    sprintf(error_str, "%s:%i %s", debug.source, debug.currentline, message);
     lua_pushstring(lua_state, error_str);
     lua_error(lua_state);
 }
