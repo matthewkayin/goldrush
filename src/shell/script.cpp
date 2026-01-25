@@ -1,6 +1,7 @@
 #include "shell/shell.h"
 
 #include "core/logger.h"
+#include "core/filesystem.h"
 
 enum ScriptChatColor {
     SCRIPT_CHAT_COLOR_WHITE,
@@ -65,6 +66,15 @@ bool match_shell_script_init(MatchShellState* state, const char* script_path) {
 
     // Register gold library
     luaL_register(state->scenario_lua_state, "scenario", GOLD_FUNCS);
+
+    // Set module path
+    lua_getglobal(state->scenario_lua_state, "package");
+    lua_getfield(state->scenario_lua_state, -1, "path");
+    const char* current_package_path = lua_tostring(state->scenario_lua_state, -1);
+    std::string new_package_path = std::string(current_package_path) + ";" + filesystem_get_resource_path() + "scenario/modules/?.lua";
+    lua_pushstring(state->scenario_lua_state, new_package_path.c_str());
+    lua_setfield(state->scenario_lua_state, -3, "path");
+    lua_pop(state->scenario_lua_state, 2);
 
     // Give lua a pointer to the shell state
     lua_pushlightuserdata(state->scenario_lua_state, state);

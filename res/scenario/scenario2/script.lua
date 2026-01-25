@@ -1,15 +1,29 @@
-has_sent_message = false
+local actions = require("actions")
+
+waow_time = 0.0
+active_coroutines = {}
+
+function wait(seconds)
+    local resume_time = scenario.get_time() + seconds
+    while scenario.get_time() < resume_time do
+        coroutine.yield()
+    end
+end
 
 function scenario_init()
     scenario.set_lose_on_buildings_destroyed(false)
-    scenario.chat(scenario.CHAT_COLOR_WHITE, "", "Hello Friends")
-    scenario.add_objective_with_entity_counter("Hire 8 Miners", scenario.ENTITY_MINER, 8)
+    actions.add(function ()
+        wait(5.0)
+        scenario.chat(scenario.CHAT_COLOR_WHITE, "", "huzzah!")
+        scenario.play_sound(scenario.SOUND_OBJECTIVE_COMPLETE)
+    end)
 end
 
 function scenario_update()
-    if not has_sent_message and scenario.get_time() > 5.0 then
+    actions.update()
+    if scenario.get_time() > waow_time then
         scenario.chat(scenario.CHAT_COLOR_WHITE, "", "Waaow")
-        scenario.play_sound(scenario.SOUND_OBJECTIVE_COMPLETE)
-        has_sent_message = true
+        scenario.play_sound(scenario.SOUND_UI_CLICK)
+        waow_time = waow_time + 1.0
     end
 end

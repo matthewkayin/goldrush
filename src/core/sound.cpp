@@ -17,7 +17,7 @@ struct SoundParams {
 
 static const std::unordered_map<SoundName, SoundParams> SOUND_PARAMS = {
     { SOUND_UI_CLICK, (SoundParams) {
-        .path = "ui_select",
+        .path = "ui_click",
         .variants = 1
     }},
     { SOUND_DEATH, (SoundParams) {
