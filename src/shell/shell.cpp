@@ -423,7 +423,7 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
     state->match_state.is_fog_dirty = false;
 
     // Script
-    if (!match_shell_script_init(state, script_path)) {
+    if (!match_shell_script_init(state, scenario, script_path)) {
         delete state;
         return NULL;
     }

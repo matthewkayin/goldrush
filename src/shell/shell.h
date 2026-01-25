@@ -235,7 +235,7 @@ bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyB
 uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type);
 
 // Script
-bool match_shell_script_init(MatchShellState* state, const char* script_path);
+bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, const char* script_path);
 void match_shell_script_update(MatchShellState* state);
 
 // State queries

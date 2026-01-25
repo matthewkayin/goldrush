@@ -2,6 +2,7 @@
 
 #include "core/logger.h"
 #include "core/filesystem.h"
+#include "network/network.h"
 
 enum ScriptChatColor {
     SCRIPT_CHAT_COLOR_WHITE,
@@ -25,6 +26,7 @@ static int script_play_sound(lua_State* lua_state);
 static int script_get_time(lua_State* lua_state);
 static int script_add_objective(lua_State* lua_state);
 static int script_clear_objectives(lua_State* lua_state);
+static int script_is_entity_visible_to_player(lua_State* lua_state);
 
 static const luaL_reg GOLD_FUNCS[] = {
     { "log", script_log },
@@ -35,6 +37,7 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "get_time", script_get_time },
     { "add_objective", script_add_objective },
     { "clear_objectives", script_clear_objectives },
+    { "is_entity_visible_to_player", script_is_entity_visible_to_player },
     { NULL, NULL }
 };
 
@@ -45,7 +48,7 @@ static const ScriptConstant GOLD_CONSTANTS[] = {
     { NULL, 0 }
 };
 
-bool match_shell_script_init(MatchShellState* state, const char* script_path) {
+bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, const char* script_path) {
     // Check for script existance
     {
         FILE* script_file = fopen(script_path, "r");
@@ -124,6 +127,24 @@ bool match_shell_script_init(MatchShellState* state, const char* script_path) {
         const_name_ptr[index] = '\0';
 
         lua_pushinteger(state->scenario_lua_state, sound_name);
+        lua_setfield(state->scenario_lua_state, -2, const_name);
+    }
+
+    // Scenario constants
+    for (const ScenarioConstant& constant : scenario->constants) {
+        char const_name[64];
+        sprintf(const_name, "SCENARIO_%s", constant.name);
+
+        switch (constant.type) {
+            case SCENARIO_CONSTANT_TYPE_ENTITY: {
+                lua_pushinteger(state->scenario_lua_state, constant.entity.index);
+                break;
+            }
+            case SCENARIO_CONSTANT_TYPE_COUNT: {
+                GOLD_ASSERT(false);
+                break;
+            }
+        }
         lua_setfield(state->scenario_lua_state, -2, const_name);
     }
 
@@ -456,4 +477,23 @@ static int script_clear_objectives(lua_State* lua_state) {
     state->scenario_objectives.clear();
 
     return 0;
+}
+
+static int script_is_entity_visible_to_player(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    uint32_t entity_index = lua_tonumber(lua_state, 1);
+
+    if (entity_index >= state->match_state.entities.size()) {
+        char error_message[128];
+        sprintf(error_message, "Entity with index %u does not exist.", entity_index);
+        script_error(lua_state, error_message);
+    }
+
+    bool result = entity_is_visible_to_player(state->match_state, state->match_state.entities[entity_index], network_get_player_id());
+    lua_pushboolean(lua_state, result);
+
+    return 1;
 }
