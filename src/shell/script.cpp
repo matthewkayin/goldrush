@@ -25,6 +25,7 @@ static int script_get_time(lua_State* lua_state);
 static int script_add_objective(lua_State* lua_state);
 static int script_add_objective_with_variable_counter(lua_State* lua_state);
 static int script_add_objective_with_entity_counter(lua_State* lua_state);
+static int script_clear_objectives(lua_State* lua_state);
 
 static const luaL_reg GOLD_FUNCS[] = {
     { "log", script_log },
@@ -36,6 +37,7 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "add_objective", script_add_objective },
     { "add_objective_with_variable_counter", script_add_objective_with_variable_counter },
     { "add_objective_with_entity_counter", script_add_objective_with_entity_counter },
+    { "clear_objectives", script_clear_objectives },
     { NULL, NULL }
 };
 
@@ -43,7 +45,7 @@ static const ScriptConstant GOLD_CONSTANTS[] = {
     { "CHAT_COLOR_WHITE", SCRIPT_CHAT_COLOR_WHITE },
     { "CHAT_COLOR_GOLD", SCRIPT_CHAT_COLOR_GOLD },
     { "CHAT_COLOR_BLUE", SCRIPT_CHAT_COLOR_GOLD },
-    { NULL, NULL }
+    { NULL, 0 }
 };
 
 bool match_shell_script_init(MatchShellState* state, const char* script_path) {
@@ -78,6 +80,7 @@ bool match_shell_script_init(MatchShellState* state, const char* script_path) {
         const_index++;
     }
 
+    // Entity constants
     for (int entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
         const char* entity_name = entity_get_data((EntityType)entity_type).name;
 
@@ -96,11 +99,29 @@ bool match_shell_script_init(MatchShellState* state, const char* script_path) {
         }
         const_name_ptr[index] = '\0';
 
-        log_debug("Setting const %s=%i", const_name, entity_type);
-
         lua_pushinteger(state->scenario_lua_state, entity_type);
         lua_setfield(state->scenario_lua_state, -2, const_name);
     }
+
+    // Sound constants
+    for (int sound_name = 0; sound_name < SOUND_COUNT; sound_name++) {
+        char const_name[64];
+        char* const_name_ptr = const_name;
+        const_name_ptr += sprintf(const_name_ptr, "SOUND_");
+
+        const char* sound_name_str = sound_get_name((SoundName)sound_name);
+        size_t index = 0;
+        while (sound_name_str[index] != '\0') {
+            const_name_ptr[index] = toupper(sound_name_str[index]);
+            index++;
+        }
+        const_name_ptr[index] = '\0';
+
+        lua_pushinteger(state->scenario_lua_state, sound_name);
+        lua_setfield(state->scenario_lua_state, -2, const_name);
+    }
+
+    // End constants
     lua_pop(state->scenario_lua_state, 1);
 
     int dofile_error = luaL_dofile(state->scenario_lua_state, script_path);
@@ -141,8 +162,7 @@ bool match_shell_script_init(MatchShellState* state, const char* script_path) {
 void match_shell_script_update(MatchShellState* state) {
     lua_getglobal(state->scenario_lua_state, "scenario_update");
     if (lua_pcall(state->scenario_lua_state, 0, 0, 0)) {
-        log_error("%s", lua_tostring(state->scenario_lua_state, -1));
-        match_shell_leave_match(state, false);
+        match_shell_script_handle_error(state);
     }
 }
 
@@ -424,4 +444,13 @@ static int script_add_objective_with_entity_counter(lua_State* lua_state) {
     };
 
     return script_add_objective_helper(state, objective);
+}
+
+static int script_clear_objectives(lua_State* lua_state) {
+    script_validate_arguments(lua_state, NULL, 0);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    state->scenario_objectives.clear();
+
+    return 0;
 }

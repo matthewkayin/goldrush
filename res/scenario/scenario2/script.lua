@@ -9,6 +9,7 @@ end
 function scenario_update()
     if not has_sent_message and scenario.get_time() > 5.0 then
         scenario.chat(scenario.CHAT_COLOR_WHITE, "", "Waaow")
+        scenario.play_sound(scenario.SOUND_OBJECTIVE_COMPLETE)
         has_sent_message = true
     end
 end

@@ -37,7 +37,7 @@ static const std::unordered_map<SoundName, SoundParams> SOUND_PARAMS = {
         .variants = 4
     }},
     { SOUND_PICKAXE, (SoundParams) {
-        .path = "impact",
+        .path = "pickaxe",
         .variants = 3
     }},
     { SOUND_HAMMER, (SoundParams) {
@@ -109,7 +109,7 @@ static const std::unordered_map<SoundName, SoundParams> SOUND_PARAMS = {
         .variants = 1
     }},
     { SOUND_ALERT_UNIT, (SoundParams) {
-        .path = "harmonica",
+        .path = "alert_unit",
         .variants = 1
     }},
     { SOUND_GOLD_MINE_COLLAPSE, (SoundParams) {
@@ -125,7 +125,7 @@ static const std::unordered_map<SoundName, SoundParams> SOUND_PARAMS = {
         .variants = 1
     }},
     { SOUND_PISTOL_SILENCED, (SoundParams) {
-        .path = "silenced",
+        .path = "pistol_silenced",
         .variants = 3
     }},
     { SOUND_CAMO_ON, (SoundParams) {
@@ -145,11 +145,11 @@ static const std::unordered_map<SoundName, SoundParams> SOUND_PARAMS = {
         .variants = 5
     }},
     { SOUND_OBJECTIVE_COMPLETE, (SoundParams) {
-        .path = "lucky_guitar",
+        .path = "objective_complete",
         .variants = 1
     }},
     { SOUND_MATCH_START, (SoundParams) {
-        .path = "standoff_guitar",
+        .path = "match_start",
         .variants = 1
     }}
 };
