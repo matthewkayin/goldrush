@@ -22,6 +22,9 @@ static int script_chat(lua_State* lua_state);
 static int script_chat_hint(lua_State* lua_state);
 static int script_play_sound(lua_State* lua_state);
 static int script_get_time(lua_State* lua_state);
+static int script_add_objective(lua_State* lua_state);
+static int script_add_objective_with_variable_counter(lua_State* lua_state);
+static int script_add_objective_with_entity_counter(lua_State* lua_state);
 
 static const luaL_reg GOLD_FUNCS[] = {
     { "log", script_log },
@@ -30,6 +33,9 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "chat_hint", script_chat_hint },
     { "play_sound", script_play_sound },
     { "get_time", script_get_time },
+    { "add_objective", script_add_objective },
+    { "add_objective_with_variable_counter", script_add_objective_with_variable_counter },
+    { "add_objective_with_entity_counter", script_add_objective_with_entity_counter },
     { NULL, NULL }
 };
 
@@ -70,6 +76,30 @@ bool match_shell_script_init(MatchShellState* state, const char* script_path) {
         lua_setfield(state->scenario_lua_state, -2, GOLD_CONSTANTS[const_index].name);
 
         const_index++;
+    }
+
+    for (int entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+        const char* entity_name = entity_get_data((EntityType)entity_type).name;
+
+        char const_name[32];
+        char* const_name_ptr = const_name;
+        const_name_ptr += sprintf(const_name_ptr, "ENTITY_");
+
+        size_t index = 0;
+        while (entity_name[index] != '\0') {
+            if (entity_name[index] == ' ' && !(entity_type == ENTITY_GOLDMINE || entity_type == ENTITY_LANDMINE)) {
+                const_name_ptr[index] = '_';
+            } else if (entity_name[index] != ' ' || entity_name[index] != '\'') {
+                const_name_ptr[index] = toupper(entity_name[index]);
+            }
+            index++;
+        }
+        const_name_ptr[index] = '\0';
+
+        log_debug("Setting const %s=%i", const_name, entity_type);
+
+        lua_pushinteger(state->scenario_lua_state, entity_type);
+        lua_setfield(state->scenario_lua_state, -2, const_name);
     }
     lua_pop(state->scenario_lua_state, 1);
 
@@ -206,6 +236,14 @@ void script_validate_arguments(lua_State* lua_state, const int* arg_types, int a
     }
 }
 
+void script_validate_entity_type(lua_State* lua_state, int entity_type) {
+    if (entity_type < 0 || entity_type >= ENTITY_TYPE_COUNT) {
+        char error_str[128];
+        sprintf(error_str, "Entity type %i not recognized.", entity_type);
+        script_error(lua_state, error_str);
+    }
+}
+
 static int script_log(lua_State* lua_state) {
 #if GOLD_LOG_LEVEL >= LOG_LEVEL_DEBUG
     int nargs = lua_gettop(lua_state);
@@ -328,4 +366,62 @@ static int script_get_time(lua_State* lua_state) {
     lua_pushnumber(lua_state, (double)state->match_timer / (double)UPDATES_PER_SECOND);
 
     return 1;
+}
+
+int script_add_objective_helper(MatchShellState* state, Objective objective) {
+    state->scenario_objectives.push_back(objective);
+    lua_pushnumber(state->scenario_lua_state, state->scenario_objectives.size() - 1);
+
+    return 1;
+}
+
+static int script_add_objective(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TSTRING };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    Objective objective = (Objective) {
+        .description = std::string(lua_tostring(lua_state, 1)),
+        .is_complete = false,
+        .counter_type = OBJECTIVE_COUNTER_TYPE_NONE,
+        .counter_value = 0,
+        .counter_target = 0
+    };
+
+    return script_add_objective_helper(state, objective);
+}
+
+static int script_add_objective_with_variable_counter(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TSTRING, LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 2);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    Objective objective = (Objective) {
+        .description = std::string(lua_tostring(lua_state, 1)),
+        .is_complete = false,
+        .counter_type = OBJECTIVE_COUNTER_TYPE_VARIABLE,
+        .counter_value = 0,
+        .counter_target = (uint32_t)lua_tonumber(lua_state, 2)
+    };
+
+    return script_add_objective_helper(state, objective);
+}
+
+static int script_add_objective_with_entity_counter(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TSTRING, LUA_TNUMBER, LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 3);
+
+    int counter_value = (int)lua_tonumber(lua_state, 2);
+    script_validate_entity_type(lua_state, counter_value);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    Objective objective = (Objective) {
+        .description = std::string(lua_tostring(lua_state, 1)),
+        .is_complete = false,
+        .counter_type = OBJECTIVE_COUNTER_TYPE_ENTITY,
+        .counter_value = (uint32_t)counter_value,
+        .counter_target = (uint32_t)lua_tonumber(lua_state, 3)
+    };
+
+    return script_add_objective_helper(state, objective);
 }

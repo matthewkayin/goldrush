@@ -2219,6 +2219,22 @@ bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyB
     return true;
 }
 
+uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type) {
+    uint32_t count = 0;
+
+    for (const Entity& entity : state->match_state.entities) {
+        if (entity.type != entity_type ||
+                entity.player_id != player_id ||
+                entity.health == 0 ||
+                entity.mode == MODE_BUILDING_IN_PROGRESS) {
+            continue;
+        }
+        count++;
+    }
+
+    return count;
+}
+
 // STATE QUERIES
 
 bool match_shell_is_mouse_in_ui() {
@@ -4184,8 +4200,7 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Objectives
-    /*
-    if (!state->current_objective_indices.empty()) {
+    if (!state->scenario_objectives.empty()) {
         const SpriteInfo& menu_button_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_BURGER);
         ivec2 objectives_text_pos = MENU_BUTTON_POSITION + ivec2(1, menu_button_sprite_info.frame_height + 4);
         render_text(FONT_HACK_SHADOW, "Objectives:", objectives_text_pos + ivec2(1, 1));
@@ -4193,14 +4208,13 @@ void match_shell_render(const MatchShellState* state) {
 
         objectives_text_pos += ivec2(4, 20);
         const SpriteInfo& checkbox_sprite_info = render_get_sprite_info(SPRITE_UI_OBJECTIVE_CHECKBOX);
-        for (uint32_t objective_index : state->current_objective_indices) {
-            const Objective& objective = state->scenario_objectives[objective_index];
+        for (const Objective& objective : state->scenario_objectives) {
             render_sprite_frame(SPRITE_UI_OBJECTIVE_CHECKBOX, ivec2((int)objective.is_complete, 0), objectives_text_pos, RENDER_SPRITE_NO_CULL, 0);
 
             // Determine objective text
             char objective_text[128];
             char* objective_text_ptr = objective_text;
-            objective_text_ptr += sprintf(objective_text_ptr, "%s", objective.description);
+            objective_text_ptr += sprintf(objective_text_ptr, "%s", objective.description.c_str());
             if (!objective.is_complete && objective.counter_type != OBJECTIVE_COUNTER_TYPE_NONE) {
                 uint32_t counter_value = 0; 
                 if (objective.counter_type == OBJECTIVE_COUNTER_TYPE_ENTITY) {
@@ -4220,7 +4234,6 @@ void match_shell_render(const MatchShellState* state) {
             objectives_text_pos.y += checkbox_sprite_info.frame_height + 4;
         }
     }
-    */
 
     // Menu button icon
     {

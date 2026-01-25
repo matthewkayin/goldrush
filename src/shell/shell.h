@@ -82,6 +82,20 @@ enum FireCellRender {
     FIRE_CELL_RENDER_ABOVE
 };
 
+enum ObjectiveCounterType {
+    OBJECTIVE_COUNTER_TYPE_NONE,
+    OBJECTIVE_COUNTER_TYPE_VARIABLE,
+    OBJECTIVE_COUNTER_TYPE_ENTITY
+};
+
+struct Objective {
+    std::string description;
+    bool is_complete;
+    ObjectiveCounterType counter_type;
+    uint32_t counter_value;
+    uint32_t counter_target;
+};
+
 #ifdef GOLD_DEBUG
     enum DebugFog {
         DEBUG_FOG_ENABLED,
@@ -165,6 +179,7 @@ struct MatchShellState {
     bool scenario_show_enemy_gold;
     bool scenario_lose_on_buildings_destroyed;
     lua_State* scenario_lua_state;
+    std::vector<Objective> scenario_objectives;
 
     // Replay file (write)
     FILE* replay_file;
@@ -217,6 +232,7 @@ void match_shell_order_move(MatchShellState* state);
 std::vector<EntityId> match_shell_find_idle_miners(const MatchShellState* state);
 bool match_shell_does_player_meet_hotkey_requirements(const MatchState& state, InputAction hotkey);
 bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyButtonInfo& info);
+uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type);
 
 // Script
 bool match_shell_script_init(MatchShellState* state, const char* script_path);
