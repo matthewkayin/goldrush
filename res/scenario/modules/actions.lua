@@ -1,7 +1,7 @@
 local actions = {}
 actions.active_coroutines = {}
 
-function actions.add(action)
+function actions.run(action)
     table.insert(actions.active_coroutines, coroutine.create(action))
 end
 
@@ -18,6 +18,13 @@ function actions.update()
         else
             index = index + 1
         end
+    end
+end
+
+function actions.wait(seconds)
+    local resume_time = gold.get_time() + seconds
+    while gold.get_time() < resume_time do
+        coroutine.yield()
     end
 end
 
