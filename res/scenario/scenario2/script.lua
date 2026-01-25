@@ -1,5 +1,6 @@
 function scenario_init()
-    log("hello friends", 5, "again")
+    gold.set_lose_on_buildings_destroyed(state, false)
+    gold.log("hi friends")
 end
 
 function scenario_update()

@@ -143,6 +143,13 @@ static const ivec2 RALLY_FLAG_OFFSET = ivec2(-4, -15);
 
 // Lua function predeclares
 static int match_shell_lua_log(lua_State* lua_state);
+static int match_shell_lua_set_lose_on_buildings_destroyed(lua_State* lua_state);
+
+static const luaL_reg GOLD_LUA_FUNCS[] = {
+    { "log", match_shell_lua_log },
+    { "set_lose_on_buildings_destroyed", match_shell_lua_set_lose_on_buildings_destroyed },
+    { NULL, NULL }
+};
 
 MatchShellState* match_shell_base_init() {
     MatchShellState* state = new MatchShellState();
@@ -444,8 +451,12 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
     state->scenario_lua_state = luaL_newstate();
     luaL_openlibs(state->scenario_lua_state);
 
-    // Register globals
-    lua_register(state->scenario_lua_state, "log", match_shell_lua_log);
+    // Register gold library
+    luaL_register(state->scenario_lua_state, "gold", GOLD_LUA_FUNCS);
+
+    // Give lua a pointer to the shell state
+    lua_pushlightuserdata(state->scenario_lua_state, state);
+    lua_setglobal(state->scenario_lua_state, "state");
 
     int dofile_error = luaL_dofile(state->scenario_lua_state, script_path);
     if (dofile_error) {
@@ -2279,6 +2290,84 @@ bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyB
 
 // SCENARIO
 
+const char* match_shell_lua_type_str(int lua_type) {
+    switch (lua_type) {
+        case LUA_TNIL: 
+            return "<nil>";
+        case LUA_TNUMBER: 
+            return "<number>";
+        case LUA_TBOOLEAN: 
+            return "<boolean>";
+        case LUA_TSTRING:
+            return "<string>";
+        case LUA_TTABLE: 
+            return "<table>";
+        case LUA_TFUNCTION: 
+            return "<function>";
+        case LUA_TUSERDATA: 
+            return "<userdata>";
+        case LUA_TTHREAD: 
+            return "<thread>";
+        case LUA_TLIGHTUSERDATA: 
+            return "<lightuserdata>";
+        default:
+            GOLD_ASSERT(false);
+            return "";
+    }
+}
+
+int match_shell_lua_sprintf_debug_prefix(char* str, lua_State* lua_state) {
+    lua_Debug debug;
+    lua_getstack(lua_state, 1, &debug);
+    lua_getinfo(lua_state, "Sl", &debug);
+
+    // Lua is not giving us the short_src so we will
+    // manually look through the string to find the tail end 
+    // (past the path separators)
+    const char* source_ptr = debug.source;
+    size_t index = 0;
+    size_t path_sep_index = 0;
+    while (source_ptr[index] != '\0') {
+        if (source_ptr[index] == GOLD_PATH_SEPARATOR) {
+            path_sep_index = index;
+        }
+        index++;
+    }
+    if (path_sep_index != 0) {
+        source_ptr = debug.source + path_sep_index + 1;
+    }
+
+    return sprintf(str, "%s:%i ", source_ptr, debug.currentline);
+}
+
+void match_shell_lua_validate_arguments(lua_State* lua_state, const int* arg_types, int arg_count) {
+    char error_str[256];
+    char* error_str_ptr = error_str;
+
+    int arg_number = lua_gettop(lua_state);
+    if (arg_number != arg_count) {
+        error_str_ptr += match_shell_lua_sprintf_debug_prefix(error_str_ptr, lua_state);
+        error_str_ptr += sprintf(error_str_ptr, "Invalid arg count. Expected %u. Received %u.", arg_count, arg_number);
+        lua_pushstring(lua_state, error_str);
+        lua_error(lua_state);
+    }
+
+    for (int arg_index = 1; arg_index <= arg_count; arg_index++) {
+        int received_type = lua_type(lua_state, arg_index);
+        if (received_type != arg_types[arg_index - 1]) {
+            error_str_ptr += match_shell_lua_sprintf_debug_prefix(error_str_ptr, lua_state);
+            error_str_ptr += sprintf(error_str_ptr, 
+                "Invalid type for arg %u. Received %s. Expected %s.", 
+                arg_index, 
+                match_shell_lua_type_str(received_type), 
+                match_shell_lua_type_str(arg_types[arg_index - 1])
+            );
+            lua_pushstring(lua_state, error_str);
+            lua_error(lua_state);
+        }
+    }
+}
+
 static int match_shell_lua_log(lua_State* lua_state) {
 #if GOLD_LOG_LEVEL >= LOG_LEVEL_DEBUG
     int nargs = lua_gettop(lua_state);
@@ -2307,24 +2396,8 @@ static int match_shell_lua_log(lua_State* lua_state) {
                 buffer_ptr += sprintf(buffer_ptr, "%s ", value);
                 break;
             }
-            case LUA_TTABLE: {
-                buffer_ptr += sprintf(buffer_ptr, "<Table> ");
-                break;
-            }
-            case LUA_TFUNCTION: {
-                buffer_ptr += sprintf(buffer_ptr, "<Function> ");
-                break;
-            }
-            case LUA_TUSERDATA: {
-                buffer_ptr += sprintf(buffer_ptr, "<User Data> ");
-                break;
-            }
-            case LUA_TTHREAD: {
-                buffer_ptr += sprintf(buffer_ptr, "<Thread> ");
-                break;
-            }
-            case LUA_TLIGHTUSERDATA: {
-                buffer_ptr += sprintf(buffer_ptr, "<Light User Data> ");
+            default: {
+                buffer_ptr += sprintf(buffer_ptr, "%s ", match_shell_lua_type_str(arg_type));
                 break;
             }
         }
@@ -2333,6 +2406,16 @@ static int match_shell_lua_log(lua_State* lua_state) {
     log_debug("%s", buffer);
 #endif
 
+    return 0;
+}
+
+static int match_shell_lua_set_lose_on_buildings_destroyed(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TLIGHTUSERDATA, LUA_TBOOLEAN };
+    match_shell_lua_validate_arguments(lua_state, arg_types, 2);
+
+    MatchShellState* state = (MatchShellState*)lua_topointer(lua_state, 1);
+    state->scenario_lose_on_buildings_destroyed = lua_toboolean(lua_state, 2);
+    
     return 0;
 }
 
