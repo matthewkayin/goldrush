@@ -8,7 +8,7 @@
 #include "bot/config.h"
 
 #define SCENARIO_SQUAD_MAX_ENTITIES SELECTION_LIMIT
-#define SCENARIO_VARIABLE_NAME_BUFFER_LENGTH 32
+#define SCENARIO_CONSTANT_NAME_BUFFER_LENGTH 32
 
 struct ScenarioPlayer {
     char name[MAX_USERNAME_LENGTH + 1];
@@ -36,21 +36,20 @@ struct ScenarioSquad {
     uint32_t entities[SCENARIO_SQUAD_MAX_ENTITIES];
 };
 
-enum ScenarioVariableType {
-    SCENARIO_VARIABLE_TYPE_SQUAD,
-    SCENARIO_VARIABLE_TYPE_COUNT
+enum ScenarioConstantType {
+    SCENARIO_CONSTANT_TYPE_ENTITY,
+    SCENARIO_CONSTANT_TYPE_COUNT
 };
 
-struct ScenarioVariableSquad {
-    uint8_t player_id;
-    uint32_t squad_id;
+struct ScenarioConstantEntity {
+    uint32_t index;
 };
 
-struct ScenarioVariable {
-    char name[SCENARIO_VARIABLE_NAME_BUFFER_LENGTH];
-    ScenarioVariableType type;
+struct ScenarioConstant {
+    char name[SCENARIO_CONSTANT_NAME_BUFFER_LENGTH];
+    ScenarioConstantType type;
     union {
-        ScenarioVariableSquad squad;
+        ScenarioConstantEntity entity;
     };
 };
 
@@ -69,6 +68,7 @@ struct Scenario {
     ScenarioEntity entities[MATCH_MAX_ENTITIES];
 
     std::vector<ScenarioSquad> squads;
+    std::vector<ScenarioConstant> constants;
 };
 
 Scenario* scenario_init_blank(MapType map_type, MapSize map_size);
@@ -80,6 +80,10 @@ ScenarioSquad scenario_squad_init();
 bool scenario_squads_are_equal(const ScenarioSquad& a, const ScenarioSquad& b);
 const char* scenario_squad_type_str(ScenarioSquadType type);
 ScenarioSquadType scenario_squad_type_from_str(const char* str);
+
+const char* scenario_constant_type_str(ScenarioConstantType type);
+ScenarioConstantType scenario_constant_type_from_str(const char* str);
+void scenario_constant_set_type(ScenarioConstant& constant, ScenarioConstantType type);
 
 uint8_t scenario_get_noise_map_value(Scenario* scenario, ivec2 cell);
 void scenario_set_noise_map_value(Scenario* scenario, ivec2 cell, uint8_t value);

@@ -137,6 +137,39 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
                 : action_data.previous_value;
             break;
         }
+        case EDITOR_ACTION_ADD_CONSTANT: {
+            if (mode == EDITOR_ACTION_MODE_DO) {
+                ScenarioConstant new_constant;
+                sprintf(new_constant.name, "Constant %u", (uint32_t)scenario->constants.size() + 1U);
+                new_constant.type = SCENARIO_CONSTANT_TYPE_ENTITY;
+                new_constant.entity.index = INDEX_INVALID;
+
+                scenario->constants.push_back(new_constant);
+            } else if (mode == EDITOR_ACTION_MODE_UNDO) {
+                scenario->constants.pop_back();
+            }
+
+            break;
+        }
+        case EDITOR_ACTION_REMOVE_CONSTANT: {
+            const EditorActionRemoveConstant& action_data = std::get<EditorActionRemoveConstant>(action.data);
+
+            if (mode == EDITOR_ACTION_MODE_DO) {
+                scenario->constants.erase(scenario->constants.begin() + action_data.index);
+            } else if (mode == EDITOR_ACTION_MODE_UNDO) {
+                scenario->constants.insert(scenario->constants.begin() + action_data.index, action_data.value);
+            }
+
+            break;
+        }
+        case EDITOR_ACTION_EDIT_CONSTANT: {
+            const EditorActionEditConstant& action_data = std::get<EditorActionEditConstant>(action.data);
+
+            scenario->constants[action_data.index] = mode == EDITOR_ACTION_MODE_DO
+                ? action_data.new_value
+                : action_data.previous_value;
+            break;
+        }
     }
 }
 

@@ -7,6 +7,7 @@
 #include "editor/menu_file.h"
 #include "editor/menu_players.h"
 #include "editor/menu_edit_squad.h"
+#include "editor/menu_constant.h"
 #include "editor/menu.h"
 #include "editor/action.h"
 #include "core/logger.h"
@@ -51,7 +52,7 @@ static const Rect CANVAS_RECT = (Rect) {
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save", "Save As" },
     { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players" },
-    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads", "Player Spawn" },
+    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads", "Player Spawn", "Constants" },
 };
 
 static const std::unordered_map<InputAction, std::vector<std::string>> TOOLBAR_SHORTCUTS = {
@@ -89,6 +90,7 @@ enum EditorTool {
     EDITOR_TOOL_EDIT_ENTITY,
     EDITOR_TOOL_SQUADS,
     EDITOR_TOOL_PLAYER_SPAWN,
+    EDITOR_TOOL_CONSTANTS
 };
 
 struct EditorClipboard {
@@ -102,7 +104,8 @@ enum EditorMenuType {
     EDITOR_MENU_TYPE_NEW,
     EDITOR_MENU_TYPE_FILE,
     EDITOR_MENU_TYPE_PLAYERS,
-    EDITOR_MENU_TYPE_EDIT_SQUAD
+    EDITOR_MENU_TYPE_EDIT_SQUAD,
+    EDITOR_MENU_TYPE_CONSTANT
 };
 
 struct EditorMenu {
@@ -111,7 +114,8 @@ struct EditorMenu {
     std::variant<
         EditorMenuNew,
         EditorMenuPlayers,
-        EditorMenuEditSquad
+        EditorMenuEditSquad,
+        EditorMenuConstant
     > menu;
 };
 
@@ -147,7 +151,6 @@ struct EditorState {
     uint32_t tool_scroll;
     uint32_t tool_edit_entity_gold_held;
     ivec2 tool_edit_entity_offset;
-    uint32_t tool_dropdown_scroll;
     int tool_size;
     bool is_painting;
     bool is_pasting;
@@ -461,6 +464,95 @@ void editor_update() {
                 }
                 case EDITOR_TOOL_PLAYER_SPAWN:
                     break;
+                case EDITOR_TOOL_CONSTANTS: {
+                    // Constant selector row
+                    ui_begin_row(state.ui, ivec2(0, 0), 2);
+                        // Build items list
+                        std::vector<std::string> constant_dropdown_items;
+                        for (uint32_t constant_index = 0; constant_index < state.scenario->constants.size(); constant_index++) {
+                            constant_dropdown_items.push_back(std::string(state.scenario->constants[constant_index].name));
+                        }
+
+                        // Dropdown
+                        ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.tool_value, constant_dropdown_items, false, 9);
+                        
+                        // Add button
+                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_PLUS, false, false)) {
+                            editor_do_action((EditorAction) {
+                                .type = EDITOR_ACTION_ADD_CONSTANT
+                            });
+                            state.tool_value = state.scenario->constants.size() - 1;
+                        }
+
+                        // Edit button
+                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, state.scenario->constants.empty(), false)) {
+                            state.menu = (EditorMenu) {
+                                .type = EDITOR_MENU_TYPE_CONSTANT,
+                                .mode = EDITOR_MENU_MODE_OPEN,
+                                .menu = editor_menu_constant_open(state.scenario->constants[state.tool_value].name)
+                            };
+                        }
+
+                        // Delete button
+                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, state.scenario->constants.empty(), false)) {
+                            editor_do_action((EditorAction) {
+                                .type = EDITOR_ACTION_REMOVE_CONSTANT,
+                                .data = (EditorActionRemoveConstant) {
+                                    .index = state.tool_value,
+                                    .value = state.scenario->constants[state.tool_value]
+                                }
+                            });
+                            state.tool_value = std::clamp(state.tool_value, 0U, (uint32_t)state.scenario->constants.size() - 1U);
+                        }
+                    ui_end_container(state.ui);
+
+                    // Constant info
+                    if (!state.scenario->constants.empty()) {
+                        const ScenarioConstant& constant = state.scenario->constants[state.tool_value];
+
+                        // Populate constant type dropdown items
+                        std::vector<std::string> constant_type_items;
+                        for (uint32_t constant_type = 0; constant_type < SCENARIO_CONSTANT_TYPE_COUNT; constant_type++) {
+                            constant_type_items.push_back(scenario_constant_type_str((ScenarioConstantType)constant_type));
+                        }
+
+                        // Constant type dropdown
+                        uint32_t constant_type = constant.type;
+                        if (editor_menu_dropdown(state.ui, "Type:", &constant_type, constant_type_items, SIDEBAR_RECT, 8)) {
+                            if (constant_type != constant.type) {
+                                ScenarioConstant edited_constant = constant;
+                                scenario_constant_set_type(edited_constant, (ScenarioConstantType)constant_type);
+                                editor_do_action((EditorAction) {
+                                    .type = EDITOR_ACTION_EDIT_CONSTANT,
+                                    .data = (EditorActionEditConstant) {
+                                        .index = state.tool_value,
+                                        .previous_value = constant,
+                                        .new_value = edited_constant
+                                    }
+                                });
+                            }
+                        }
+
+                        switch (constant.type) {
+                            case SCENARIO_CONSTANT_TYPE_ENTITY: {
+                                char value_str[32];
+                                if (constant.entity.index >= state.scenario->entity_count) {
+                                    sprintf(value_str, "Entity: INVALID");
+                                } else {
+                                    sprintf(value_str, "Entity: %u", constant.entity.index);
+                                }
+                                ui_text(state.ui, FONT_HACK_GOLD, value_str);
+                                break;
+                            }
+                            case SCENARIO_CONSTANT_TYPE_COUNT: {
+                                GOLD_ASSERT(false);
+                                break;
+                            }
+                        }
+                    }
+
+                    break;
+                }
             }
         ui_end_container(state.ui);
     }
@@ -562,6 +654,30 @@ void editor_update() {
                                 .index = state.tool_value,
                                 .previous_value = previous_squad,
                                 .new_value = edited_squad
+                            }
+                        });
+                    }
+                }
+
+                break;
+            }
+            case EDITOR_MENU_TYPE_CONSTANT: {
+                EditorMenuConstant& menu = std::get<EditorMenuConstant>(state.menu.menu);
+                editor_menu_constant_update(menu, state.ui, state.menu.mode);
+
+                if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
+                    const ScenarioConstant previous_constant = state.scenario->constants[state.tool_value];
+
+                    if (strcmp(menu.value.c_str(), previous_constant.name) != 0) {
+                        ScenarioConstant edited_constant = previous_constant;
+                        strncpy(edited_constant.name, menu.value.c_str(), SCENARIO_CONSTANT_NAME_BUFFER_LENGTH);
+
+                        editor_do_action((EditorAction) {
+                            .type = EDITOR_ACTION_EDIT_CONSTANT,
+                            .data = (EditorActionEditConstant) {
+                                .index = state.tool_value,
+                                .previous_value = previous_constant,
+                                .new_value = edited_constant
                             }
                         });
                     }
@@ -674,6 +790,36 @@ void editor_update() {
             .data = (EditorActionSetPlayerSpawn) {
                 .previous_value = state.scenario->player_spawn,
                 .new_value = editor_get_hovered_cell()
+            }
+        });
+    }
+
+    // Constants tool - set value
+    if (state.tool == EDITOR_TOOL_CONSTANTS &&
+            !state.scenario->constants.empty() &&
+            editor_can_single_use_tool_be_used() &&
+            editor_is_hovered_cell_valid() &&
+            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+        const ScenarioConstant& constant = state.scenario->constants[state.tool_value];
+        ScenarioConstant edited_constant = constant;
+
+        switch (constant.type) {
+            case SCENARIO_CONSTANT_TYPE_ENTITY: {
+                edited_constant.entity.index = editor_get_hovered_entity();
+                break;
+            }
+            case SCENARIO_CONSTANT_TYPE_COUNT: {
+                GOLD_ASSERT(false);
+                break;
+            }
+        }
+
+        editor_do_action((EditorAction) {
+            .type = EDITOR_ACTION_EDIT_CONSTANT,
+            .data = (EditorActionEditConstant) {
+                .index = state.tool_value,
+                .previous_value = constant,
+                .new_value = edited_constant
             }
         });
     }
@@ -993,7 +1139,10 @@ void editor_set_tool(EditorTool tool) {
         case EDITOR_TOOL_SQUADS: {
             state.tool_value = 0;
             state.tool_scroll = 0;
-            state.tool_dropdown_scroll = 0;
+            break;
+        }
+        case EDITOR_TOOL_CONSTANTS: {
+            state.tool_value = 0;
             break;
         }
         case EDITOR_TOOL_PLAYER_SPAWN:
@@ -1029,6 +1178,7 @@ uint32_t editor_get_hovered_entity() {
 
 bool editor_is_hovered_cell_valid() {
     ivec2 cell = editor_get_hovered_cell();
+    const uint32_t entity_index = editor_get_hovered_entity();
     if (state.tool == EDITOR_TOOL_DECORATE) {
         Cell map_cell = map_get_cell(state.scenario->map, CELL_LAYER_GROUND, cell);
         return map_cell.type == CELL_DECORATION || map_cell.type == CELL_EMPTY;
@@ -1045,7 +1195,6 @@ bool editor_is_hovered_cell_valid() {
         return !map_is_cell_rect_occupied(state.scenario->map, entity_data.cell_layer, cell, entity_data.cell_size);
     }
     if (state.tool == EDITOR_TOOL_SQUADS) {
-        uint32_t entity_index = editor_get_hovered_entity();
         if (entity_index == INDEX_INVALID) {
             return false;
         }
@@ -1063,6 +1212,18 @@ bool editor_is_hovered_cell_valid() {
         }
 
         return true;
+    }
+    if (state.tool == EDITOR_TOOL_CONSTANTS && !state.scenario->constants.empty()) {
+        const ScenarioConstant& constant = state.scenario->constants[state.tool_value];
+        switch (constant.type) {
+            case SCENARIO_CONSTANT_TYPE_ENTITY: {
+                return entity_index != INDEX_INVALID;
+            }
+            case SCENARIO_CONSTANT_TYPE_COUNT: {
+                GOLD_ASSERT(false);
+                return false;
+            }
+        }
     }
     return true;
 }
@@ -1549,6 +1710,13 @@ std::vector<uint32_t> editor_get_selected_entities() {
         }
     }
 
+    if (state.tool == EDITOR_TOOL_CONSTANTS && !state.scenario->constants.empty()) {
+        const ScenarioConstant& constant = state.scenario->constants[state.tool_value];
+        if (constant.type == SCENARIO_CONSTANT_TYPE_ENTITY && constant.entity.index < state.scenario->entity_count) {
+            entities.push_back(constant.entity.index);
+        }
+    }
+
     return entities;
 }
 
@@ -1996,6 +2164,15 @@ void editor_render() {
 
         ivec2 cell = editor_get_hovered_cell();
         int cell_size = 1;
+        if (state.tool == EDITOR_TOOL_CONSTANTS && !state.scenario->constants.empty()) {
+            const ScenarioConstant& constant = state.scenario->constants[state.tool_value];
+            if (constant.type == SCENARIO_CONSTANT_TYPE_ENTITY && editor_is_hovered_cell_valid()) {
+                uint32_t entity_index = editor_get_hovered_entity();
+                const ScenarioEntity& entity = state.scenario->entities[entity_index];
+                cell = entity.cell;
+                cell_size = entity_get_data(entity.type).cell_size;
+            }
+        }
         Rect rect = (Rect) {
             .x = ((cell.x * TILE_SIZE) - state.camera_offset.x) + CANVAS_RECT.x,
             .y = ((cell.y * TILE_SIZE) - state.camera_offset.y) + CANVAS_RECT.y,

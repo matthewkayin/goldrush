@@ -175,6 +175,39 @@ ScenarioSquadType scenario_squad_type_from_str(const char* str) {
     return (ScenarioSquadType)squad_type;
 }
 
+const char* scenario_constant_type_str(ScenarioConstantType type) {
+    switch (type) {
+        case SCENARIO_CONSTANT_TYPE_ENTITY:
+            return "Entity";
+        case SCENARIO_CONSTANT_TYPE_COUNT:
+            GOLD_ASSERT(false);
+            return "";
+    }
+}
+
+ScenarioConstantType scenario_constant_type_from_str(const char* str) {
+    uint32_t constant_type;
+    for (constant_type = 0; constant_type < SCENARIO_CONSTANT_TYPE_COUNT; constant_type++) {
+        if (strcmp(str, scenario_constant_type_str((ScenarioConstantType)constant_type)) == 0) {
+            break;
+        }
+    }
+
+    return (ScenarioConstantType)constant_type;
+}
+
+void scenario_constant_set_type(ScenarioConstant& constant, ScenarioConstantType type) {
+    switch (type) {
+        case SCENARIO_CONSTANT_TYPE_ENTITY: {
+            constant.entity.index = INDEX_INVALID;
+            break;
+        }
+        case SCENARIO_CONSTANT_TYPE_COUNT: {
+            break;
+        }
+    }
+}
+
 uint8_t scenario_get_noise_map_value(Scenario* scenario, ivec2 cell) {
     return scenario->noise->map[cell.x + (cell.y * scenario->noise->width)];
 }
@@ -186,8 +219,7 @@ void scenario_set_noise_map_value(Scenario* scenario, ivec2 cell, uint8_t value)
 }
 
 bool scenario_save_file(const Scenario* scenario, const char* json_full_path, const char* map_short_path, const char* script_short_path) {
-    const std::string json_path_string = std::string(json_full_path);
-    const std::string folder_path = json_path_string.substr(0, json_path_string.size() - 5) + "/";
+    const std::string folder_path = filesystem_get_path_folder(json_full_path);
 
     // Write map file
     {
@@ -323,6 +355,27 @@ bool scenario_save_file(const Scenario* scenario, const char* json_full_path, co
             json_array_push(squads_json, squad_json);
         }
         json_object_set(scenario_json, "squads", squads_json);
+
+        // Constants
+        Json* constants_json = json_array();
+        for (const ScenarioConstant& constant : scenario->constants) {
+            Json* constant_json = json_object();
+            json_object_set_string(constant_json, "name", constant.name);
+            json_object_set_string(constant_json, "type", scenario_constant_type_str(constant.type));
+            switch (constant.type) {
+                case SCENARIO_CONSTANT_TYPE_ENTITY: {
+                    json_object_set_number(constant_json, "entity_index", constant.entity.index);
+                    break;
+                }
+                case SCENARIO_CONSTANT_TYPE_COUNT: {
+                    GOLD_ASSERT(false);
+                    break;
+                }
+            }
+
+            json_array_push(constants_json, constant_json);
+        }
+        json_object_set(scenario_json, "constants", constants_json);
     }
 
     bool json_save_success = json_write(scenario_json, json_full_path);
@@ -518,6 +571,7 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
         }
 
         // Squads
+        // TODO: pretty sure this doesn't work 
         Json* squads_json = json_array();
         for (size_t squad_index = 0; squad_index < squads_json->array.length; squad_index++) {
             Json* squad_json = json_array_get(squads_json, squad_index);
@@ -548,6 +602,35 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
 
             scenario->squads.push_back(squad);
         }
+
+        // Constants
+        Json* constants_json = json_object_get(scenario_json, "constants");
+        for (size_t constant_index = 0; constant_index < constants_json->array.length; constant_index++) {
+            Json* constant_json = json_array_get(constants_json, constant_index);
+
+            ScenarioConstant constant;
+            strncpy(constant.name, json_object_get_string(constant_json, "name"), SCENARIO_CONSTANT_NAME_BUFFER_LENGTH);
+
+            const char* constant_type_str = json_object_get_string(constant_json, "type");
+            constant.type = scenario_constant_type_from_str(constant_type_str);
+            if (constant.type == SCENARIO_CONSTANT_TYPE_COUNT) {
+                log_error("Constant type %s for constant %u:%s not recognized.", constant_type_str, constant_index, constant.name);
+                goto error;
+            }
+
+            switch (constant.type) {
+                case SCENARIO_CONSTANT_TYPE_ENTITY: {
+                    constant.entity.index = (uint32_t)json_object_get_number(constant_json, "entity_index");
+                    break;
+                }
+                case SCENARIO_CONSTANT_TYPE_COUNT: {
+                    GOLD_ASSERT(false);
+                    break;
+                }
+            }
+
+            scenario->constants.push_back(constant);
+        }   
 
         json_free(scenario_json);
         log_info("Loaded scenario %s.", json_path);

@@ -26,6 +26,9 @@ enum EditorActionType {
     EDITOR_ACTION_EDIT_SQUAD,
     EDITOR_ACTION_REMOVE_SQUAD,
     EDITOR_ACTION_SET_PLAYER_SPAWN,
+    EDITOR_ACTION_ADD_CONSTANT,
+    EDITOR_ACTION_REMOVE_CONSTANT,
+    EDITOR_ACTION_EDIT_CONSTANT
 };
 
 struct EditorActionBrushStroke {
@@ -83,6 +86,17 @@ struct EditorActionSetPlayerSpawn {
     ivec2 new_value;
 };
 
+struct EditorActionRemoveConstant {
+    uint32_t index;
+    ScenarioConstant value;
+};
+
+struct EditorActionEditConstant {
+    uint32_t index;
+    ScenarioConstant previous_value;
+    ScenarioConstant new_value;
+};
+
 struct EditorAction {
     EditorActionType type;
     std::variant<
@@ -94,7 +108,9 @@ struct EditorAction {
         EditorActionRemoveEntity,
         EditorActionEditSquad,
         EditorActionRemoveSquad,
-        EditorActionSetPlayerSpawn
+        EditorActionSetPlayerSpawn,
+        EditorActionRemoveConstant,
+        EditorActionEditConstant
     > data;
 };
 
