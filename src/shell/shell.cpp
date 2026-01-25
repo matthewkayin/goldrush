@@ -8,7 +8,6 @@
 #include "shell/desync.h"
 #include "profile/profile.h"
 #include <algorithm>
-#include <luajit/lua.hpp>
 
 // Status
 static const uint32_t STATUS_DURATION = 60;
@@ -32,7 +31,6 @@ static const Rect DESYNC_MENU_RECT = (Rect) {
 
 // Chat
 static const size_t CHAT_MAX_LENGTH = 64;
-static const uint32_t CHAT_MESSAGE_DURATION = 3U * 60U;
 static const uint32_t CHAT_MAX_LINES = 8;
 static const uint32_t CHAT_CURSOR_BLINK_DURATION = 30;
 
@@ -140,16 +138,6 @@ static const ivec2 RALLY_FLAG_OFFSET = ivec2(-4, -15);
 #else
     static const uint32_t DESYNC_FREQUENCY = 60U;
 #endif
-
-// Lua function predeclares
-static int match_shell_lua_log(lua_State* lua_state);
-static int match_shell_lua_set_lose_on_buildings_destroyed(lua_State* lua_state);
-
-static const luaL_reg GOLD_LUA_FUNCS[] = {
-    { "log", match_shell_lua_log },
-    { "set_lose_on_buildings_destroyed", match_shell_lua_set_lose_on_buildings_destroyed },
-    { NULL, NULL }
-};
 
 MatchShellState* match_shell_base_init() {
     MatchShellState* state = new MatchShellState();
@@ -435,66 +423,10 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
     state->match_state.is_fog_dirty = false;
 
     // Script
-
-    // Check for script existance
-    {
-        FILE* script_file = fopen(script_path, "r");
-        if (script_file == NULL) {
-            log_error("Could not open script file %s.", script_path);
-            delete state;
-            return NULL;
-        }
-        fclose(script_file);
-    }
-
-    // Init lua state
-    state->scenario_lua_state = luaL_newstate();
-    luaL_openlibs(state->scenario_lua_state);
-
-    // Register gold library
-    luaL_register(state->scenario_lua_state, "gold", GOLD_LUA_FUNCS);
-
-    // Give lua a pointer to the shell state
-    lua_pushlightuserdata(state->scenario_lua_state, state);
-    lua_setglobal(state->scenario_lua_state, "state");
-
-    int dofile_error = luaL_dofile(state->scenario_lua_state, script_path);
-    if (dofile_error) {
-        log_error("Error loading script file %s. Code %u: %s", script_path, dofile_error, lua_tostring(state->scenario_lua_state, -1));
-        lua_close(state->scenario_lua_state);
+    if (!match_shell_script_init(state, script_path)) {
         delete state;
         return NULL;
     }
-
-    // Get the scenario_init() function
-    lua_getglobal(state->scenario_lua_state, "scenario_init");
-    if (!lua_isfunction(state->scenario_lua_state, -1)) {
-        log_error("Script %s is missing scenario_init() function.", script_path);
-        lua_pop(state->scenario_lua_state, 1);
-        lua_close(state->scenario_lua_state);
-        delete state;
-        return NULL;
-    }
-
-    // Call scenario_init() 
-    if (lua_pcall(state->scenario_lua_state, 0, 0, 0)) {
-        log_error("Script error: %s", lua_tostring(state->scenario_lua_state, -1));
-        lua_close(state->scenario_lua_state);
-        delete state;
-        return NULL;
-    }
-
-    // Check to make sure that scenario_update() exists
-    lua_getglobal(state->scenario_lua_state, "scenario_update");
-    if (!lua_isfunction(state->scenario_lua_state, -1)) {
-        log_error("Script %s is missing scenario_update() function.", script_path);
-        lua_pop(state->scenario_lua_state, 1);
-        lua_close(state->scenario_lua_state);
-        delete state;
-        return NULL;
-    }
-    // Pop scenario_update() off the stack because we are not calling it
-    lua_pop(state->scenario_lua_state, 1);
 
     return state;
 }
@@ -1309,8 +1241,7 @@ void match_shell_update(MatchShellState* state) {
 
     // Scenario script
     if (state->scenario_lua_state != NULL) {
-        lua_getglobal(state->scenario_lua_state, "scenario_update");
-        lua_call(state->scenario_lua_state, 0, 0);
+        match_shell_script_update(state);
     }
 
     // Update timers and animations
@@ -2287,225 +2218,6 @@ bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyB
 
     return true;
 }
-
-// SCENARIO
-
-const char* match_shell_lua_type_str(int lua_type) {
-    switch (lua_type) {
-        case LUA_TNIL: 
-            return "<nil>";
-        case LUA_TNUMBER: 
-            return "<number>";
-        case LUA_TBOOLEAN: 
-            return "<boolean>";
-        case LUA_TSTRING:
-            return "<string>";
-        case LUA_TTABLE: 
-            return "<table>";
-        case LUA_TFUNCTION: 
-            return "<function>";
-        case LUA_TUSERDATA: 
-            return "<userdata>";
-        case LUA_TTHREAD: 
-            return "<thread>";
-        case LUA_TLIGHTUSERDATA: 
-            return "<lightuserdata>";
-        default:
-            GOLD_ASSERT(false);
-            return "";
-    }
-}
-
-int match_shell_lua_sprintf_debug_prefix(char* str, lua_State* lua_state) {
-    lua_Debug debug;
-    lua_getstack(lua_state, 1, &debug);
-    lua_getinfo(lua_state, "Sl", &debug);
-
-    // Lua is not giving us the short_src so we will
-    // manually look through the string to find the tail end 
-    // (past the path separators)
-    const char* source_ptr = debug.source;
-    size_t index = 0;
-    size_t path_sep_index = 0;
-    while (source_ptr[index] != '\0') {
-        if (source_ptr[index] == GOLD_PATH_SEPARATOR) {
-            path_sep_index = index;
-        }
-        index++;
-    }
-    if (path_sep_index != 0) {
-        source_ptr = debug.source + path_sep_index + 1;
-    }
-
-    return sprintf(str, "%s:%i ", source_ptr, debug.currentline);
-}
-
-void match_shell_lua_validate_arguments(lua_State* lua_state, const int* arg_types, int arg_count) {
-    char error_str[256];
-    char* error_str_ptr = error_str;
-
-    int arg_number = lua_gettop(lua_state);
-    if (arg_number != arg_count) {
-        error_str_ptr += match_shell_lua_sprintf_debug_prefix(error_str_ptr, lua_state);
-        error_str_ptr += sprintf(error_str_ptr, "Invalid arg count. Expected %u. Received %u.", arg_count, arg_number);
-        lua_pushstring(lua_state, error_str);
-        lua_error(lua_state);
-    }
-
-    for (int arg_index = 1; arg_index <= arg_count; arg_index++) {
-        int received_type = lua_type(lua_state, arg_index);
-        if (received_type != arg_types[arg_index - 1]) {
-            error_str_ptr += match_shell_lua_sprintf_debug_prefix(error_str_ptr, lua_state);
-            error_str_ptr += sprintf(error_str_ptr, 
-                "Invalid type for arg %u. Received %s. Expected %s.", 
-                arg_index, 
-                match_shell_lua_type_str(received_type), 
-                match_shell_lua_type_str(arg_types[arg_index - 1])
-            );
-            lua_pushstring(lua_state, error_str);
-            lua_error(lua_state);
-        }
-    }
-}
-
-static int match_shell_lua_log(lua_State* lua_state) {
-#if GOLD_LOG_LEVEL >= LOG_LEVEL_DEBUG
-    int nargs = lua_gettop(lua_state);
-    char buffer[2048];
-    char* buffer_ptr = buffer;
-
-    for (int arg_index = 1; arg_index <= nargs; arg_index++) {
-        int arg_type = lua_type(lua_state, arg_index);
-        switch (arg_type) {
-            case LUA_TNIL: {
-                buffer_ptr += sprintf(buffer_ptr, "nil ");
-                break;
-            }
-            case LUA_TNUMBER: {
-                double value = lua_tonumber(lua_state, arg_index);
-                buffer_ptr += sprintf(buffer_ptr, "%f ", value);
-                break;
-            }
-            case LUA_TBOOLEAN: {
-                bool value = lua_toboolean(lua_state, arg_index);
-                buffer_ptr += sprintf(buffer_ptr, "%s ", value ? "true" : "false");
-                break;
-            }
-            case LUA_TSTRING: {
-                const char* value = lua_tostring(lua_state, arg_index);
-                buffer_ptr += sprintf(buffer_ptr, "%s ", value);
-                break;
-            }
-            default: {
-                buffer_ptr += sprintf(buffer_ptr, "%s ", match_shell_lua_type_str(arg_type));
-                break;
-            }
-        }
-    }
-
-    log_debug("%s", buffer);
-#endif
-
-    return 0;
-}
-
-static int match_shell_lua_set_lose_on_buildings_destroyed(lua_State* lua_state) {
-    const int arg_types[] = { LUA_TLIGHTUSERDATA, LUA_TBOOLEAN };
-    match_shell_lua_validate_arguments(lua_state, arg_types, 2);
-
-    MatchShellState* state = (MatchShellState*)lua_topointer(lua_state, 1);
-    state->scenario_lose_on_buildings_destroyed = lua_toboolean(lua_state, 2);
-    
-    return 0;
-}
-
-uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type) {
-    uint32_t count = 0;
-
-    for (const Entity& entity : state->match_state.entities) {
-        if (entity.type != entity_type ||
-                entity.player_id != player_id ||
-                entity.health == 0 ||
-                entity.mode == MODE_BUILDING_IN_PROGRESS) {
-            continue;
-        }
-        count++;
-    }
-
-    return count;
-}
-
-ivec2 match_shell_trigger_action_spawn_units_find_spawn_cell(const MatchShellState* state, EntityType entity_type, ivec2 spawn_cell, ivec2 target_cell) {
-    const EntityData& entity_data = entity_get_data(entity_type);
-
-    std::vector<ivec2> frontier;
-    std::vector<bool> explored = std::vector<bool>(state->match_state.map.width * state->match_state.map.height, false);
-
-    frontier.push_back(spawn_cell);
-
-    while (!frontier.empty()) {
-        uint32_t nearest_index = 0;
-        for (uint32_t index = 1; index < frontier.size(); index++) {
-            if (ivec2::manhattan_distance(frontier[index], spawn_cell) < 
-                    ivec2::manhattan_distance(frontier[nearest_index], spawn_cell)) {
-                nearest_index = index;
-            }
-        }
-        ivec2 next = frontier[nearest_index];
-        frontier[nearest_index] = frontier.back();
-        frontier.pop_back();
-
-        if (!map_is_cell_rect_occupied(state->match_state.map, entity_data.cell_layer, next, entity_data.cell_size)) {
-            return next;
-        }
-
-        explored[next.x + (next.y * state->match_state.map.width)] = true;
-
-        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-            ivec2 child = next + DIRECTION_IVEC2[direction];
-            if (!map_is_cell_rect_in_bounds(state->match_state.map, child, entity_data.cell_size)) {
-                continue;
-            }
-            if (explored[child.x + (child.y * state->match_state.map.width)]) {
-                continue;
-            }
-            if (ivec2::manhattan_distance(child, spawn_cell) > 16 || 
-                    ivec2::manhattan_distance(child, target_cell) < 16) {
-                continue;
-            }
-
-            bool is_in_frontier = false;
-            for (ivec2 cell : frontier) {
-                if (cell == child) {
-                    is_in_frontier = true;
-                    break;
-                }
-            }
-            if (!is_in_frontier) {
-                frontier.push_back(child);
-            }
-        }
-    }
-
-    return ivec2(-1, -1);
-}
-
-/*
-FontName match_shell_trigger_action_chat_get_font(TriggerActionChatType type) {
-    switch (type) {
-        case TRIGGER_ACTION_CHAT_TYPE_MESSAGE:
-            return FONT_HACK_WHITE;
-        case TRIGGER_ACTION_CHAT_TYPE_NEW_OBJECTIVE:
-        case TRIGGER_ACTION_CHAT_TYPE_OBJECTIVES_COMPLETE:
-            return FONT_HACK_GOLD_SATURATED;
-        case TRIGGER_ACTION_CHAT_TYPE_HINT:
-            return FONT_HACK_PLAYER0;
-        case TRIGGER_ACTION_CHAT_TYPE_COUNT:
-            GOLD_ASSERT(false);
-            return FONT_HACK_WHITE;
-    }
-}
-*/
 
 // STATE QUERIES
 
