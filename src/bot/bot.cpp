@@ -2317,7 +2317,8 @@ MatchInput bot_squad_garrison_into_carrier(const MatchState& state, const BotSqu
         
         // Don't garrison units which cannot garrison
         if (entity_garrison_size == ENTITY_CANNOT_GARRISON) {
-            log_warn("BOT %u squad_garrison_into_carrier, entity_id %u has garrison ENTITY_CANNOT_GARRISON. We should not be adding ungarrisonable entitites to the infantry list.");
+            log_warn("BOT %u squad_garrison_into_carrier, entity_id %u has garrison ENTITY_CANNOT_GARRISON. We should not be adding ungarrisonable entitites to the infantry list.",
+                entity.player_id, entity_id);
             continue;
         }
 

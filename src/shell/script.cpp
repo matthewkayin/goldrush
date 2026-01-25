@@ -17,11 +17,17 @@ struct ScriptConstant {
 static int script_log(lua_State* lua_state);
 static int script_set_lose_on_buildings_destroyed(lua_State* lua_state);
 static int script_chat(lua_State* lua_state);
+static int script_chat_hint(lua_State* lua_state);
+static int script_play_sound(lua_State* lua_state);
+static int script_get_time(lua_State* lua_state);
 
 static const luaL_reg GOLD_FUNCS[] = {
     { "log", script_log },
     { "set_lose_on_buildings_destroyed", script_set_lose_on_buildings_destroyed },
     { "chat", script_chat },
+    { "chat_hint", script_chat_hint },
+    { "play_sound", script_play_sound },
+    { "get_time", script_get_time },
     { NULL, NULL }
 };
 
@@ -48,14 +54,14 @@ bool match_shell_script_init(MatchShellState* state, const char* script_path) {
     luaL_openlibs(state->scenario_lua_state);
 
     // Register gold library
-    luaL_register(state->scenario_lua_state, "gold", GOLD_FUNCS);
+    luaL_register(state->scenario_lua_state, "scenario", GOLD_FUNCS);
 
     // Give lua a pointer to the shell state
     lua_pushlightuserdata(state->scenario_lua_state, state);
     lua_setfield(state->scenario_lua_state, LUA_REGISTRYINDEX, "__match_shell_state");
 
     // Constants
-    lua_getglobal(state->scenario_lua_state, "gold");
+    lua_getglobal(state->scenario_lua_state, "scenario");
     size_t const_index = 0;
     while (GOLD_CONSTANTS[const_index].name != NULL) {
         lua_pushinteger(state->scenario_lua_state, GOLD_CONSTANTS[const_index].value);
@@ -83,7 +89,7 @@ bool match_shell_script_init(MatchShellState* state, const char* script_path) {
 
     // Call scenario_init() 
     if (lua_pcall(state->scenario_lua_state, 0, 0, 0)) {
-        log_error("Script error: %s", lua_tostring(state->scenario_lua_state, -1));
+        log_error("%s", lua_tostring(state->scenario_lua_state, -1));
         lua_close(state->scenario_lua_state);
         return false;
     }
@@ -104,7 +110,10 @@ bool match_shell_script_init(MatchShellState* state, const char* script_path) {
 
 void match_shell_script_update(MatchShellState* state) {
     lua_getglobal(state->scenario_lua_state, "scenario_update");
-    lua_call(state->scenario_lua_state, 0, 0);
+    if (lua_pcall(state->scenario_lua_state, 0, 0, 0)) {
+        log_error("%s", lua_tostring(state->scenario_lua_state, -1));
+        match_shell_leave_match(state, false);
+    }
 }
 
 MatchShellState* script_get_match_shell_state(lua_State* lua_state) {
@@ -273,4 +282,43 @@ static int script_chat(lua_State* lua_state) {
     match_shell_add_chat_message(state, font, chat_prefix, chat_message, CHAT_MESSAGE_DURATION);
 
     return 0;
+}
+
+static int script_chat_hint(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TSTRING };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    const char* message = lua_tostring(lua_state, 1);
+
+    sound_play(SOUND_UI_CLICK);
+    match_shell_add_chat_message(state, FONT_HACK_PLAYER0, "Hint:", message, CHAT_MESSAGE_HINT_DURATION);
+
+    return 0;
+}
+
+static int script_play_sound(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    int sound = (int)lua_tonumber(lua_state, 1);
+
+    if (sound < 0 || sound >= SOUND_COUNT) {
+        char error_message[128];
+        sprintf(error_message, "Invalid sound %i", sound);
+        script_error(lua_state, error_message);
+    }
+
+    sound_play((SoundName)sound);
+
+    return 0;
+}
+
+static int script_get_time(lua_State* lua_state) {
+    script_validate_arguments(lua_state, NULL, 0);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    lua_pushnumber(lua_state, (double)state->match_timer / (double)UPDATES_PER_SECOND);
+
+    return 1;
 }
