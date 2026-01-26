@@ -21,23 +21,35 @@ void match_shell_script_handle_error(MatchShellState* state);
 static int script_log(lua_State* lua_state);
 static int script_set_lose_on_buildings_destroyed(lua_State* lua_state);
 static int script_chat(lua_State* lua_state);
-static int script_chat_hint(lua_State* lua_state);
+static int script_hint(lua_State* lua_state);
 static int script_play_sound(lua_State* lua_state);
 static int script_get_time(lua_State* lua_state);
 static int script_add_objective(lua_State* lua_state);
+static int script_complete_objective(lua_State* lua_state);
+static int script_is_objective_complete(lua_State* lua_state);
+static int script_are_objectives_complete(lua_State* lua_state);
 static int script_clear_objectives(lua_State* lua_state);
-static int script_is_entity_visible_to_player(lua_State* lua_state);
+static int script_entity_is_visible_to_player(lua_State* lua_state);
+static int script_highlight_entity(lua_State* lua_state);
+static int script_get_player_entity_count(lua_State* lua_state);
+static int script_get_player_full_bunker_count(lua_State* lua_state);
 
 static const luaL_reg GOLD_FUNCS[] = {
     { "log", script_log },
     { "set_lose_on_buildings_destroyed", script_set_lose_on_buildings_destroyed },
     { "chat", script_chat },
-    { "chat_hint", script_chat_hint },
+    { "hint", script_hint },
     { "play_sound", script_play_sound },
     { "get_time", script_get_time },
     { "add_objective", script_add_objective },
+    { "complete_objective", script_complete_objective },
+    { "is_objective_complete", script_is_objective_complete },
+    { "are_objectives_complete", script_are_objectives_complete },
     { "clear_objectives", script_clear_objectives },
-    { "is_entity_visible_to_player", script_is_entity_visible_to_player },
+    { "entity_is_visible_to_player", script_entity_is_visible_to_player },
+    { "highlight_entity", script_highlight_entity },
+    { "get_player_entity_count", script_get_player_entity_count },
+    { "get_player_full_bunker_count", script_get_player_full_bunker_count },
     { NULL, NULL }
 };
 
@@ -64,7 +76,7 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
     luaL_openlibs(state->scenario_lua_state);
 
     // Register gold library
-    luaL_register(state->scenario_lua_state, "gold", GOLD_FUNCS);
+    luaL_register(state->scenario_lua_state, "scenario", GOLD_FUNCS);
 
     // Set module path
     lua_getglobal(state->scenario_lua_state, "package");
@@ -80,7 +92,7 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
     lua_setfield(state->scenario_lua_state, LUA_REGISTRYINDEX, "__match_shell_state");
 
     // Constants
-    lua_getglobal(state->scenario_lua_state, "gold");
+    lua_getglobal(state->scenario_lua_state, "scenario");
     size_t const_index = 0;
     while (GOLD_CONSTANTS[const_index].name != NULL) {
         lua_pushinteger(state->scenario_lua_state, GOLD_CONSTANTS[const_index].value);
@@ -131,10 +143,8 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
     }
 
     // Scenario constants
+    lua_newtable(state->scenario_lua_state);
     for (const ScenarioConstant& constant : scenario->constants) {
-        char const_name[64];
-        sprintf(const_name, "SCENARIO_%s", constant.name);
-
         switch (constant.type) {
             case SCENARIO_CONSTANT_TYPE_ENTITY: {
                 lua_pushinteger(state->scenario_lua_state, constant.entity.index);
@@ -145,8 +155,9 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
                 break;
             }
         }
-        lua_setfield(state->scenario_lua_state, -2, const_name);
+        lua_setfield(state->scenario_lua_state, -2, constant.name);
     }
+    lua_setfield(state->scenario_lua_state, -2, "constants");
 
     // End constants
     lua_pop(state->scenario_lua_state, 1);
@@ -296,6 +307,17 @@ void script_validate_entity_type(lua_State* lua_state, int entity_type) {
     }
 }
 
+uint32_t script_validate_entity_id(MatchShellState* state, EntityId entity_id) {
+    uint32_t entity_index = state->match_state.entities.get_index_of(entity_id);
+    if (entity_index == INDEX_INVALID) {
+        char error_message[128];
+        sprintf(error_message, "Entity ID %u does not exist.", entity_id);
+        script_error(state->scenario_lua_state, error_message);
+    }
+
+    return entity_index;
+}
+
 static int script_log(lua_State* lua_state) {
 #if GOLD_LOG_LEVEL >= LOG_LEVEL_DEBUG
     int nargs = lua_gettop(lua_state);
@@ -381,7 +403,7 @@ static int script_chat(lua_State* lua_state) {
     return 0;
 }
 
-static int script_chat_hint(lua_State* lua_state) {
+static int script_hint(lua_State* lua_state) {
     const int arg_types[] = { LUA_TSTRING };
     script_validate_arguments(lua_state, arg_types, 1);
 
@@ -470,6 +492,58 @@ static int script_add_objective(lua_State* lua_state) {
     return 1;
 }
 
+static int script_complete_objective(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    uint32_t objective_index = lua_tonumber(lua_state, 1);
+    if (objective_index >= state->scenario_objectives.size()) {
+        char error_message[128];
+        sprintf(error_message, "Objective index %u out of bounds.", objective_index);
+        script_error(lua_state, error_message);
+    }
+
+    state->scenario_objectives[objective_index].is_complete = true;
+
+    return 0;
+}
+
+static int script_is_objective_complete(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    uint32_t objective_index = lua_tonumber(lua_state, 1);
+    if (objective_index >= state->scenario_objectives.size()) {
+        char error_message[128];
+        sprintf(error_message, "Objective index %u out of bounds.", objective_index);
+        script_error(lua_state, error_message);
+    }
+
+    lua_pushboolean(lua_state, state->scenario_objectives[objective_index].is_complete);
+
+    return 1;
+}
+
+static int script_are_objectives_complete(lua_State* lua_state) {
+    script_validate_arguments(lua_state, NULL, 0);
+
+    bool result = true;
+
+    const MatchShellState* state = script_get_match_shell_state(lua_state);
+    for (uint32_t index = 0; index < state->scenario_objectives.size(); index++) {
+        if (!state->scenario_objectives[index].is_complete) {
+            result = false;
+            break;
+        }
+    }
+
+    lua_pushboolean(lua_state, result);
+
+    return 1;
+}
+
 static int script_clear_objectives(lua_State* lua_state) {
     script_validate_arguments(lua_state, NULL, 0);
 
@@ -479,21 +553,77 @@ static int script_clear_objectives(lua_State* lua_state) {
     return 0;
 }
 
-static int script_is_entity_visible_to_player(lua_State* lua_state) {
+static int script_entity_is_visible_to_player(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 1);
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
-    uint32_t entity_index = lua_tonumber(lua_state, 1);
-
-    if (entity_index >= state->match_state.entities.size()) {
-        char error_message[128];
-        sprintf(error_message, "Entity with index %u does not exist.", entity_index);
-        script_error(lua_state, error_message);
-    }
+    EntityId entity_id = lua_tonumber(lua_state, 1);
+    uint32_t entity_index = script_validate_entity_id(state, entity_id);
 
     bool result = entity_is_visible_to_player(state->match_state, state->match_state.entities[entity_index], network_get_player_id());
     lua_pushboolean(lua_state, result);
+
+    return 1;
+}
+
+static int script_highlight_entity(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    EntityId entity_id = lua_tonumber(lua_state, 1);
+    script_validate_entity_id(state, entity_id);
+
+    state->highlight_animation = animation_create(ANIMATION_UI_HIGHLIGHT_ENTITY);
+    state->highlight_entity_id = entity_id;
+
+    return 0;
+}
+
+static int script_get_player_entity_count(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER, LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 2);
+
+    uint8_t player_id = lua_tonumber(lua_state, 1);
+    int entity_type = lua_tonumber(lua_state, 2);
+    script_validate_entity_type(lua_state, entity_type);
+
+    const MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    uint32_t result = match_shell_get_player_entity_count(state, player_id, (EntityType)entity_type);
+    lua_pushnumber(lua_state, result);
+
+    return 1;
+}
+
+static int script_get_player_full_bunker_count(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    uint8_t player_id = lua_tonumber(lua_state, 1);
+    const MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    uint32_t count = 0;
+    for (const Entity& entity : state->match_state.entities) {
+        if (entity.player_id != player_id ||
+                entity.type != ENTITY_BUNKER ||
+                entity.garrisoned_units.size() != 4) {
+            continue;
+        }
+        bool is_all_cowboys = true;
+        for (EntityId garrisoned_unit_id : entity.garrisoned_units) {
+            if (state->match_state.entities.get_by_id(garrisoned_unit_id).type != ENTITY_COWBOY) {
+                is_all_cowboys = false;
+            }
+        }
+        if (!is_all_cowboys) {
+            continue;
+        }
+        count++;
+    }
+
+    lua_pushnumber(lua_state, count);
 
     return 1;
 }

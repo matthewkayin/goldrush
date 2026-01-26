@@ -22,8 +22,8 @@ function actions.update()
 end
 
 function actions.wait(seconds)
-    local resume_time = gold.get_time() + seconds
-    while gold.get_time() < resume_time do
+    local resume_time = scenario.get_time() + seconds
+    while scenario.get_time() < resume_time do
         coroutine.yield()
     end
 end

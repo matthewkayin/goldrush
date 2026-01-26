@@ -1,0 +1,42 @@
+local actions = require("actions")
+
+local common = {}
+common.objectives = {}
+
+function common.announce_new_objective(title)
+    scenario.play_sound(scenario.SOUND_UI_CLICK)
+    scenario.chat(scenario.CHAT_COLOR_GOLD, "New Objective:", title)
+    actions.wait(2.0)
+end
+
+function common.announce_objectives_complete()
+    scenario.play_sound(scenario.SOUND_OBJECTIVE_COMPLETE)
+    scenario.chat(scenario.CHAT_COLOR_GOLD, "Objective Complete", "")
+    actions.wait(5.0)
+    scenario.clear_objectives()
+end
+
+function common.add_objective(objective, complete_fn)
+    local index = scenario.add_objective(objective)
+    scenario.log("Added objective", index)
+    table.insert(common.objectives, {
+        index = index,
+        complete_fn = complete_fn
+    })
+end
+
+function common.update_objectives()
+    local index = 1
+    while index <= #common.objectives do
+        local objective = common.objectives[index]
+        if objective.complete_fn() then
+            scenario.log("Completing objective", objective.index)
+            scenario.complete_objective(objective.index)
+            table.remove(common.objectives, index)
+        else
+            index = index + 1
+        end
+    end
+end
+
+return common

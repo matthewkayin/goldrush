@@ -595,7 +595,7 @@
 	"squads": [],
 	"constants": [
 		{
-			"name": "FIRST_ENTITY",
+			"name": "FIRST_GOLDMINE",
 			"type": "Entity",
 			"entity_index": 0.000000
 		}
