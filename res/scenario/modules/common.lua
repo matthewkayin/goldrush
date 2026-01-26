@@ -16,12 +16,12 @@ function common.announce_objectives_complete()
     scenario.clear_objectives()
 end
 
-function common.add_objective(objective, complete_fn)
-    local index = scenario.add_objective(objective)
+function common.add_objective(params)
+    local index = scenario.add_objective(params.objective)
     scenario.log("Added objective", index)
     table.insert(common.objectives, {
         index = index,
-        complete_fn = complete_fn
+        complete_fn = params.complete_fn
     })
 end
 

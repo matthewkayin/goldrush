@@ -288,7 +288,7 @@ void script_validate_arguments(lua_State* lua_state, const int* arg_types, int a
     int arg_number = lua_gettop(lua_state);
     if (arg_number != arg_count) {
         char error_message[256];
-        sprintf(error_message, "Invalid arg count. Expected %u. Received %u.", arg_count, arg_number);
+        sprintf(error_message, "Invalid arg count. Received %u. Expected %u.", arg_number, arg_count);
         script_error(lua_state, error_message);
     }
 
@@ -307,49 +307,65 @@ void script_validate_entity_type(lua_State* lua_state, int entity_type) {
     }
 }
 
-uint32_t script_validate_entity_id(MatchShellState* state, EntityId entity_id) {
+uint32_t script_validate_entity_id(lua_State* lua_state, const MatchShellState* state, EntityId entity_id) {
     uint32_t entity_index = state->match_state.entities.get_index_of(entity_id);
     if (entity_index == INDEX_INVALID) {
         char error_message[128];
         sprintf(error_message, "Entity ID %u does not exist.", entity_id);
-        script_error(state->scenario_lua_state, error_message);
+        script_error(lua_state, error_message);
     }
 
     return entity_index;
 }
 
+int script_sprintf(char* str_ptr, lua_State* lua_state, int stack_index) {
+    int arg_type = lua_type(lua_state, stack_index);
+    switch (arg_type) {
+        case LUA_TNIL: {
+            return sprintf(str_ptr, "nil");
+        }
+        case LUA_TNUMBER: {
+            double value = lua_tonumber(lua_state, stack_index);
+            return sprintf(str_ptr, "%f", value);
+        }
+        case LUA_TBOOLEAN: {
+            bool value = lua_toboolean(lua_state, stack_index);
+            return sprintf(str_ptr, "%s", value ? "true" : "false");
+        }
+        case LUA_TSTRING: {
+            const char* value = lua_tostring(lua_state, stack_index);
+            return sprintf(str_ptr, "%s", value);
+        }
+        case LUA_TTABLE: {
+            size_t offset = 0;
+            offset += sprintf(str_ptr + offset, "{ ");
+            lua_pushnil(lua_state);
+            while (lua_next(lua_state, stack_index) != 0) {
+                const char* key = lua_tostring(lua_state, -2);
+                offset += sprintf(str_ptr + offset, "%s = ", key);
+                offset += script_sprintf(str_ptr + offset, lua_state, -1);
+                offset += sprintf(str_ptr + offset, ", ");
+                lua_pop(lua_state, 1);
+            }
+            offset += sprintf(str_ptr + offset, "}");
+            return offset;
+        }
+        default: {
+            return sprintf(str_ptr, "%s", script_lua_type_str(arg_type));
+        }
+    }
+}
+
 static int script_log(lua_State* lua_state) {
 #if GOLD_LOG_LEVEL >= LOG_LEVEL_DEBUG
     int nargs = lua_gettop(lua_state);
-    char buffer[2048];
+    char buffer[4096];
     char* buffer_ptr = buffer;
 
     for (int arg_index = 1; arg_index <= nargs; arg_index++) {
-        int arg_type = lua_type(lua_state, arg_index);
-        switch (arg_type) {
-            case LUA_TNIL: {
-                buffer_ptr += sprintf(buffer_ptr, "nil ");
-                break;
-            }
-            case LUA_TNUMBER: {
-                double value = lua_tonumber(lua_state, arg_index);
-                buffer_ptr += sprintf(buffer_ptr, "%f ", value);
-                break;
-            }
-            case LUA_TBOOLEAN: {
-                bool value = lua_toboolean(lua_state, arg_index);
-                buffer_ptr += sprintf(buffer_ptr, "%s ", value ? "true" : "false");
-                break;
-            }
-            case LUA_TSTRING: {
-                const char* value = lua_tostring(lua_state, arg_index);
-                buffer_ptr += sprintf(buffer_ptr, "%s ", value);
-                break;
-            }
-            default: {
-                buffer_ptr += sprintf(buffer_ptr, "%s ", script_lua_type_str(arg_type));
-                break;
-            }
+        buffer_ptr += script_sprintf(buffer_ptr, lua_state, arg_index);
+        if (arg_index < nargs) {
+            buffer_ptr += sprintf(buffer_ptr, " ");
         }
     }
 
@@ -487,7 +503,7 @@ static int script_add_objective(lua_State* lua_state) {
     MatchShellState* state = script_get_match_shell_state(lua_state);
 
     state->scenario_objectives.push_back(objective);
-    lua_pushnumber(state->scenario_lua_state, state->scenario_objectives.size() - 1);
+    lua_pushnumber(lua_state, (int)state->scenario_objectives.size() - 1);
 
     return 1;
 }
@@ -559,7 +575,7 @@ static int script_entity_is_visible_to_player(lua_State* lua_state) {
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
     EntityId entity_id = lua_tonumber(lua_state, 1);
-    uint32_t entity_index = script_validate_entity_id(state, entity_id);
+    uint32_t entity_index = script_validate_entity_id(lua_state, state, entity_id);
 
     bool result = entity_is_visible_to_player(state->match_state, state->match_state.entities[entity_index], network_get_player_id());
     lua_pushboolean(lua_state, result);
@@ -573,7 +589,7 @@ static int script_highlight_entity(lua_State* lua_state) {
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
     EntityId entity_id = lua_tonumber(lua_state, 1);
-    script_validate_entity_id(state, entity_id);
+    script_validate_entity_id(lua_state, state, entity_id);
 
     state->highlight_animation = animation_create(ANIMATION_UI_HIGHLIGHT_ENTITY);
     state->highlight_entity_id = entity_id;
