@@ -103,7 +103,6 @@ function scenario_update()
                 target_cell = scenario.constants.BANDIT_TARGET_CELL,
                 entities = squad_entities
             })
-            scenario.log("Created squad", squad_id)
             scenario.play_sound(scenario.sound.ALERT_BELL)
             scenario.fog_reveal({
                 player_id = scenario.PLAYER_ID,
