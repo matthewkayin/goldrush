@@ -15,8 +15,6 @@ struct ScriptConstant {
     int value;
 };
 
-void match_shell_script_handle_error(MatchShellState* state);
-
 // Lua function predeclares
 static int script_log(lua_State* lua_state);
 static int script_set_lose_on_buildings_destroyed(lua_State* lua_state);
@@ -60,6 +58,9 @@ static const ScriptConstant GOLD_CONSTANTS[] = {
     { NULL, 0 }
 };
 
+const char* match_shell_script_get_entity_type_str(EntityType type);
+void match_shell_script_handle_error(MatchShellState* state);
+
 bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, const char* script_path) {
     // Check for script existance
     {
@@ -91,40 +92,16 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
     lua_pushlightuserdata(state->scenario_lua_state, state);
     lua_setfield(state->scenario_lua_state, LUA_REGISTRYINDEX, "__match_shell_state");
 
-    // Constants
-    lua_getglobal(state->scenario_lua_state, "scenario");
-    size_t const_index = 0;
-    while (GOLD_CONSTANTS[const_index].name != NULL) {
-        lua_pushinteger(state->scenario_lua_state, GOLD_CONSTANTS[const_index].value);
-        lua_setfield(state->scenario_lua_state, -2, GOLD_CONSTANTS[const_index].name);
-
-        const_index++;
-    }
-
     // Entity constants
+    lua_newtable(state->scenario_lua_state);
     for (int entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
-        const char* entity_name = entity_get_data((EntityType)entity_type).name;
-
-        char const_name[32];
-        char* const_name_ptr = const_name;
-        const_name_ptr += sprintf(const_name_ptr, "ENTITY_");
-
-        size_t index = 0;
-        while (entity_name[index] != '\0') {
-            if (entity_name[index] == ' ' && !(entity_type == ENTITY_GOLDMINE || entity_type == ENTITY_LANDMINE)) {
-                const_name_ptr[index] = '_';
-            } else if (entity_name[index] != ' ' || entity_name[index] != '\'') {
-                const_name_ptr[index] = toupper(entity_name[index]);
-            }
-            index++;
-        }
-        const_name_ptr[index] = '\0';
-
         lua_pushinteger(state->scenario_lua_state, entity_type);
-        lua_setfield(state->scenario_lua_state, -2, const_name);
+        lua_setfield(state->scenario_lua_state, -2, match_shell_script_get_entity_type_str((EntityType)entity_type));
     }
+    lua_setfield(state->scenario_lua_state, -2, "entity_type");
 
     // Sound constants
+    lua_newtable(state->scenario_lua_state);
     for (int sound_name = 0; sound_name < SOUND_COUNT; sound_name++) {
         char const_name[64];
         char* const_name_ptr = const_name;
@@ -140,6 +117,17 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
 
         lua_pushinteger(state->scenario_lua_state, sound_name);
         lua_setfield(state->scenario_lua_state, -2, const_name);
+    }
+    lua_setfield(state->scenario_lua_state, -2, "sound");
+
+    // Script constants
+    lua_getglobal(state->scenario_lua_state, "scenario");
+    size_t const_index = 0;
+    while (GOLD_CONSTANTS[const_index].name != NULL) {
+        lua_pushinteger(state->scenario_lua_state, GOLD_CONSTANTS[const_index].value);
+        lua_setfield(state->scenario_lua_state, -2, GOLD_CONSTANTS[const_index].name);
+
+        const_index++;
     }
 
     // Scenario constants
@@ -226,6 +214,59 @@ void match_shell_script_handle_error(MatchShellState* state) {
     log_error("%s", error_str);
     match_shell_leave_match(state, false);
 }
+
+const char* match_shell_script_get_entity_type_str(EntityType type) {
+    switch (type) {
+        case ENTITY_GOLDMINE:
+            return "GOLDMINE";
+        case ENTITY_MINER:
+            return "MINER";
+        case ENTITY_COWBOY:
+            return "COWBOY";
+        case ENTITY_BANDIT:
+            return "BANDIT"; 
+        case ENTITY_WAGON:
+            return "WAGON";
+        case ENTITY_JOCKEY:
+            return "JOCKEY";
+        case ENTITY_SAPPER:
+            return "SAPPER";
+        case ENTITY_PYRO:
+            return "PYRO";
+        case ENTITY_SOLDIER:
+            return "SOLDIER";
+        case ENTITY_CANNON:
+            return "CANNON";
+        case ENTITY_DETECTIVE:
+            return "DETECTIVE";
+        case ENTITY_BALLOON:
+            return "BALLOON";
+        case ENTITY_HALL:
+            return "HALL";
+        case ENTITY_HOUSE:
+            return "HOUSE";
+        case ENTITY_SALOON:
+            return "SALOON";
+        case ENTITY_BUNKER:
+            return "BUNKER";
+        case ENTITY_WORKSHOP:
+            return "WORKSHOP";
+        case ENTITY_SMITH:
+            return "SMITH";
+        case ENTITY_COOP:
+            return "COOP";
+        case ENTITY_BARRACKS:
+            return "BARRACKS";
+        case ENTITY_SHERIFFS:
+            return "SHERIFFS";
+        case ENTITY_LANDMINE:
+            return "LANDMINE";
+        case ENTITY_TYPE_COUNT:
+            GOLD_ASSERT(false);
+            return "";
+    }
+}
+
 
 MatchShellState* script_get_match_shell_state(lua_State* lua_state) {
     lua_getfield(lua_state, LUA_REGISTRYINDEX, "__match_shell_state");

@@ -1,15 +1,18 @@
 local actions = require("actions")
 
 local common = {}
+common.current_objective = nil
 common.objectives = {}
 
 function common.announce_new_objective(title)
     scenario.play_sound(scenario.SOUND_UI_CLICK)
     scenario.chat(scenario.CHAT_COLOR_GOLD, "New Objective:", title)
     actions.wait(2.0)
+    common.current_objective = title
 end
 
 function common.announce_objectives_complete()
+    common.current_objective = nil
     scenario.play_sound(scenario.SOUND_OBJECTIVE_COMPLETE)
     scenario.chat(scenario.CHAT_COLOR_GOLD, "Objective Complete", "")
     actions.wait(5.0)
