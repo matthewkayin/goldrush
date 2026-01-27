@@ -3,6 +3,7 @@
 #include "core/logger.h"
 #include "core/filesystem.h"
 #include "network/network.h"
+#include <algorithm>
 
 #ifdef GOLD_DEBUG
     #include <fstream>
@@ -956,7 +957,7 @@ static int script_fog_reveal(lua_State* lua_state) {
         .cell = cell,
         .cell_size = cell_size,
         .sight = sight,
-        .timer = (uint32_t)(60.0 * duration)
+        .timer = (uint32_t)(duration * (double)UPDATES_PER_SECOND)
     });
 
     return 0;
@@ -973,17 +974,35 @@ static int script_begin_camera_pan(lua_State* lua_state) {
     double duration = lua_tonumber(lua_state, 2);
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
-    match_shell_begin_camera_pan(state, cell, (uint32_t)(60.0 * duration));
+
+    // Convert to cell into camera offset
+    state->camera_pan_offset.x = (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
+    state->camera_pan_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / 2);
+    state->camera_pan_offset.x = std::clamp(state->camera_pan_offset.x, 0, (state->match_state.map.width * TILE_SIZE) - SCREEN_WIDTH);
+    state->camera_pan_offset.y = std::clamp(state->camera_pan_offset.y, 0, (state->match_state.map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
+
+    state->camera_pan_return_offset = state->camera_offset;
+    state->camera_pan_timer = (uint32_t)(duration * (double)UPDATES_PER_SECOND);
+    state->camera_pan_duration = state->camera_pan_timer;
+
+    state->camera_mode = CAMERA_MODE_PAN;
 
     return 0;
 }
 
 // Gradually returns the camera to the position it was at before the most recent camera pan started.
+// @param duration number The duration in seconds of the camera return
 static int script_begin_camera_return(lua_State* lua_state) {
-    script_validate_arguments(lua_state, NULL, 0);
+    const int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    double duration = lua_tonumber(lua_state, 1);
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
-    match_shell_begin_camera_return(state);
+
+    state->camera_pan_timer = (uint32_t)(duration * (double)UPDATES_PER_SECOND);
+    state->camera_pan_duration = state->camera_pan_timer;
+    state->camera_mode = CAMERA_MODE_PAN_RETURN;
 
     return 0;
 }
@@ -993,7 +1012,7 @@ static int script_free_camera(lua_State* lua_state) {
     script_validate_arguments(lua_state, NULL, 0);
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
-    match_shell_end_camera_pan(state);
+    state->camera_mode = CAMERA_MODE_FREE;
 
     return 0;
 }

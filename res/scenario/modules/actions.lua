@@ -23,9 +23,23 @@ end
 
 function actions.wait(seconds)
     local resume_time = scenario.get_time() + seconds
-    while scenario.get_time() < resume_time do
+    repeat
         coroutine.yield()
-    end
+    until scenario.get_time() >= resume_time
+end
+
+function actions.camera_pan(cell, duration)
+    scenario.begin_camera_pan(cell, duration)
+    repeat
+        coroutine.yield()
+    until scenario.get_camera_mode() == scenario.CAMERA_MODE_PAN_HOLD
+end
+
+function actions.camera_return(duration)
+    scenario.begin_camera_return(duration)
+    repeat
+        coroutine.yield()
+    until scenario.get_camera_mode() == scenario.CAMERA_MODE_FREE
 end
 
 return actions

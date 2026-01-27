@@ -111,10 +111,10 @@ function scenario_update()
                 sight = 9,
                 duration = 3.0
             })
-            scenario.camera_pan(scenario.constants.BANDIT_SPAWN_CELL, 0.75)
+            actions.camera_pan(scenario.constants.BANDIT_SPAWN_CELL, 0.75)
             scenario.chat(scenario.CHAT_COLOR_WHITE, "", "It's a bandit attack! Hold steady!")
             actions.wait(2.0)
-            scenario.camera_return()
+            scenario.begin_camera_return(0.75)
         end)
     elseif objectives.current_objective == OBJECTIVE_DEFEAT_BANDITS and scenario.are_objectives_complete() then
         actions.run(function()
@@ -126,7 +126,7 @@ function scenario_update()
     -- Handle bandit attack defeated
     if bandit_attack_squad_id ~= nil and not scenario.does_squad_exist(ENEMY_BANDITS_PLAYER_ID, bandit_attack_squad_id) then
         actions.run(function()
-            actions.wait(1.0)
+            actions.wait(2.0)
             scenario.fog_reveal({
                 player_id = scenario.PLAYER_ID,
                 cell = scenario.constants.BANDIT_BASE_CELL,
@@ -134,8 +134,7 @@ function scenario_update()
                 sight = 13,
                 duration = 5.0
             })
-            scenario.camera_pan(scenario.constants.BANDIT_BASE_CELL, 1.0)
-            actions.wait(1.0)
+            actions.camera_pan(scenario.constants.BANDIT_BASE_CELL, 1.5)
             objectives.announce_new_objective(OBJECTIVE_DEFEAT_BANDITS)
             objectives.add_objective({
                 objective = {
@@ -145,6 +144,7 @@ function scenario_update()
                     return scenario.is_player_defeated(ENEMY_BANDITS_PLAYER_ID)
                 end
             })
+            actions.camera_return(2.0)
         end)
         bandit_attack_squad_id = nil
     end

@@ -92,7 +92,6 @@ static const uint32_t REPLAY_FOG_EVERYONE = 1U;
 
 // Camera
 static const int CAMERA_DRAG_MARGIN = 4;
-static const uint32_t CAMERA_PAN_RETURN_DURATION = 60U;
 
 // Selection
 static const uint32_t MATCH_SHELL_DOUBLE_CLICK_DURATION = 30U;
@@ -601,7 +600,7 @@ void match_shell_update(MatchShellState* state) {
         .x = MENU_BUTTON_POSITION.x, .y = MENU_BUTTON_POSITION.y,
         .w = menu_button_sprite_info.frame_width, .h = menu_button_sprite_info.frame_height
     };
-    if (match_shell_is_camera_free(state) && 
+    if (state->camera_mode != CAMERA_MODE_MINIMAP_DRAG &&
             !match_shell_is_selecting(state) && 
             // Menu button doesn't work for defeat / victory / desync screens
             !(state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT || state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY || state->mode == MATCH_SHELL_MODE_DESYNC) &&
@@ -621,6 +620,7 @@ void match_shell_update(MatchShellState* state) {
     // Menu
     ui_begin(state->ui);
     if (match_shell_is_in_menu(state)) {
+        // This handles the case where the menu opens because they pressed F10
         if (state->camera_mode == CAMERA_MODE_MINIMAP_DRAG) {
             state->camera_mode = CAMERA_MODE_FREE;
         }
@@ -785,7 +785,7 @@ void match_shell_update(MatchShellState* state) {
             !match_shell_is_selecting(state) &&
             input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
             !match_shell_is_in_menu(state) &&
-            state->camera_pan_timer == 0) {
+            match_shell_is_camera_free(state)) {
         state->camera_mode = CAMERA_MODE_MINIMAP_DRAG;
     } 
 
@@ -2325,30 +2325,6 @@ bool match_shell_is_camera_panning(const MatchShellState* state) {
     return state->camera_mode == CAMERA_MODE_PAN || 
         state->camera_mode == CAMERA_MODE_PAN_HOLD ||
         state->camera_mode == CAMERA_MODE_PAN_RETURN;
-}
-
-void match_shell_end_camera_pan(MatchShellState* state) {
-    state->camera_mode = CAMERA_MODE_FREE;
-}
-
-void match_shell_begin_camera_pan(MatchShellState* state, ivec2 to, uint32_t pan_duration) {
-    // Convert to cell into camera offset
-    state->camera_pan_offset.x = (to.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
-    state->camera_pan_offset.y = (to.y * TILE_SIZE) + (TILE_SIZE / 2) - ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / 2);
-    state->camera_pan_offset.x = std::clamp(state->camera_pan_offset.x, 0, (state->match_state.map.width * TILE_SIZE) - SCREEN_WIDTH);
-    state->camera_pan_offset.y = std::clamp(state->camera_pan_offset.y, 0, (state->match_state.map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
-
-    state->camera_pan_return_offset = state->camera_offset;
-    state->camera_pan_timer = pan_duration;
-    state->camera_pan_duration = state->camera_pan_timer;
-
-    state->camera_mode = CAMERA_MODE_PAN;
-}
-
-void match_shell_begin_camera_return(MatchShellState* state) {
-    state->camera_pan_timer = CAMERA_PAN_RETURN_DURATION;
-    state->camera_pan_duration = state->camera_pan_timer;
-    state->camera_mode = CAMERA_MODE_PAN_RETURN;
 }
 
 // SELECTION

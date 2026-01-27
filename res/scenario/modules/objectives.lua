@@ -15,7 +15,7 @@ function objectives.announce_objectives_complete()
     objectives.current_objective = nil
     scenario.play_sound(scenario.sound.OBJECTIVE_COMPLETE)
     scenario.chat(scenario.CHAT_COLOR_GOLD, "Objective Complete", "")
-    actions.wait(5.0)
+    actions.wait(3.0)
     scenario.clear_objectives()
 end
 

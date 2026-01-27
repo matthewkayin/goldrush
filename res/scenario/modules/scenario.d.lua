@@ -167,7 +167,8 @@ function scenario.fog_reveal(params) end
 function scenario.begin_camera_pan(cell, duration) end
 
 --- Gradually returns the camera to the position it was at before the most recent camera pan started.
-function scenario.begin_camera_return() end
+--- @param duration number The duration in seconds of the camera return
+function scenario.begin_camera_return(duration) end
 
 --- Ends the current camera pan and returns free camera movement to the player.
 function scenario.free_camera() end

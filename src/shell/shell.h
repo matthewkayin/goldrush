@@ -255,9 +255,6 @@ void match_shell_clamp_camera(MatchShellState* state);
 void match_shell_center_camera_on_cell(MatchShellState* state, ivec2 cell);
 bool match_shell_is_camera_free(const MatchShellState* state);
 bool match_shell_is_camera_panning(const MatchShellState* state);
-void match_shell_end_camera_pan(MatchShellState* state);
-void match_shell_begin_camera_pan(MatchShellState* state, ivec2 to, uint32_t pan_duration);
-void match_shell_begin_camera_return(MatchShellState* state);
 
 // Selection
 std::vector<EntityId> match_shell_create_selection(const MatchShellState* state, Rect select_rect);
