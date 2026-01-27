@@ -5,6 +5,9 @@ local OBJECTIVE_FIND_GOLDMINE = "Find a Goldmine"
 local OBJECTIVE_BUILD_HALL = "Build a Town Hall"
 local OBJECTIVE_ESTABLISH_BASE = "Establish a Base"
 
+local ENEMY_BANDITS_PLAYER_ID = 1
+local bandit_attack_squad_id = nil
+
 function scenario_init()
     actions.run(function()
         actions.wait(2.0)
@@ -49,6 +52,7 @@ function scenario_update()
             common.announce_objectives_complete()
             common.announce_new_objective("Establish a Base")
             -- DEBUG: delete this objective
+            --[[
             common.add_objective({
                 objective = {
                     description = "Hire 4 Miners",
@@ -59,7 +63,7 @@ function scenario_update()
                     return scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.MINER) >= 4
                 end
             })
-            --[[
+            ]]
             common.add_objective({
                 objective = {
                     description = "Hire 8 Miners",
@@ -96,7 +100,6 @@ function scenario_update()
                     return scenario.get_player_full_bunker_count(scenario.PLAYER_ID) >= 1
                 end
             })
-            ]]
         end)
     elseif common.current_objective == OBJECTIVE_ESTABLISH_BASE and scenario.are_objectives_complete() then
         actions.run(function()
@@ -106,8 +109,8 @@ function scenario_update()
             table.insert(squad_entities, scenario.entity_type.BANDIT)
             table.insert(squad_entities, scenario.entity_type.BANDIT)
             table.insert(squad_entities, scenario.entity_type.BANDIT)
-            local squad_id = scenario.spawn_enemy_squad({
-                player_id = 1,
+            bandit_attack_squad_id = scenario.spawn_enemy_squad({
+                player_id = ENEMY_BANDITS_PLAYER_ID,
                 spawn_cell = scenario.constants.BANDIT_SPAWN_CELL,
                 target_cell = scenario.constants.BANDIT_TARGET_CELL,
                 entities = squad_entities
@@ -122,9 +125,16 @@ function scenario_update()
                 sight = 9,
                 duration = 3.0
             })
-            scenario.camera_pan(scenario.constants.BANDIT_SPAWN_CELL, 0.5)
+            scenario.camera_pan(scenario.constants.BANDIT_SPAWN_CELL, 0.75)
             actions.wait(2.0)
             scenario.camera_return()
+        end)
+    end
+
+    if bandit_attack_squad_id ~= nil and not scenario.does_squad_exist(ENEMY_BANDITS_PLAYER_ID, bandit_attack_squad_id) then
+        actions.run(function()
+            actions.wait(1.0)
+            scenario.set_match_over_victory()
         end)
     end
 

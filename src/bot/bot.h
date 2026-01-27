@@ -43,7 +43,7 @@ enum BotSquadType {
 };
 
 struct BotSquad {
-    uint32_t id;
+    int id;
     BotSquadType type;
     ivec2 target_cell;
     std::vector<EntityId> entities;
@@ -90,7 +90,7 @@ struct Bot {
     uint32_t macro_cycle_count;
 
     // Squads
-    uint32_t next_squad_id;
+    int next_squad_id;
     std::vector<BotSquad> squads;
     uint32_t next_landmine_time;
 

@@ -19,6 +19,8 @@ struct ScriptConstant {
 
 // Lua function predeclares
 static int script_log(lua_State* lua_state);
+static int script_set_match_over_victory(lua_State* lua_state);
+static int script_set_match_over_defeat(lua_State* lua_state);
 static int script_chat(lua_State* lua_state);
 static int script_hint(lua_State* lua_state);
 static int script_play_sound(lua_State* lua_state);
@@ -37,9 +39,12 @@ static int script_camera_pan(lua_State* lua_state);
 static int script_camera_return(lua_State* lua_state);
 static int script_camera_free(lua_State* lua_state);
 static int script_spawn_enemy_squad(lua_State* lua_state);
+static int script_does_squad_exist(lua_State* lua_state);
 
 static const luaL_reg GOLD_FUNCS[] = {
     { "log", script_log },
+    { "set_match_over_victory", script_set_match_over_victory },
+    { "set_match_over_defeat", script_set_match_over_defeat },
     { "chat", script_chat },
     { "hint", script_hint },
     { "play_sound", script_play_sound },
@@ -58,6 +63,7 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "camera_return", script_camera_return },
     { "camera_free", script_camera_free },
     { "spawn_enemy_squad", script_spawn_enemy_squad },
+    { "does_squad_exist", script_does_squad_exist },
     { NULL, NULL }
 };
 
@@ -454,6 +460,24 @@ static int script_log(lua_State* lua_state) {
 
     log_debug("%s", buffer);
 #endif
+
+    return 0;
+}
+
+static int script_set_match_over_victory(lua_State* lua_state) {
+    script_validate_arguments(lua_state, NULL, 0);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    state->mode = MATCH_SHELL_MODE_MATCH_OVER_VICTORY;
+
+    return 0;
+}
+
+static int script_set_match_over_defeat(lua_State* lua_state) {
+    script_validate_arguments(lua_state, NULL, 0);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    state->mode = MATCH_SHELL_MODE_MATCH_OVER_DEFEAT;
 
     return 0;
 }
@@ -856,6 +880,37 @@ static int script_spawn_enemy_squad(lua_State* lua_state) {
     }
 
     lua_pushnumber(lua_state, squad_id);
+
+    return 1;
+}
+
+static int script_does_squad_exist(lua_State* lua_state) {
+    int arg_types[] = { LUA_TNUMBER, LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 2);
+
+    uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
+    if (player_id == 0 || player_id >= MAX_PLAYERS) {
+        char error_message[128];
+        sprintf(error_message, "player_id %u is out of bounds", player_id);
+        script_error(lua_state, error_message);
+    }
+
+    int squad_id = (int)lua_tonumber(lua_state, 2);
+    if (squad_id == SQUAD_ID_NULL) {
+        script_error(lua_state, "Squad ID NULL is not valid.");
+    }
+
+    const MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    bool result = false;
+    for (const BotSquad& squad : state->bots[player_id].squads) {
+        if (squad.id == squad_id) {
+            result = true;
+            break;
+        }
+    }
+
+    lua_pushboolean(lua_state, result);
 
     return 1;
 }
