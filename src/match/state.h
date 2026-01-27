@@ -200,7 +200,8 @@ enum MatchEventType {
     MATCH_EVENT_ALERT,
     MATCH_EVENT_SELECTION_HANDOFF,
     MATCH_EVENT_RESEARCH_COMPLETE,
-    MATCH_EVENT_STATUS
+    MATCH_EVENT_STATUS,
+    MATCH_EVENT_PLAYER_DEFEATED
 };
 
 struct MatchEventSound {
@@ -240,6 +241,10 @@ struct MatchEventStatus {
     const char* message;
 };
 
+struct MatchEventPlayerDefeated {
+    uint8_t player_id;
+};
+
 struct MatchEvent {
     MatchEventType type;
     union {
@@ -248,6 +253,7 @@ struct MatchEvent {
         MatchEventSelectionHandoff selection_handoff;
         MatchEventResearchComplete research_complete;
         MatchEventStatus status;
+        MatchEventPlayerDefeated player_defeated;
     };
 };
 
@@ -344,6 +350,7 @@ std::vector<EntityId> match_find_entities(const MatchState& state, std::function
 EntityId match_get_nearest_builder(const MatchState& state, const std::vector<EntityId>& builders, ivec2 cell);
 
 bool match_is_target_invalid(const MatchState& state, const Target& target, uint8_t player_id);
+bool match_player_has_buildings(const MatchState& state, uint8_t player_id);
 
 // Entity
 

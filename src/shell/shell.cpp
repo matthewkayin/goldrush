@@ -150,6 +150,7 @@ MatchShellState* match_shell_base_init() {
     state->match_timer = 0;
     state->disconnect_timer = 0;
     state->match_over_timer = MATCH_OVER_TIMER_NOT_STARTED;
+    state->match_over_is_victory = false;
     state->is_paused = false;
 
     // Camera
@@ -193,7 +194,6 @@ MatchShellState* match_shell_base_init() {
 
     // Scenario
     state->scenario_show_enemy_gold = false;
-    state->scenario_lose_on_buildings_destroyed = true;
     state->scenario_lua_state = NULL;
 
     // Replay file
@@ -1235,6 +1235,28 @@ void match_shell_update(MatchShellState* state) {
                 match_shell_show_status(state, message);
                 break;
             }
+            case MATCH_EVENT_PLAYER_DEFEATED: {
+                char defeat_message[128];
+                sprintf(defeat_message, "%s has been defeated.", state->match_state.players[event.player_defeated.player_id].name);
+                match_shell_add_chat_message(state, FONT_HACK_WHITE, "", defeat_message, CHAT_MESSAGE_DURATION);
+
+                if (!state->replay_mode && 
+                        event.player_defeated.player_id == network_get_player_id()) {
+                    state->match_over_timer = MATCH_OVER_TIMER_DURATION;
+                    state->match_over_is_victory = false;
+                    break;
+                }
+
+                if (!state->replay_mode &&
+                        state->scenario_lua_state == NULL &&
+                        !match_shell_is_at_least_one_opponent_in_match(state)) {
+                    state->match_over_timer = MATCH_OVER_TIMER_DURATION;
+                    state->match_over_is_victory = true;
+                    break;
+                }
+
+                break;
+            }
         }
     }
     state->match_state.events.clear();
@@ -1465,49 +1487,11 @@ void match_shell_update(MatchShellState* state) {
         }
     }
 
-    // Check win conditions
-    if (!state->replay_mode) {
-        bool player_has_buildings[MAX_PLAYERS];
-        bool player_has_entities[MAX_PLAYERS];
-        memset(player_has_buildings, 0, sizeof(player_has_buildings));
-        memset(player_has_entities, 0, sizeof(player_has_entities));
-
-        for (const Entity& entity : state->match_state.entities) {
-            if (entity.type == ENTITY_GOLDMINE || entity.type == ENTITY_LANDMINE) {
-                continue;
-            }
-            player_has_buildings[entity.player_id] |= entity_is_building(entity.type) && entity.health != 0;
-            player_has_entities[entity.player_id] |= entity.health != 0;
-        }
-
-        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (!state->match_state.players[player_id].active) {
-                continue;
-            }
-
-            const bool player_has_lost = 
-                (state->scenario_lose_on_buildings_destroyed && !player_has_buildings[player_id]) ||
-                !player_has_entities[player_id];
-            if (player_has_lost) {
-                state->match_state.players[player_id].active = false;
-
-                char defeat_message[128];
-                sprintf(defeat_message, "%s has been defeated.", state->match_state.players[player_id].name);
-                match_shell_add_chat_message(state, FONT_HACK_WHITE, "", defeat_message, CHAT_MESSAGE_DURATION);
-
-                if (player_id == network_get_player_id() ||
-                        (state->match_state.players[network_get_player_id()].active && 
-                        !match_shell_is_at_least_one_opponent_in_match(state))) {
-                    state->match_over_timer = MATCH_OVER_TIMER_DURATION;
-                }
-            }
-        }
-    }
-
+    // Match over timer
     if (state->match_over_timer != MATCH_OVER_TIMER_NOT_STARTED) {
         state->match_over_timer--;
         if (state->match_over_timer == 0) {
-            if (state->match_state.players[network_get_player_id()].active) {
+            if (state->match_over_is_victory) {
                 state->mode = MATCH_SHELL_MODE_MATCH_OVER_VICTORY;
             } else {
                 state->mode = MATCH_SHELL_MODE_MATCH_OVER_DEFEAT;

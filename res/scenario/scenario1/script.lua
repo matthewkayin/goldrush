@@ -6,8 +6,6 @@ local OBJECTIVE_BUILD_HALL = "Build a Town Hall"
 local OBJECTIVE_ESTABLISH_BASE = "Establish a Base"
 
 function scenario_init()
-    scenario.set_lose_on_buildings_destroyed(false)
-
     actions.run(function()
         actions.wait(2.0)
         common.announce_new_objective(OBJECTIVE_FIND_GOLDMINE)

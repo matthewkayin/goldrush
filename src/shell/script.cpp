@@ -19,7 +19,6 @@ struct ScriptConstant {
 
 // Lua function predeclares
 static int script_log(lua_State* lua_state);
-static int script_set_lose_on_buildings_destroyed(lua_State* lua_state);
 static int script_chat(lua_State* lua_state);
 static int script_hint(lua_State* lua_state);
 static int script_play_sound(lua_State* lua_state);
@@ -41,7 +40,6 @@ static int script_spawn_enemy_squad(lua_State* lua_state);
 
 static const luaL_reg GOLD_FUNCS[] = {
     { "log", script_log },
-    { "set_lose_on_buildings_destroyed", script_set_lose_on_buildings_destroyed },
     { "chat", script_chat },
     { "hint", script_hint },
     { "play_sound", script_play_sound },
@@ -457,16 +455,6 @@ static int script_log(lua_State* lua_state) {
     log_debug("%s", buffer);
 #endif
 
-    return 0;
-}
-
-static int script_set_lose_on_buildings_destroyed(lua_State* lua_state) {
-    const int arg_types[] = { LUA_TBOOLEAN };
-    script_validate_arguments(lua_state, arg_types, 1);
-
-    MatchShellState* state = script_get_match_shell_state(lua_state);
-    state->scenario_lose_on_buildings_destroyed = lua_toboolean(lua_state, 1);
-    
     return 0;
 }
 

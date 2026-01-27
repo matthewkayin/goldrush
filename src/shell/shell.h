@@ -114,6 +114,7 @@ struct MatchShellState {
     uint32_t match_timer;
     uint32_t disconnect_timer;
     uint32_t match_over_timer;
+    bool match_over_is_victory;
     bool is_paused;
 
     // Inputs
@@ -177,7 +178,6 @@ struct MatchShellState {
     uint32_t scenario_allowed_upgrades;
     bool scenario_allowed_entities[ENTITY_TYPE_COUNT];
     bool scenario_show_enemy_gold;
-    bool scenario_lose_on_buildings_destroyed;
     lua_State* scenario_lua_state;
     std::vector<Objective> scenario_objectives;
 
