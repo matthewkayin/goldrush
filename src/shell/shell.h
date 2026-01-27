@@ -239,6 +239,10 @@ ivec2 match_shell_spawn_enemy_squad_find_spawn_cell(const MatchShellState* state
 bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, const char* script_path);
 void match_shell_script_update(MatchShellState* state);
 
+#ifdef GOLD_DEBUG
+    void match_shell_script_generate_doc();
+#endif
+
 // State queries
 bool match_shell_is_mouse_in_ui();
 bool match_shell_is_selecting(const MatchShellState* state);

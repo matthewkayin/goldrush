@@ -94,8 +94,11 @@ int gold_main(int argc, char** argv) {
                 launch_mode = LAUNCH_MODE_TEST_HOST;
             } else if (strcmp(argv[argn], "--test-join") == 0) {
                 launch_mode = LAUNCH_MODE_TEST_JOIN;
-            } else if (strcmp(argv[argn], "--map-edit") == 0)  {
+            } else if (strcmp(argv[argn], "--map-edit") == 0) {
                 launch_mode = LAUNCH_MODE_MAP_EDIT;
+            } else if (strcmp(argv[argn], "--lua-doc") == 0) {
+                match_shell_script_generate_doc();
+                return 0;
             }
         #endif
         #ifdef GOLD_STEAM

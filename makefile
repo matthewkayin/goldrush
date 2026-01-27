@@ -155,3 +155,11 @@ ifeq ($(BUILD_PLATFORM),linux)
 	@tar -czvf goldrush_linux.tar.gz -C $(BUILD_DIR) .
 	@mv goldrush_linux.tar.gz $(BUILD_DIR)/goldrush_linux.tar.gz
 endif
+
+.PHONY: luadoc
+luadoc:
+ifeq ($(BUILD_PLATFORM),win64)
+	-@setlocal enableextensions enabledelayedexpansion && cd $(BUILD_DIR) && gold.exe --lua-doc
+else
+	@cd $(BUILD_DIR) && ./gold --lua-doc
+endif

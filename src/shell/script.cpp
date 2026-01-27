@@ -4,6 +4,10 @@
 #include "core/filesystem.h"
 #include "network/network.h"
 
+#ifdef GOLD_DEBUG
+    #include <fstream>
+#endif
+
 enum ScriptChatColor {
     SCRIPT_CHAT_COLOR_WHITE,
     SCRIPT_CHAT_COLOR_GOLD,
@@ -35,11 +39,15 @@ static int script_highlight_entity(lua_State* lua_state);
 static int script_get_player_entity_count(lua_State* lua_state);
 static int script_get_player_full_bunker_count(lua_State* lua_state);
 static int script_fog_reveal(lua_State* lua_state);
-static int script_camera_pan(lua_State* lua_state);
-static int script_camera_return(lua_State* lua_state);
-static int script_camera_free(lua_State* lua_state);
+static int script_begin_camera_pan(lua_State* lua_state);
+static int script_begin_camera_return(lua_State* lua_state);
+static int script_free_camera(lua_State* lua_state);
+static int script_get_camera_mode(lua_State* lua_state);
 static int script_spawn_enemy_squad(lua_State* lua_state);
 static int script_does_squad_exist(lua_State* lua_state);
+static int script_is_player_defeated(lua_State* lua_state);
+
+static const char* MODULE_NAME = "scenario";
 
 static const luaL_reg GOLD_FUNCS[] = {
     { "log", script_log },
@@ -59,11 +67,13 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "get_player_entity_count", script_get_player_entity_count },
     { "get_player_full_bunker_count", script_get_player_full_bunker_count },
     { "fog_reveal", script_fog_reveal },
-    { "camera_pan", script_camera_pan },
-    { "camera_return", script_camera_return },
-    { "camera_free", script_camera_free },
+    { "begin_camera_pan", script_begin_camera_pan },
+    { "begin_camera_return", script_begin_camera_return },
+    { "free_camera", script_free_camera },
+    { "get_camera_mode", script_get_camera_mode },
     { "spawn_enemy_squad", script_spawn_enemy_squad },
     { "does_squad_exist", script_does_squad_exist },
+    { "is_player_defeated", script_is_player_defeated },
     { NULL, NULL }
 };
 
@@ -72,6 +82,11 @@ static const ScriptConstant GOLD_CONSTANTS[] = {
     { "CHAT_COLOR_GOLD", SCRIPT_CHAT_COLOR_GOLD },
     { "CHAT_COLOR_BLUE", SCRIPT_CHAT_COLOR_GOLD },
     { "SQUAD_ID_NULL", SQUAD_ID_NULL },
+    { "CAMERA_MODE_FREE", CAMERA_MODE_FREE },
+    { "CAMERA_MODE_MINIMAP_DRAG", CAMERA_MODE_MINIMAP_DRAG },
+    { "CAMERA_MODE_PAN", CAMERA_MODE_PAN },
+    { "CAMERA_MODE_PAN_HOLD", CAMERA_MODE_PAN_HOLD },
+    { "CAMERA_MODE_PAN_RETURN", CAMERA_MODE_PAN_RETURN },
     { NULL, 0 }
 };
 
@@ -94,7 +109,7 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
     luaL_openlibs(state->scenario_lua_state);
 
     // Register scenario library
-    luaL_register(state->scenario_lua_state, "scenario", GOLD_FUNCS);
+    luaL_register(state->scenario_lua_state, MODULE_NAME, GOLD_FUNCS);
 
     // Set module path
     lua_getglobal(state->scenario_lua_state, "package");
@@ -112,7 +127,7 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
     // Scenario module constants
 
     // Script constants
-    lua_getglobal(state->scenario_lua_state, "scenario");
+    lua_getglobal(state->scenario_lua_state, MODULE_NAME);
     size_t const_index = 0;
     while (GOLD_CONSTANTS[const_index].name != NULL) {
         lua_pushinteger(state->scenario_lua_state, GOLD_CONSTANTS[const_index].value);
@@ -297,6 +312,119 @@ const char* match_shell_script_get_entity_type_str(EntityType type) {
     }
 }
 
+#ifdef GOLD_DEBUG
+void match_shell_script_generate_doc() {
+    std::string doc_path = filesystem_get_resource_path() + "scenario" + GOLD_PATH_SEPARATOR + "modules" + GOLD_PATH_SEPARATOR + "scenario.d.lua";
+    FILE* file = fopen(doc_path.c_str(), "w");
+    if (!file) {
+        printf("Error: could not open %s.\n", doc_path.c_str());
+        return;
+    }
+
+    fprintf(file, "--- @meta\n");
+    fprintf(file, "%s = {}\n\n", MODULE_NAME);
+
+    fprintf(file, "--- @class ivec2\n");
+    fprintf(file, "--- @field x number\n");
+    fprintf(file, "--- @field y number\n\n");
+
+    fprintf(file, "--- Script constants\n");
+    size_t index = 0;
+    while (GOLD_CONSTANTS[index].name != NULL) {
+        fprintf(file, "%s.%s = %i\n", MODULE_NAME, GOLD_CONSTANTS[index].name, GOLD_CONSTANTS[index].value);
+        index++;
+    }
+    fprintf(file, "\n");
+
+    fprintf(file, "--- Scenario constants\n");
+    fprintf(file, "%s.constants = {}\n\n", MODULE_NAME);
+
+    fprintf(file, "--- Entity constants\n");
+    fprintf(file, "%s.entity_type = {}\n", MODULE_NAME);
+    for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+        fprintf(file, "%s.entity_type.%s = %u\n", MODULE_NAME, match_shell_script_get_entity_type_str((EntityType)entity_type), entity_type);
+    }
+    fprintf(file, "\n");
+
+    fprintf(file, "--- Sound constants\n");
+    fprintf(file, "%s.sound = {}\n", MODULE_NAME);
+    for (uint32_t sound = 0; sound < SOUND_COUNT; sound++) {
+        const char* sound_name = sound_get_name((SoundName)sound);
+        char const_name[64];
+        sprintf(const_name, "%s", sound_name);
+        char* sound_name_ptr = const_name;
+        while (*sound_name_ptr != '\0') {
+            (*sound_name_ptr) = toupper(*sound_name_ptr);
+            sound_name_ptr++;
+        }
+
+        fprintf(file, "%s.sound.%s = %u\n", MODULE_NAME, const_name, sound);
+    }
+    fprintf(file, "\n");
+
+    std::ifstream script_cpp_ifstream("../src/shell/script.cpp");
+    std::vector<std::string> comments;
+    std::unordered_map<std::string, std::vector<std::string>> function_comments;
+
+    std::string line;
+    while (std::getline(script_cpp_ifstream, line)) {
+        if (line.rfind("// ", 0) == 0) {
+            comments.push_back(line.substr(3));
+            continue;
+        }
+
+        if (line.rfind("static int script_", 0) == 0 && line.rfind("{") != std::string::npos) {
+            size_t function_name_start = strlen("static int script_");
+            size_t parameter_list_start = line.find('(');
+            size_t function_name_length = parameter_list_start - function_name_start;
+            std::string function_name = line.substr(function_name_start, function_name_length);
+            function_comments[function_name] = comments;
+        }
+
+        // If line not a comment, clear the comments list
+        comments.clear();
+    }
+
+    index = 0;
+    while (GOLD_FUNCS[index].name != NULL) {
+        std::vector<std::string> param_names;
+        for (const std::string& comment : function_comments[GOLD_FUNCS[index].name]) {
+            fprintf(file, "--- %s\n", comment.c_str());
+            if (comment.rfind("@param", 0) == 0) {
+                size_t space_index = comment.find(' ');
+                if (space_index == std::string::npos) {
+                    printf("ERROR: Invalid @param for function %s\n", GOLD_FUNCS[index].name);
+                    continue;
+                } 
+
+                std::string param_name = comment.substr(space_index + 1);
+                space_index = param_name.find(' ');
+                if (space_index != std::string::npos) {
+                    param_name = param_name.substr(0, space_index);
+                }
+
+                param_names.push_back(param_name);
+            }
+        }
+
+        std::string param_string = "";
+        for (size_t param_index = 0; param_index < param_names.size(); param_index++) {
+            param_string += param_names[param_index];
+            if (param_index != param_names.size() - 1) {
+                param_string += ", ";
+            }
+        }
+
+        fprintf(file, "function %s.%s(%s) end\n\n", MODULE_NAME, GOLD_FUNCS[index].name, param_string.c_str());
+
+        index++;
+    }
+
+    fclose(file);
+    printf("Generated Lua doc at %s\n", doc_path.c_str());
+}
+#endif
+
 MatchShellState* script_get_match_shell_state(lua_State* lua_state) {
     lua_getfield(lua_state, LUA_REGISTRYINDEX, "__match_shell_state");
     MatchShellState* state = (MatchShellState*)lua_touserdata(lua_state, -1);
@@ -445,6 +573,8 @@ int script_sprintf(char* str_ptr, lua_State* lua_state, int stack_index) {
     }
 }
 
+// Send a debug log. If debug logging is disabled, this function does nothing.
+// @param ... any Values to print
 static int script_log(lua_State* lua_state) {
 #if GOLD_LOG_LEVEL >= LOG_LEVEL_DEBUG
     int nargs = lua_gettop(lua_state);
@@ -464,6 +594,7 @@ static int script_log(lua_State* lua_state) {
     return 0;
 }
 
+// End the match in victory.
 static int script_set_match_over_victory(lua_State* lua_state) {
     script_validate_arguments(lua_state, NULL, 0);
 
@@ -473,6 +604,7 @@ static int script_set_match_over_victory(lua_State* lua_state) {
     return 0;
 }
 
+// End the match in defeat.
 static int script_set_match_over_defeat(lua_State* lua_state) {
     script_validate_arguments(lua_state, NULL, 0);
 
@@ -495,6 +627,10 @@ FontName script_chat_get_font_from_chat_color(int chat_color) {
     }
 }
 
+// Sends a chat message.
+// @param color number
+// @param prefix string
+// @param message string
 static int script_chat(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER, LUA_TSTRING, LUA_TSTRING };
     script_validate_arguments(lua_state, arg_types, 3);
@@ -516,6 +652,8 @@ static int script_chat(lua_State* lua_state) {
     return 0;
 }
 
+// Sends a hint message.
+// @param message string
 static int script_hint(lua_State* lua_state) {
     const int arg_types[] = { LUA_TSTRING };
     script_validate_arguments(lua_state, arg_types, 1);
@@ -529,6 +667,8 @@ static int script_hint(lua_State* lua_state) {
     return 0;
 }
 
+// Plays a sound effect.
+// @param sound number
 static int script_play_sound(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 1);
@@ -546,6 +686,8 @@ static int script_play_sound(lua_State* lua_state) {
     return 0;
 }
 
+// Returns the time in seconds since the scenario started.
+// @return number
 static int script_get_time(lua_State* lua_state) {
     script_validate_arguments(lua_state, NULL, 0);
 
@@ -555,6 +697,16 @@ static int script_get_time(lua_State* lua_state) {
     return 1;
 }
 
+// Adds an objective to the objectives list.
+// 
+// If entity_type is provided, then counter_target is also required and 
+// the objective counter will be based on the player's entities of that type.
+// 
+// If counter_target is provided but entity_type is not, then the objective counter
+// will be a variable counter that must be manually updated.
+// 
+// Returns the index of the created objective.
+// @param params { description: string, entity_type: number|nil, counter_target: number|nil }
 static int script_add_objective(lua_State* lua_state) {
     const int arg_types[] = { LUA_TTABLE };
     script_validate_arguments(lua_state, arg_types, 1);
@@ -605,6 +757,8 @@ static int script_add_objective(lua_State* lua_state) {
     return 1;
 }
 
+// Marks the specified objective as complete.
+// @param objective_index number
 static int script_complete_objective(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 1);
@@ -622,6 +776,9 @@ static int script_complete_objective(lua_State* lua_state) {
     return 0;
 }
 
+// Returns true if the specified objective is complete.
+// @param objective_index number
+// @return boolean
 static int script_is_objective_complete(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 1);
@@ -639,6 +796,8 @@ static int script_is_objective_complete(lua_State* lua_state) {
     return 1;
 }
 
+// Returns true if all objectives are complete.
+// @return boolean
 static int script_are_objectives_complete(lua_State* lua_state) {
     script_validate_arguments(lua_state, NULL, 0);
 
@@ -657,6 +816,7 @@ static int script_are_objectives_complete(lua_State* lua_state) {
     return 1;
 }
 
+// Clears the objectives list.
 static int script_clear_objectives(lua_State* lua_state) {
     script_validate_arguments(lua_state, NULL, 0);
 
@@ -666,6 +826,9 @@ static int script_clear_objectives(lua_State* lua_state) {
     return 0;
 }
 
+// Returns true if the specified entity is visible to the player.
+// @param entity_id number
+// @return boolean
 static int script_entity_is_visible_to_player(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 1);
@@ -680,6 +843,8 @@ static int script_entity_is_visible_to_player(lua_State* lua_state) {
     return 1;
 }
 
+// Highlights the specified entity.
+// @param entity_id number
 static int script_highlight_entity(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 1);
@@ -694,6 +859,10 @@ static int script_highlight_entity(lua_State* lua_state) {
     return 0;
 }
 
+// Returns the number of entities controlled by the player of a given type.
+// @param player_id number
+// @param entity_type number
+// @return number
 static int script_get_player_entity_count(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER, LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 2);
@@ -710,6 +879,9 @@ static int script_get_player_entity_count(lua_State* lua_state) {
     return 1;
 }
 
+// Returns the number of bunkers controlled by the player that have 4 cowboys in them.
+// @param player_id number
+// @return number
 static int script_get_player_full_bunker_count(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 1);
@@ -741,6 +913,8 @@ static int script_get_player_full_bunker_count(lua_State* lua_state) {
     return 1;
 }
 
+// Reveals fog at the specified cell.
+// @param params { player_id: number, cell: ivec2, cell_size: number, sight: number, duration: number }
 static int script_fog_reveal(lua_State* lua_state) {
     const int arg_types[] = { LUA_TTABLE };
     script_validate_arguments(lua_state, arg_types, 1);
@@ -788,7 +962,10 @@ static int script_fog_reveal(lua_State* lua_state) {
     return 0;
 }
 
-static int script_camera_pan(lua_State* lua_state) {
+// Gradually pans the camera to center on the specified cell. 
+// @param cell ivec2 The cell to pan the camera to
+// @param duration number The duration in seconds of the camera pan
+static int script_begin_camera_pan(lua_State* lua_state) {
     const int arg_types[] = { LUA_TTABLE, LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 2);
 
@@ -801,7 +978,8 @@ static int script_camera_pan(lua_State* lua_state) {
     return 0;
 }
 
-static int script_camera_return(lua_State* lua_state) {
+// Gradually returns the camera to the position it was at before the most recent camera pan started.
+static int script_begin_camera_return(lua_State* lua_state) {
     script_validate_arguments(lua_state, NULL, 0);
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
@@ -810,7 +988,8 @@ static int script_camera_return(lua_State* lua_state) {
     return 0;
 }
 
-static int script_camera_free(lua_State* lua_state) {
+// Ends the current camera pan and returns free camera movement to the player.
+static int script_free_camera(lua_State* lua_state) {
     script_validate_arguments(lua_state, NULL, 0);
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
@@ -819,6 +998,21 @@ static int script_camera_free(lua_State* lua_state) {
     return 0;
 }
 
+// Returns the current camera mode.
+// @return number
+static int script_get_camera_mode(lua_State* lua_state) {
+    script_validate_arguments(lua_state, NULL, 0);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    lua_pushnumber(lua_state, state->camera_mode);
+
+    return 1;
+}
+
+// Spawns an enemy squad. The entities table should be an array of entity types.
+// Returns the squad ID of the created squad, or SQUAD_ID_NULL if no squad was created.
+// @param params { player_id: number, target_cell: ivec2, spawn_cell: ivec2, entities: table }
+// @return number 
 static int script_spawn_enemy_squad(lua_State* lua_state) {
     int arg_types[] = { LUA_TTABLE };
     script_validate_arguments(lua_state, arg_types, 1);
@@ -884,6 +1078,10 @@ static int script_spawn_enemy_squad(lua_State* lua_state) {
     return 1;
 }
 
+// Checks if the squad exists.
+// @param player_id number
+// @param squad_id number
+// @return boolean 
 static int script_does_squad_exist(lua_State* lua_state) {
     int arg_types[] = { LUA_TNUMBER, LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 2);
@@ -911,6 +1109,26 @@ static int script_does_squad_exist(lua_State* lua_state) {
     }
 
     lua_pushboolean(lua_state, result);
+
+    return 1;
+}
+
+// Checks if the player has been defeated.
+// @param player_id number
+// @return boolean 
+static int script_is_player_defeated(lua_State* lua_state) {
+    int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
+    if (player_id == 0 || player_id >= MAX_PLAYERS) {
+        char error_message[128];
+        sprintf(error_message, "player_id %u is out of bounds", player_id);
+        script_error(lua_state, error_message);
+    }
+
+    const MatchShellState* state = script_get_match_shell_state(lua_state);
+    lua_pushboolean(lua_state, !state->match_state.players[player_id].active);
 
     return 1;
 }

@@ -1,9 +1,10 @@
 local actions = require("actions")
-local common = require("common")
+local objectives = require("objectives")
 
 local OBJECTIVE_FIND_GOLDMINE = "Find a Goldmine"
 local OBJECTIVE_BUILD_HALL = "Build a Town Hall"
 local OBJECTIVE_ESTABLISH_BASE = "Establish a Base"
+local OBJECTIVE_DEFEAT_BANDITS = "Destroy the Bandit's Base"
 
 local ENEMY_BANDITS_PLAYER_ID = 1
 local bandit_attack_squad_id = nil
@@ -11,11 +12,11 @@ local bandit_attack_squad_id = nil
 function scenario_init()
     actions.run(function()
         actions.wait(2.0)
-        common.announce_new_objective(OBJECTIVE_FIND_GOLDMINE)
-        common.add_objective({
+        objectives.announce_new_objective(OBJECTIVE_FIND_GOLDMINE)
+        objectives.add_objective({
             objective = {
                 description = "Find a Goldmine"
-            }, 
+            },
             complete_fn = function()
                 if scenario.entity_is_visible_to_player(scenario.constants.FIRST_GOLDMINE) then
                     scenario.highlight_entity(scenario.constants.FIRST_GOLDMINE)
@@ -30,13 +31,13 @@ function scenario_init()
 end
 
 function scenario_update()
-    common.update_objectives()
+    objectives.update()
 
-    if common.current_objective == OBJECTIVE_FIND_GOLDMINE and scenario.are_objectives_complete() then
+    if objectives.current_objective == OBJECTIVE_FIND_GOLDMINE and scenario.are_objectives_complete() then
         actions.run(function()
-            common.announce_objectives_complete()
-            common.announce_new_objective("Build a Town Hall")
-            common.add_objective({
+            objectives.announce_objectives_complete()
+            objectives.announce_new_objective("Build a Town Hall")
+            objectives.add_objective({
                 objective = {
                     description = "Build a Town Hall",
                 },
@@ -47,24 +48,11 @@ function scenario_update()
             actions.wait(5.0)
             scenario.hint("Multiple miners can work together to build buildings more quickly.")
         end)
-    elseif common.current_objective == OBJECTIVE_BUILD_HALL and scenario.are_objectives_complete() then
+    elseif objectives.current_objective == OBJECTIVE_BUILD_HALL and scenario.are_objectives_complete() then
         actions.run(function()
-            common.announce_objectives_complete()
-            common.announce_new_objective("Establish a Base")
-            -- DEBUG: delete this objective
-            --[[
-            common.add_objective({
-                objective = {
-                    description = "Hire 4 Miners",
-                    entity_type = scenario.entity_type.MINER,
-                    counter_target = 4
-                },
-                complete_fn = function()
-                    return scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.MINER) >= 4
-                end
-            })
-            ]]
-            common.add_objective({
+            objectives.announce_objectives_complete()
+            objectives.announce_new_objective("Establish a Base")
+            objectives.add_objective({
                 objective = {
                     description = "Hire 8 Miners",
                     entity_type = scenario.entity_type.MINER,
@@ -74,7 +62,7 @@ function scenario_update()
                     return scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.MINER) >= 8
                 end
             })
-            common.add_objective({
+            objectives.add_objective({
                 objective = {
                     description = "Hire 4 Cowboys",
                     entity_type = scenario.entity_type.COWBOY,
@@ -84,7 +72,7 @@ function scenario_update()
                     return scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.COWBOY) >= 4
                 end
             })
-            common.add_objective({
+            objectives.add_objective({
                 objective = {
                     description = "Build a Bunker"
                 },
@@ -92,7 +80,7 @@ function scenario_update()
                     return scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.BUNKER) >= 1
                 end
             })
-            common.add_objective({
+            objectives.add_objective({
                 objective = {
                     description = "Garrison into the Bunker"
                 },
@@ -101,9 +89,9 @@ function scenario_update()
                 end
             })
         end)
-    elseif common.current_objective == OBJECTIVE_ESTABLISH_BASE and scenario.are_objectives_complete() then
+    elseif objectives.current_objective == OBJECTIVE_ESTABLISH_BASE and scenario.are_objectives_complete() then
         actions.run(function()
-            common.announce_objectives_complete()
+            objectives.announce_objectives_complete()
             local squad_entities = {}
             table.insert(squad_entities, scenario.entity_type.BANDIT)
             table.insert(squad_entities, scenario.entity_type.BANDIT)
@@ -117,7 +105,6 @@ function scenario_update()
             })
             scenario.log("Created squad", squad_id)
             scenario.play_sound(scenario.sound.ALERT_BELL)
-            scenario.chat(scenario.CHAT_COLOR_WHITE, "", "It's a bandit attack! Hold steady!")
             scenario.fog_reveal({
                 player_id = scenario.PLAYER_ID,
                 cell = scenario.constants.BANDIT_SPAWN_CELL,
@@ -126,16 +113,41 @@ function scenario_update()
                 duration = 3.0
             })
             scenario.camera_pan(scenario.constants.BANDIT_SPAWN_CELL, 0.75)
+            scenario.chat(scenario.CHAT_COLOR_WHITE, "", "It's a bandit attack! Hold steady!")
             actions.wait(2.0)
             scenario.camera_return()
         end)
+    elseif objectives.current_objective == OBJECTIVE_DEFEAT_BANDITS and scenario.are_objectives_complete() then
+        actions.run(function()
+            objectives.announce_objectives_complete()
+            scenario.set_match_over_victory()
+        end)
     end
 
+    -- Handle bandit attack defeated
     if bandit_attack_squad_id ~= nil and not scenario.does_squad_exist(ENEMY_BANDITS_PLAYER_ID, bandit_attack_squad_id) then
         actions.run(function()
             actions.wait(1.0)
-            scenario.set_match_over_victory()
+            scenario.fog_reveal({
+                player_id = scenario.PLAYER_ID,
+                cell = scenario.constants.BANDIT_BASE_CELL,
+                cell_size = 1,
+                sight = 13,
+                duration = 5.0
+            })
+            scenario.camera_pan(scenario.constants.BANDIT_BASE_CELL, 1.0)
+            actions.wait(1.0)
+            objectives.announce_new_objective(OBJECTIVE_DEFEAT_BANDITS)
+            objectives.add_objective({
+                objective = {
+                    description = OBJECTIVE_DEFEAT_BANDITS
+                },
+                complete_fn = function()
+                    return scenario.is_player_defeated(ENEMY_BANDITS_PLAYER_ID)
+                end
+            })
         end)
+        bandit_attack_squad_id = nil
     end
 
     -- This is placed on the bottom so that any actions can begin running on the frame they are kicked off
