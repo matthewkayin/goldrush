@@ -233,6 +233,7 @@ std::vector<EntityId> match_shell_find_idle_miners(const MatchShellState* state)
 bool match_shell_does_player_meet_hotkey_requirements(const MatchState& state, InputAction hotkey);
 bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyButtonInfo& info);
 uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type);
+ivec2 match_shell_spawn_enemy_squad_find_spawn_cell(const MatchShellState* state, EntityType entity_type, ivec2 spawn_cell, ivec2 target_cell);
 
 // Script
 bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, const char* script_path);

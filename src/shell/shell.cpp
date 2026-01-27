@@ -2235,6 +2235,61 @@ uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8
     return count;
 }
 
+ivec2 match_shell_spawn_enemy_squad_find_spawn_cell(const MatchShellState* state, EntityType entity_type, ivec2 spawn_cell, ivec2 target_cell) {
+    const EntityData& entity_data = entity_get_data(entity_type);
+
+    std::vector<ivec2> frontier;
+    std::vector<bool> explored = std::vector<bool>(state->match_state.map.width * state->match_state.map.height, false);
+
+    frontier.push_back(spawn_cell);
+
+    while (!frontier.empty()) {
+        uint32_t nearest_index = 0;
+        for (uint32_t index = 1; index < frontier.size(); index++) {
+            if (ivec2::manhattan_distance(frontier[index], spawn_cell) < 
+                    ivec2::manhattan_distance(frontier[nearest_index], spawn_cell)) {
+                nearest_index = index;
+            }
+        }
+        ivec2 next = frontier[nearest_index];
+        frontier[nearest_index] = frontier.back();
+        frontier.pop_back();
+
+        if (!map_is_cell_rect_occupied(state->match_state.map, entity_data.cell_layer, next, entity_data.cell_size)) {
+            return next;
+        }
+
+        explored[next.x + (next.y * state->match_state.map.width)] = true;
+
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            ivec2 child = next + DIRECTION_IVEC2[direction];
+            if (!map_is_cell_rect_in_bounds(state->match_state.map, child, entity_data.cell_size)) {
+                continue;
+            }
+            if (explored[child.x + (child.y * state->match_state.map.width)]) {
+                continue;
+            }
+            if (ivec2::manhattan_distance(child, spawn_cell) > 16 || 
+                    ivec2::manhattan_distance(child, target_cell) < 16) {
+                continue;
+            }
+
+            bool is_in_frontier = false;
+            for (ivec2 cell : frontier) {
+                if (cell == child) {
+                    is_in_frontier = true;
+                    break;
+                }
+            }
+            if (!is_in_frontier) {
+                frontier.push_back(child);
+            }
+        }
+    }
+
+    return ivec2(-1, -1);
+}
+
 // STATE QUERIES
 
 bool match_shell_is_mouse_in_ui() {

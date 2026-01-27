@@ -546,7 +546,7 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
                 ? scenario->player_allowed_entities
                 : scenario->bot_config[index - 1].is_entity_allowed;
             memset(allowed_entities, 0, ENTITY_TYPE_COUNT * sizeof(bool));
-            Json* allowed_entities_json = json_array();
+            Json* allowed_entities_json = json_object_get(player_json, "allowed_entities");
             for (size_t allowed_entities_index = 0; allowed_entities_index < allowed_entities_json->array.length; allowed_entities_index++) {
                 const char* entity_str = json_array_get_string(allowed_entities_json, allowed_entities_index);
                 EntityType entity_type = entity_type_from_str(entity_str);

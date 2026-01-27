@@ -10,6 +10,8 @@ enum ScriptChatColor {
     SCRIPT_CHAT_COLOR_BLUE
 };
 
+static const int SQUAD_ID_NULL = -1;
+
 struct ScriptConstant {
     const char* name;
     int value;
@@ -31,6 +33,11 @@ static int script_entity_is_visible_to_player(lua_State* lua_state);
 static int script_highlight_entity(lua_State* lua_state);
 static int script_get_player_entity_count(lua_State* lua_state);
 static int script_get_player_full_bunker_count(lua_State* lua_state);
+static int script_fog_reveal(lua_State* lua_state);
+static int script_camera_pan(lua_State* lua_state);
+static int script_camera_return(lua_State* lua_state);
+static int script_camera_free(lua_State* lua_state);
+static int script_spawn_enemy_squad(lua_State* lua_state);
 
 static const luaL_reg GOLD_FUNCS[] = {
     { "log", script_log },
@@ -48,6 +55,11 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "highlight_entity", script_highlight_entity },
     { "get_player_entity_count", script_get_player_entity_count },
     { "get_player_full_bunker_count", script_get_player_full_bunker_count },
+    { "fog_reveal", script_fog_reveal },
+    { "camera_pan", script_camera_pan },
+    { "camera_return", script_camera_return },
+    { "camera_free", script_camera_free },
+    { "spawn_enemy_squad", script_spawn_enemy_squad },
     { NULL, NULL }
 };
 
@@ -55,6 +67,7 @@ static const ScriptConstant GOLD_CONSTANTS[] = {
     { "CHAT_COLOR_WHITE", SCRIPT_CHAT_COLOR_WHITE },
     { "CHAT_COLOR_GOLD", SCRIPT_CHAT_COLOR_GOLD },
     { "CHAT_COLOR_BLUE", SCRIPT_CHAT_COLOR_GOLD },
+    { "SQUAD_ID_NULL", SQUAD_ID_NULL },
     { NULL, 0 }
 };
 
@@ -103,6 +116,11 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
 
         const_index++;
     }
+
+    // Player ID constant
+    // It's gonna be 0 anyways, but we may as well
+    lua_pushinteger(state->scenario_lua_state, network_get_player_id());
+    lua_setfield(state->scenario_lua_state, -2, "PLAYER_ID");
 
     // Entity constants
     lua_newtable(state->scenario_lua_state);
@@ -366,16 +384,19 @@ uint32_t script_validate_entity_id(lua_State* lua_state, const MatchShellState* 
     return entity_index;
 }
 
-ivec2 script_validate_ivec2(lua_State* lua_state, int stack_index) {
+ivec2 script_validate_ivec2(lua_State* lua_state, int stack_index, const char* name) {
+    char field_name[32];
     ivec2 value;
 
     lua_getfield(lua_state, stack_index, "x");
-    script_validate_type(lua_state, -1, "ivec2.x", LUA_TNUMBER);
+    sprintf(field_name, "%s.x", name);
+    script_validate_type(lua_state, -1, field_name, LUA_TNUMBER);
     value.x = (int)lua_tonumber(lua_state, -1);
     lua_pop(lua_state, 1);
 
     lua_getfield(lua_state, stack_index, "y");
-    script_validate_type(lua_state, -1, "ivec2.y", LUA_TNUMBER);
+    sprintf(field_name, "%s.y", name);
+    script_validate_type(lua_state, -1, field_name, LUA_TNUMBER);
     value.y = (int)lua_tonumber(lua_state, -1);
     lua_pop(lua_state, 1);
 
@@ -704,6 +725,149 @@ static int script_get_player_full_bunker_count(lua_State* lua_state) {
     }
 
     lua_pushnumber(lua_state, count);
+
+    return 1;
+}
+
+static int script_fog_reveal(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TTABLE };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    // Team
+    lua_getfield(lua_state, 1, "player_id");
+    script_validate_type(lua_state, -1, "player_id", LUA_TNUMBER);
+    uint8_t player_id = (uint8_t)lua_tonumber(lua_state, -1);
+    lua_pop(lua_state, 1);
+
+    // Cell
+    lua_getfield(lua_state, 1, "cell");
+    ivec2 cell = script_validate_ivec2(lua_state, -1, "cell");
+    lua_pop(lua_state, 1);
+
+    // Cell size
+    lua_getfield(lua_state, 1, "cell_size");
+    script_validate_type(lua_state, -1, "cell_size", LUA_TNUMBER);
+    int cell_size = (int)lua_tonumber(lua_state, -1);
+    lua_pop(lua_state, 1);
+
+    // Sight
+    lua_getfield(lua_state, 1, "sight");
+    script_validate_type(lua_state, -1, "sight", LUA_TNUMBER);
+    int sight = (int)lua_tonumber(lua_state, -1);
+    lua_pop(lua_state, 1);
+
+    // Duration
+    lua_getfield(lua_state, 1, "duration");
+    script_validate_type(lua_state, -1, "duration", LUA_TNUMBER);
+    double duration = lua_tonumber(lua_state, -1);
+    lua_pop(lua_state, 1);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    uint8_t team = state->match_state.players[player_id].team;
+    match_fog_update(state->match_state, team, cell, cell_size, sight, false, CELL_LAYER_SKY, true);
+    state->match_state.fog_reveals.push_back((FogReveal) {
+        .team = team,
+        .cell = cell,
+        .cell_size = cell_size,
+        .sight = sight,
+        .timer = (uint32_t)(60.0 * duration)
+    });
+
+    return 0;
+}
+
+static int script_camera_pan(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TTABLE, LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 2);
+
+    ivec2 cell = script_validate_ivec2(lua_state, 1, "arg 1");
+    double duration = lua_tonumber(lua_state, 2);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    match_shell_begin_camera_pan(state, cell, (uint32_t)(60.0 * duration));
+
+    return 0;
+}
+
+static int script_camera_return(lua_State* lua_state) {
+    script_validate_arguments(lua_state, NULL, 0);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    match_shell_begin_camera_return(state);
+
+    return 0;
+}
+
+static int script_camera_free(lua_State* lua_state) {
+    script_validate_arguments(lua_state, NULL, 0);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    match_shell_end_camera_pan(state);
+
+    return 0;
+}
+
+static int script_spawn_enemy_squad(lua_State* lua_state) {
+    int arg_types[] = { LUA_TTABLE };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    // Player
+    lua_getfield(lua_state, 1, "player_id");
+    script_validate_type(lua_state, -1, "player_id", LUA_TNUMBER);
+    uint8_t player_id = (uint8_t)lua_tonumber(lua_state, -1);
+    lua_pop(lua_state, 1);
+
+    // Target cell
+    lua_getfield(lua_state, 1, "target_cell");
+    ivec2 target_cell = script_validate_ivec2(lua_state, -1, "target_cell");
+    lua_pop(lua_state, 1);
+
+    // Spawn cell
+    lua_getfield(lua_state, 1, "spawn_cell");
+    ivec2 spawn_cell = script_validate_ivec2(lua_state, -1, "spawn_cell");
+    lua_pop(lua_state, 1);
+
+    // Entities
+    lua_getfield(lua_state, 1, "entities");
+    script_validate_type(lua_state, -1, "entities", LUA_TTABLE);
+
+    std::vector<EntityType> entity_types;
+    lua_pushnil(lua_state);
+    while (lua_next(lua_state, -2)) {
+        script_validate_type(lua_state, -1, "entity_type", LUA_TNUMBER);
+        int value = lua_tonumber(lua_state, -1);
+        script_validate_entity_type(lua_state, value);
+        entity_types.push_back((EntityType)value);
+
+        lua_pop(lua_state, 1);
+    }
+
+    lua_pop(lua_state, 1); 
+
+    if (entity_types.empty()) {
+        script_error(lua_state, "No entities provided for spawn_enemy_squad()");
+    }
+
+    // Create the squad
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    std::vector<EntityId> squad_entity_list;
+    for (EntityType entity_type : entity_types) {
+        ivec2 entity_cell = match_shell_spawn_enemy_squad_find_spawn_cell(state, entity_type, spawn_cell, target_cell);
+        if (entity_cell.x == -1) {
+            log_warn("Couldn't find a place to spawn unit with type %u spawn cell <%i, %i>", entity_type, spawn_cell.x, spawn_cell.y);
+        }
+
+        EntityId entity_id = entity_create(state->match_state, entity_type, entity_cell, player_id);
+        squad_entity_list.push_back(entity_id);
+    }
+
+    int squad_id = SQUAD_ID_NULL;
+    if (!squad_entity_list.empty()) {
+        squad_id = bot_squad_create(state->bots[player_id], BOT_SQUAD_TYPE_ATTACK, target_cell, squad_entity_list);
+    }
+
+    lua_pushnumber(lua_state, squad_id);
 
     return 1;
 }

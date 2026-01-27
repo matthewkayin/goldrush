@@ -10,7 +10,15 @@
 			"name": "Player",
 			"starting_gold": 600.000000,
 			"allowed_upgrades": [],
-			"allowed_entities": []
+			"allowed_entities": [
+				"Miner",
+				"Cowboy",
+				"Bandit",
+				"Town Hall",
+				"House",
+				"Saloon",
+				"Bunker"
+			]
 		},
 		{
 			"name": "Bandits",
@@ -605,6 +613,14 @@
 			"cell": {
 				"x": 37.000000,
 				"y": 21.000000
+			}
+		},
+		{
+			"name": "BANDIT_TARGET_CELL",
+			"type": "Cell",
+			"cell": {
+				"x": 13.000000,
+				"y": 5.000000
 			}
 		}
 	]
