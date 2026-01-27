@@ -40,7 +40,7 @@ function scenario_update()
                     description = "Build a Town Hall",
                 },
                 complete_fn = function()
-                    return scenario.get_player_entity_count(0, entity_type.HALL) >= 1
+                    return scenario.get_player_entity_count(0, scenario.entity_type.HALL) >= 1
                 end
             })
             actions.wait(5.0)
@@ -53,21 +53,21 @@ function scenario_update()
             common.add_objective({
                 objective = {
                     description = "Hire 8 Miners",
-                    entity_type = scenario.ENTITY_MINER,
+                    entity_type = scenario.entity_type.MINER,
                     counter_target = 8
                 },
                 complete_fn = function()
-                    return scenario.get_player_entity_count(0, scenario.ENTITY_MINER) >= 8
+                    return scenario.get_player_entity_count(0, scenario.entity_type.MINER) >= 8
                 end
             })
             common.add_objective({
                 objective = {
                     description = "Hire 4 Cowboys",
-                    entity_type = scenario.ENTITY_COWBOY,
+                    entity_type = scenario.entity_type.COWBOY,
                     counter_target = 4
                 },
                 complete_fn = function()
-                    return scenario.get_player_entity_count(0, scenario.ENTITY_COWBOY) >= 4
+                    return scenario.get_player_entity_count(0, scenario.entity_type.COWBOY) >= 4
                 end
             })
             common.add_objective({
@@ -75,7 +75,7 @@ function scenario_update()
                     description = "Build a Bunker"
                 },
                 complete_fn = function()
-                    return scenario.get_player_entity_count(0, scenario.ENTITY_BUNKER) >= 1
+                    return scenario.get_player_entity_count(0, scenario.entity_type.BUNKER) >= 1
                 end
             })
             common.add_objective({
@@ -83,7 +83,7 @@ function scenario_update()
                     description = "Garrison into the Bunker"
                 },
                 complete_fn = function()
-                    return scenario.get_player_full_bunker_count() >= 1
+                    return scenario.get_player_full_bunker_count(0) >= 1
                 end
             })
         end)

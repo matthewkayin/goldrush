@@ -76,7 +76,7 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
     state->scenario_lua_state = luaL_newstate();
     luaL_openlibs(state->scenario_lua_state);
 
-    // Register gold library
+    // Register scenario library
     luaL_register(state->scenario_lua_state, "scenario", GOLD_FUNCS);
 
     // Set module path
@@ -92,33 +92,7 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
     lua_pushlightuserdata(state->scenario_lua_state, state);
     lua_setfield(state->scenario_lua_state, LUA_REGISTRYINDEX, "__match_shell_state");
 
-    // Entity constants
-    lua_newtable(state->scenario_lua_state);
-    for (int entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
-        lua_pushinteger(state->scenario_lua_state, entity_type);
-        lua_setfield(state->scenario_lua_state, -2, match_shell_script_get_entity_type_str((EntityType)entity_type));
-    }
-    lua_setfield(state->scenario_lua_state, -2, "entity_type");
-
-    // Sound constants
-    lua_newtable(state->scenario_lua_state);
-    for (int sound_name = 0; sound_name < SOUND_COUNT; sound_name++) {
-        char const_name[64];
-        char* const_name_ptr = const_name;
-        const_name_ptr += sprintf(const_name_ptr, "SOUND_");
-
-        const char* sound_name_str = sound_get_name((SoundName)sound_name);
-        size_t index = 0;
-        while (sound_name_str[index] != '\0') {
-            const_name_ptr[index] = toupper(sound_name_str[index]);
-            index++;
-        }
-        const_name_ptr[index] = '\0';
-
-        lua_pushinteger(state->scenario_lua_state, sound_name);
-        lua_setfield(state->scenario_lua_state, -2, const_name);
-    }
-    lua_setfield(state->scenario_lua_state, -2, "sound");
+    // Scenario module constants
 
     // Script constants
     lua_getglobal(state->scenario_lua_state, "scenario");
@@ -130,7 +104,33 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
         const_index++;
     }
 
-    // Scenario constants
+    // Entity constants
+    lua_newtable(state->scenario_lua_state);
+    for (int entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+        lua_pushinteger(state->scenario_lua_state, entity_type);
+        lua_setfield(state->scenario_lua_state, -2, match_shell_script_get_entity_type_str((EntityType)entity_type));
+    }
+    lua_setfield(state->scenario_lua_state, -2, "entity_type");
+
+    // Sound constants
+    lua_newtable(state->scenario_lua_state);
+    for (int sound_name = 0; sound_name < SOUND_COUNT; sound_name++) {
+        const char* sound_name_str = sound_get_name((SoundName)sound_name);
+        char const_name[64];
+
+        size_t index = 0;
+        while (sound_name_str[index] != '\0') {
+            const_name[index] = toupper(sound_name_str[index]);
+            index++;
+        }
+        const_name[index] = '\0';
+
+        lua_pushinteger(state->scenario_lua_state, sound_name);
+        lua_setfield(state->scenario_lua_state, -2, const_name);
+    }
+    lua_setfield(state->scenario_lua_state, -2, "sound");
+
+    // Scenario file constants
     lua_newtable(state->scenario_lua_state);
     for (const ScenarioConstant& constant : scenario->constants) {
         switch (constant.type) {
@@ -147,7 +147,7 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
     }
     lua_setfield(state->scenario_lua_state, -2, "constants");
 
-    // End constants
+    // End scenario module constants
     lua_pop(state->scenario_lua_state, 1);
 
     int dofile_error = luaL_dofile(state->scenario_lua_state, script_path);
