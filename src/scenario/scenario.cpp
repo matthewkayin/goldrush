@@ -179,6 +179,8 @@ const char* scenario_constant_type_str(ScenarioConstantType type) {
     switch (type) {
         case SCENARIO_CONSTANT_TYPE_ENTITY:
             return "Entity";
+        case SCENARIO_CONSTANT_TYPE_CELL:
+            return "Cell";
         case SCENARIO_CONSTANT_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
@@ -197,9 +199,14 @@ ScenarioConstantType scenario_constant_type_from_str(const char* str) {
 }
 
 void scenario_constant_set_type(ScenarioConstant& constant, ScenarioConstantType type) {
+    constant.type = type;
     switch (type) {
         case SCENARIO_CONSTANT_TYPE_ENTITY: {
-            constant.entity.index = INDEX_INVALID;
+            constant.entity_index = INDEX_INVALID;
+            break;
+        }
+        case SCENARIO_CONSTANT_TYPE_CELL: {
+            constant.cell = ivec2(0, 0);
             break;
         }
         case SCENARIO_CONSTANT_TYPE_COUNT: {
@@ -364,7 +371,11 @@ bool scenario_save_file(const Scenario* scenario, const char* json_full_path, co
             json_object_set_string(constant_json, "type", scenario_constant_type_str(constant.type));
             switch (constant.type) {
                 case SCENARIO_CONSTANT_TYPE_ENTITY: {
-                    json_object_set_number(constant_json, "entity_index", constant.entity.index);
+                    json_object_set_number(constant_json, "entity_index", constant.entity_index);
+                    break;
+                }
+                case SCENARIO_CONSTANT_TYPE_CELL: {
+                    json_object_set(constant_json, "cell", json_from_ivec2(constant.cell));
                     break;
                 }
                 case SCENARIO_CONSTANT_TYPE_COUNT: {
@@ -620,7 +631,11 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
 
             switch (constant.type) {
                 case SCENARIO_CONSTANT_TYPE_ENTITY: {
-                    constant.entity.index = (uint32_t)json_object_get_number(constant_json, "entity_index");
+                    constant.entity_index = (uint32_t)json_object_get_number(constant_json, "entity_index");
+                    break;
+                }
+                case SCENARIO_CONSTANT_TYPE_CELL: {
+                    constant.cell = json_to_ivec2(json_object_get(constant_json, "cell"));
                     break;
                 }
                 case SCENARIO_CONSTANT_TYPE_COUNT: {

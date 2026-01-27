@@ -135,7 +135,15 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
     for (const ScenarioConstant& constant : scenario->constants) {
         switch (constant.type) {
             case SCENARIO_CONSTANT_TYPE_ENTITY: {
-                lua_pushinteger(state->scenario_lua_state, constant.entity.index);
+                lua_pushinteger(state->scenario_lua_state, constant.entity_index);
+                break;
+            }
+            case SCENARIO_CONSTANT_TYPE_CELL: {
+                lua_newtable(state->scenario_lua_state);
+                lua_pushinteger(state->scenario_lua_state, constant.cell.x);
+                lua_setfield(state->scenario_lua_state, -2, "x");
+                lua_pushinteger(state->scenario_lua_state, constant.cell.y);
+                lua_setfield(state->scenario_lua_state, -2, "y");
                 break;
             }
             case SCENARIO_CONSTANT_TYPE_COUNT: {
@@ -267,7 +275,6 @@ const char* match_shell_script_get_entity_type_str(EntityType type) {
     }
 }
 
-
 MatchShellState* script_get_match_shell_state(lua_State* lua_state) {
     lua_getfield(lua_state, LUA_REGISTRYINDEX, "__match_shell_state");
     MatchShellState* state = (MatchShellState*)lua_touserdata(lua_state, -1);
@@ -357,6 +364,22 @@ uint32_t script_validate_entity_id(lua_State* lua_state, const MatchShellState* 
     }
 
     return entity_index;
+}
+
+ivec2 script_validate_ivec2(lua_State* lua_state, int stack_index) {
+    ivec2 value;
+
+    lua_getfield(lua_state, stack_index, "x");
+    script_validate_type(lua_state, -1, "ivec2.x", LUA_TNUMBER);
+    value.x = (int)lua_tonumber(lua_state, -1);
+    lua_pop(lua_state, 1);
+
+    lua_getfield(lua_state, stack_index, "y");
+    script_validate_type(lua_state, -1, "ivec2.y", LUA_TNUMBER);
+    value.y = (int)lua_tonumber(lua_state, -1);
+    lua_pop(lua_state, 1);
+
+    return value;
 }
 
 int script_sprintf(char* str_ptr, lua_State* lua_state, int stack_index) {

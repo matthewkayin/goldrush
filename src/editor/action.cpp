@@ -142,7 +142,7 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
                 ScenarioConstant new_constant;
                 sprintf(new_constant.name, "Constant %u", (uint32_t)scenario->constants.size() + 1U);
                 new_constant.type = SCENARIO_CONSTANT_TYPE_ENTITY;
-                new_constant.entity.index = INDEX_INVALID;
+                new_constant.entity_index = INDEX_INVALID;
 
                 scenario->constants.push_back(new_constant);
             } else if (mode == EDITOR_ACTION_MODE_UNDO) {

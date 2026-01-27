@@ -10,15 +10,7 @@
 			"name": "Player",
 			"starting_gold": 600.000000,
 			"allowed_upgrades": [],
-			"allowed_entities": [
-				"Miner",
-				"Cowboy",
-				"Bandit",
-				"Town Hall",
-				"House",
-				"Saloon",
-				"Bunker"
-			]
+			"allowed_entities": []
 		},
 		{
 			"name": "Bandits",
@@ -606,6 +598,14 @@
 			"name": "FIRST_GOLDMINE",
 			"type": "Entity",
 			"entity_index": 0.000000
+		},
+		{
+			"name": "BANDIT_SPAWN_CELL",
+			"type": "Cell",
+			"cell": {
+				"x": 37.000000,
+				"y": 21.000000
+			}
 		}
 	]
 }

@@ -210,8 +210,6 @@ uint32_t editor_get_entity_squad(uint32_t entity_index);
 void editor_remove_entity_from_squad(uint32_t squad_index, uint32_t entity_index);
 std::vector<std::string> editor_get_player_name_dropdown_items();
 ivec2 editor_get_player_spawn_camera_offset(ivec2 cell);
-void editor_tool_fog_get_hovered_cell(ivec2* cell, int* cell_size);
-std::vector<ivec2> editor_tool_fog_reveal_get_preview_cells();
 std::string editor_get_scenario_folder_path();
 static void SDLCALL editor_save_callback(void* user_data, const char* const* filelist, int filter);
 static void SDLCALL editor_open_callback(void* user_data, const char* const* filelist, int filter);
@@ -462,8 +460,6 @@ void editor_update() {
 
                     break;
                 }
-                case EDITOR_TOOL_PLAYER_SPAWN:
-                    break;
                 case EDITOR_TOOL_CONSTANTS: {
                     // Constant selector row
                     ui_begin_row(state.ui, ivec2(0, 0), 2);
@@ -536,11 +532,17 @@ void editor_update() {
                         switch (constant.type) {
                             case SCENARIO_CONSTANT_TYPE_ENTITY: {
                                 char value_str[32];
-                                if (constant.entity.index >= state.scenario->entity_count) {
+                                if (constant.entity_index >= state.scenario->entity_count) {
                                     sprintf(value_str, "Entity: INVALID");
                                 } else {
-                                    sprintf(value_str, "Entity: %u", constant.entity.index);
+                                    sprintf(value_str, "Entity: %u", constant.entity_index);
                                 }
+                                ui_text(state.ui, FONT_HACK_GOLD, value_str);
+                                break;
+                            }
+                            case SCENARIO_CONSTANT_TYPE_CELL: {
+                                char value_str[32];
+                                sprintf(value_str, "Cell: <%i, %i>", constant.cell.x, constant.cell.y);
                                 ui_text(state.ui, FONT_HACK_GOLD, value_str);
                                 break;
                             }
@@ -553,6 +555,8 @@ void editor_update() {
 
                     break;
                 }
+                case EDITOR_TOOL_PLAYER_SPAWN:
+                    break;
             }
         ui_end_container(state.ui);
     }
@@ -798,14 +802,18 @@ void editor_update() {
     if (state.tool == EDITOR_TOOL_CONSTANTS &&
             !state.scenario->constants.empty() &&
             editor_can_single_use_tool_be_used() &&
-            editor_is_hovered_cell_valid() &&
+            editor_is_hovered_cell_valid() && 
             input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
         const ScenarioConstant& constant = state.scenario->constants[state.tool_value];
         ScenarioConstant edited_constant = constant;
 
         switch (constant.type) {
             case SCENARIO_CONSTANT_TYPE_ENTITY: {
-                edited_constant.entity.index = editor_get_hovered_entity();
+                edited_constant.entity_index = editor_get_hovered_entity();
+                break;
+            }
+            case SCENARIO_CONSTANT_TYPE_CELL: {
+                edited_constant.cell = editor_get_hovered_cell();
                 break;
             }
             case SCENARIO_CONSTANT_TYPE_COUNT: {
@@ -1143,6 +1151,7 @@ void editor_set_tool(EditorTool tool) {
         }
         case EDITOR_TOOL_CONSTANTS: {
             state.tool_value = 0;
+            state.tool_size = 1;
             break;
         }
         case EDITOR_TOOL_PLAYER_SPAWN:
@@ -1218,6 +1227,9 @@ bool editor_is_hovered_cell_valid() {
         switch (constant.type) {
             case SCENARIO_CONSTANT_TYPE_ENTITY: {
                 return entity_index != INDEX_INVALID;
+            }
+            case SCENARIO_CONSTANT_TYPE_CELL: {
+                return true;
             }
             case SCENARIO_CONSTANT_TYPE_COUNT: {
                 GOLD_ASSERT(false);
@@ -1712,8 +1724,8 @@ std::vector<uint32_t> editor_get_selected_entities() {
 
     if (state.tool == EDITOR_TOOL_CONSTANTS && !state.scenario->constants.empty()) {
         const ScenarioConstant& constant = state.scenario->constants[state.tool_value];
-        if (constant.type == SCENARIO_CONSTANT_TYPE_ENTITY && constant.entity.index < state.scenario->entity_count) {
-            entities.push_back(constant.entity.index);
+        if (constant.type == SCENARIO_CONSTANT_TYPE_ENTITY && constant.entity_index < state.scenario->entity_count) {
+            entities.push_back(constant.entity_index);
         }
     }
 
@@ -1739,103 +1751,6 @@ ivec2 editor_get_player_spawn_camera_offset(ivec2 cell) {
     camera_offset.y = std::clamp(camera_offset.y, 0, (state.scenario->map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
 
     return camera_offset;
-}
-
-void editor_tool_fog_get_hovered_cell(ivec2* cell, int* cell_size) {
-    uint32_t entity_index = editor_get_hovered_entity();
-    if (entity_index != INDEX_INVALID) {
-        const ScenarioEntity& entity = state.scenario->entities[entity_index];
-        *cell = entity.cell;
-        *cell_size = entity_get_data(entity.type).cell_size;
-    } else {
-        *cell = editor_get_hovered_cell();
-        *cell_size = 1;
-    }
-}
-
-std::vector<ivec2> editor_tool_fog_reveal_get_preview_cells() {
-    std::vector<ivec2> cells;
-    ivec2 cell;
-    int cell_size;
-    editor_tool_fog_get_hovered_cell(&cell, &cell_size);
-    const int sight = state.tool_size;
-    ivec2 search_corners[4] = {
-        cell - ivec2(sight, sight),
-        cell + ivec2((cell_size - 1) + sight, -sight),
-        cell + ivec2((cell_size - 1) + sight, (cell_size - 1) + sight),
-        cell + ivec2(-sight, (cell_size - 1) + sight)
-    };
-    for (int search_index = 0; search_index < 4; search_index++) {
-        ivec2 search_goal = search_corners[search_index + 1 == 4 ? 0 : search_index + 1];
-        ivec2 search_step = DIRECTION_IVEC2[(search_index * 2) + 2 == DIRECTION_COUNT 
-                                            ? DIRECTION_NORTH 
-                                            : (search_index * 2) + 2];
-        for (ivec2 line_end = search_corners[search_index]; line_end != search_goal; line_end += search_step) {
-            ivec2 line_start;
-            switch (cell_size) {
-                case 1:
-                    line_start = cell;
-                    break;
-                case 3:
-                    line_start = cell + ivec2(1, 1);
-                    break;
-                case 2:
-                case 4: {
-                    ivec2 center_cell = cell_size == 2 ? cell : cell + ivec2(1, 1);
-                    if (line_end.x < center_cell.x) {
-                        line_start.x = center_cell.x;
-                    } else if (line_end.x > center_cell.x + 1) {
-                        line_start.x = center_cell.x + 1;
-                    } else {
-                        line_start.x = line_end.x;
-                    }
-                    if (line_end.y < center_cell.y) {
-                        line_start.y = center_cell.y;
-                    } else if (line_end.y > center_cell.y + 1) {
-                        line_start.y = center_cell.y + 1;
-                    } else {
-                        line_start.y = line_end.y;
-                    }
-                    break;
-                }
-                default:
-                    log_warn("cell size of %i not handled in map_fog_update", cell_size);
-                    line_start = cell;
-                    break;
-            }
-
-            // we want slope to be between 0 and 1
-            // if "run" is greater than "rise" then m is naturally between 0 and 1, we will step with x in increments of 1 and handle y increments that are less than 1
-            // if "rise" is greater than "run" (use_x_step is false) then we will swap x and y so that we can step with y in increments of 1 and handle x increments that are less than 1
-            bool use_x_step = std::abs(line_end.x - line_start.x) >= std::abs(line_end.y - line_start.y);
-            int slope = std::abs(2 * (use_x_step ? (line_end.y - line_start.y) : (line_end.x - line_start.x)));
-            int slope_error = slope - std::abs((use_x_step ? (line_end.x - line_start.x) : (line_end.y - line_start.y)));
-            ivec2 line_step;
-            ivec2 line_opposite_step;
-            if (use_x_step) {
-                line_step = ivec2(1, 0) * (line_end.x >= line_start.x ? 1 : -1);
-                line_opposite_step = ivec2(0, 1) * (line_end.y >= line_start.y ? 1 : -1);
-            } else {
-                line_step = ivec2(0, 1) * (line_end.y >= line_start.y ? 1 : -1);
-                line_opposite_step = ivec2(1, 0) * (line_end.x >= line_start.x ? 1 : -1);
-            }
-            for (ivec2 line_cell = line_start; line_cell != line_end; line_cell += line_step) {
-                if (!map_is_cell_in_bounds(state.scenario->map, line_cell) || ivec2::euclidean_distance_squared(line_start, line_cell) > sight * sight) {
-                    break;
-                }
-
-                cells.push_back(line_cell);
-
-                slope_error += slope;
-                if (slope_error >= 0) {
-                    line_cell += line_opposite_step;
-                    slope_error -= 2 * std::abs((use_x_step ? (line_end.x - line_start.x) : (line_end.y - line_start.y)));
-                }
-            } // End for each line cell in line
-        } // End for each line end from corner to corner
-    } // End for each search index
-
-    return cells;
 }
 
 std::string editor_get_scenario_folder_path() {
@@ -2181,20 +2096,33 @@ void editor_render() {
         render_draw_rect(rect, state.scenario == NULL || editor_is_hovered_cell_valid() ? RENDER_COLOR_WHITE : RENDER_COLOR_RED);
     }
 
-    // Tool fog reveal preview
-    if (CANVAS_RECT.has_point(input_get_mouse_position()) &&
-            !state.is_minimap_dragging &&
-            state.camera_drag_mouse_position.x == -1) {
-        std::vector<ivec2> cells = editor_tool_fog_reveal_get_preview_cells();
-        for (ivec2 cell : cells) {
+    // Constants - chosen value preview
+    if (state.tool == EDITOR_TOOL_CONSTANTS && !state.scenario->constants.empty()) {
+        const ScenarioConstant& constant = state.scenario->constants[state.tool_value];
+        ivec2 cell = ivec2(-1, -1);
+        int cell_size = 1;
+        switch (constant.type) {
+            case SCENARIO_CONSTANT_TYPE_ENTITY: {
+                // Nothing to do for this constant type because
+                // it will already be rendered in the entity selection
+                break;
+            }
+            case SCENARIO_CONSTANT_TYPE_CELL: {
+                cell = constant.cell;
+                break;
+            }
+            case SCENARIO_CONSTANT_TYPE_COUNT: {
+                GOLD_ASSERT(false);
+                break;
+            }
+        }
+
+        if (cell.x != -1) {
             Rect rect = (Rect) {
                 .x = ((cell.x * TILE_SIZE) - state.camera_offset.x) + CANVAS_RECT.x,
                 .y = ((cell.y * TILE_SIZE) - state.camera_offset.y) + CANVAS_RECT.y,
-                .w = TILE_SIZE, .h = TILE_SIZE
+                .w = cell_size * TILE_SIZE, .h = cell_size * TILE_SIZE
             };
-            if (!CANVAS_RECT.intersects(rect)) {
-                continue;
-            }
             render_draw_rect(rect, RENDER_COLOR_WHITE);
         }
     }
@@ -2275,6 +2203,12 @@ void editor_render() {
     ivec2 camera_cell = ivec2(-1, -1);
     if (state.tool == EDITOR_TOOL_PLAYER_SPAWN) {
         camera_cell = state.scenario->player_spawn;
+    }
+    if (state.tool == EDITOR_TOOL_CONSTANTS && 
+            !state.scenario->constants.empty() && 
+            state.scenario->constants[state.tool_value].type == SCENARIO_CONSTANT_TYPE_CELL &&
+            input_is_action_pressed(INPUT_ACTION_SHIFT)) {
+        camera_cell = state.scenario->constants[state.tool_value].cell;
     }
     if (camera_cell.x != -1) {
         ivec2 camera_offset = editor_get_player_spawn_camera_offset(camera_cell);

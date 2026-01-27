@@ -38,18 +38,16 @@ struct ScenarioSquad {
 
 enum ScenarioConstantType {
     SCENARIO_CONSTANT_TYPE_ENTITY,
+    SCENARIO_CONSTANT_TYPE_CELL,
     SCENARIO_CONSTANT_TYPE_COUNT
-};
-
-struct ScenarioConstantEntity {
-    uint32_t index;
 };
 
 struct ScenarioConstant {
     char name[SCENARIO_CONSTANT_NAME_BUFFER_LENGTH];
     ScenarioConstantType type;
     union {
-        ScenarioConstantEntity entity;
+        uint32_t entity_index;
+        ivec2 cell;
     };
 };
 
