@@ -1986,6 +1986,11 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
         const Entity& entity = state.entities.get_by_id(entity_id);
         const EntityData& entity_data = entity_get_data(entity.type);
 
+        // If units are already close to target cell, don't move them
+        if (ivec2::manhattan_distance(entity.cell, squad.target_cell) < BOT_NEAR_DISTANCE / 2) {
+            continue;
+        }
+
         // If units cannot garrison, they are cavalry
         if (entity_data.garrison_size == ENTITY_CANNOT_GARRISON) {
             distant_cavalry.push_back(entity_id);
@@ -2231,7 +2236,15 @@ MatchInput bot_squad_bunker_micro(const MatchState& state, const Bot& bot, const
             bot_squad_carrier_has_capacity(state, squad, bunker, bunker_id)) {
         MatchInput garrison_input = bot_squad_garrison_into_carrier(state, squad, bunker, bunker_id, squad.entities);
         if (garrison_input.type != MATCH_INPUT_NONE) {
-            log_debug("BOT %u squad_update, bunker squad enter bunker.", bot.player_id);
+            std::vector<EntityId> infantry;
+            for (EntityId entity_id : squad.entities) {
+                if (entity_id == bunker_id) {
+                    continue;
+                }
+                infantry.push_back(entity_id);
+            }
+
+            log_debug("BOT %u squad %u squad_update, bunker squad enter bunker.", bot.player_id, squad.id);
             return garrison_input;
         }
     }
@@ -2317,8 +2330,8 @@ MatchInput bot_squad_garrison_into_carrier(const MatchState& state, const BotSqu
         
         // Don't garrison units which cannot garrison
         if (entity_garrison_size == ENTITY_CANNOT_GARRISON) {
-            log_warn("BOT %u squad_garrison_into_carrier, entity_id %u has garrison ENTITY_CANNOT_GARRISON. We should not be adding ungarrisonable entitites to the infantry list.",
-                entity.player_id, entity_id);
+            log_warn("BOT %u squad %u squad_garrison_into_carrier, entity_id %u has garrison ENTITY_CANNOT_GARRISON. We should not be adding ungarrisonable entitites to the infantry list.",
+                entity.player_id, squad.id, entity_id);
             continue;
         }
 
