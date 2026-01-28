@@ -363,7 +363,7 @@ void editor_update() {
                             .display = UI_SLIDER_DISPLAY_NO_VALUE,
                             .size = UI_SLIDER_SIZE_MINI,
                             .min = 0,
-                            .max = 10000,
+                            .max = 20000,
                             .step = 50
                         }); 
                         if (input_is_action_just_released(INPUT_ACTION_LEFT_CLICK) && state.tool_edit_entity_gold_held != entity.gold_held) {
@@ -571,7 +571,12 @@ void editor_update() {
             state.camera_drag_mouse_position.x == -1 &&
             !editor_is_in_menu()) {
         ivec2 cell = editor_get_hovered_cell();
-        status_text_ptr += sprintf(status_text_ptr, "Cell: <%i, %i> Value: %s", cell.x, cell.y, editor_get_noise_value_str(state.scenario->noise->map[cell.x + (cell.y * state.scenario->noise->width)]));
+        status_text_ptr += sprintf(status_text_ptr, "Cell: <%i, %i> Value: %s ", cell.x, cell.y, editor_get_noise_value_str(state.scenario->noise->map[cell.x + (cell.y * state.scenario->noise->width)]));
+
+        uint32_t entity_index = editor_get_hovered_entity();
+        if (entity_index != INDEX_INVALID) {
+            status_text_ptr += sprintf(status_text_ptr, "Entity: %u", entity_index);
+        }
     } else if (!CANVAS_RECT.has_point(input_get_mouse_position())) {
         status_text_ptr += sprintf(status_text_ptr, "%s", state.scenario_path.empty() ? "Untitled" : state.scenario_path.c_str());
         if (!state.scenario_is_saved) {

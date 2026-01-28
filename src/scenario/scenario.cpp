@@ -35,6 +35,10 @@ Scenario* scenario_base_init() {
     // Init bot configs
     for (uint32_t bot_index = 0; bot_index < MAX_PLAYERS - 1; bot_index++) {
         scenario->bot_config[bot_index] = bot_config_init_from_difficulty(DIFFICULTY_HARD);
+        scenario->bot_config[bot_index].allowed_upgrades = 0;
+        scenario->bot_config[bot_index].flags = 0;
+        scenario->bot_config[bot_index].target_base_count = 0;
+        memset(scenario->bot_config[bot_index].is_entity_allowed, 0, sizeof(scenario->bot_config[bot_index].is_entity_allowed));
     }
 
     return scenario;
@@ -583,7 +587,7 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
 
         // Squads
         // TODO: pretty sure this doesn't work 
-        Json* squads_json = json_array();
+        Json* squads_json = json_object_get(scenario_json, "squads");
         for (size_t squad_index = 0; squad_index < squads_json->array.length; squad_index++) {
             Json* squad_json = json_array_get(squads_json, squad_index);
 
@@ -601,7 +605,7 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
 
             Json* squad_entities_json = json_object_get(squad_json, "entities");
             squad.entity_count = 0;
-            for (size_t squad_entities_index = 0; squad_entities_index < squad_entities_json->array.length; squad_entities_json++) {
+            for (size_t squad_entities_index = 0; squad_entities_index < squad_entities_json->array.length; squad_entities_index++) {
                 uint32_t entity_index = (uint32_t)json_array_get_number(squad_entities_json, squad_entities_index);
                 if (entity_index >= scenario->entity_count) {
                     log_error("Entity index %u for squad %u (%s) is out of range.", entity_index, squad_index, squad.name);

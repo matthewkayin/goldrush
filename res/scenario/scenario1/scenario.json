@@ -80,7 +80,7 @@
 		{
 			"type": "Gold Mine",
 			"player_id": 4.000000,
-			"gold_held": 7500.000000,
+			"gold_held": 20000.000000,
 			"cell": {
 				"x": 9.000000,
 				"y": 4.000000
@@ -98,7 +98,7 @@
 		{
 			"type": "Gold Mine",
 			"player_id": 4.000000,
-			"gold_held": 7500.000000,
+			"gold_held": 20000.000000,
 			"cell": {
 				"x": 74.000000,
 				"y": 65.000000
@@ -600,7 +600,30 @@
 			}
 		}
 	],
-	"squads": [],
+	"squads": [
+		{
+			"name": "Squad 1",
+			"player_id": 1.000000,
+			"type": "Defend",
+			"entities": [
+				10.000000,
+				4.000000,
+				1.000000,
+				48.000000,
+				49.000000
+			]
+		},
+		{
+			"name": "Squad 2",
+			"player_id": 1.000000,
+			"type": "Defend",
+			"entities": [
+				45.000000,
+				46.000000,
+				47.000000
+			]
+		}
+	],
 	"constants": [
 		{
 			"name": "FIRST_GOLDMINE",
