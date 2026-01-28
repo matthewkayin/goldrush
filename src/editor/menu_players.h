@@ -17,6 +17,7 @@ struct EditorMenuPlayers {
     EditorMenuPlayersMode mode;
     uint32_t selected_player_id;
     std::string player_name_string;
+    int scroll;
 };
 
 EditorMenuPlayers editor_menu_players_open(const Scenario* scenario);

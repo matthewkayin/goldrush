@@ -3,6 +3,9 @@
 #ifdef GOLD_DEBUG
 
 #include "util/bitflag.h"
+#include <functional>
+#include <vector>
+#include <algorithm>
 
 static const Rect MENU_RECT = (Rect) {
     .x = (SCREEN_WIDTH / 2) - (300 / 2),
@@ -12,6 +15,7 @@ static const Rect MENU_RECT = (Rect) {
 };
 
 static const int ICON_ROW_SIZE = 8;
+static const int MAX_VISIBLE_SCROLL_ITEMS = 8;
 
 static const UiSliderParams STARTING_GOLD_SLIDER_PARAMS = (UiSliderParams) {
     .display = UI_SLIDER_DISPLAY_RAW_VALUE,
@@ -35,6 +39,7 @@ EditorMenuPlayers editor_menu_players_open(const Scenario* scenario) {
     menu.mode = EDITOR_MENU_PLAYERS_MODE_PLAYERS;
     menu.selected_player_id = 0;
     menu.player_name_string = std::string(scenario->players[menu.selected_player_id].name);
+    menu.scroll = 0;
 
     return menu;
 }
@@ -61,6 +66,7 @@ void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorMenuMode&
                 }
 
                 menu.player_name_string = std::string(scenario->players[menu.selected_player_id].name);
+                menu.scroll = 0;
             }
 
             // Name
@@ -68,45 +74,74 @@ void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorMenuMode&
                 ui_text_input(ui, "Name: ", ivec2(MENU_RECT.w - 32, 24), &menu.player_name_string, MAX_USERNAME_LENGTH);
             }
 
+            std::vector<std::function<void()>> scroll_items;
+
             // Starting gold
-            editor_menu_slider(ui, "Starting Gold:", &scenario->players[menu.selected_player_id].starting_gold, STARTING_GOLD_SLIDER_PARAMS, MENU_RECT);
+            scroll_items.push_back([&menu, &ui, scenario]() {
+                editor_menu_slider(ui, "Starting Gold:", &scenario->players[menu.selected_player_id].starting_gold, STARTING_GOLD_SLIDER_PARAMS, MENU_RECT);
+            });
 
             // Bot config options
             if (menu.selected_player_id != 0) {
                 BotConfig& bot_config = scenario->bot_config[menu.selected_player_id - 1];
 
-                std::vector<std::string> opener_items;
-                for (uint32_t opener = 0; opener < BOT_OPENER_COUNT; opener++) {
-                    opener_items.push_back(std::string(bot_config_opener_str((BotOpener)opener)));
-                }
-                editor_menu_dropdown(ui, "Opener:", (uint32_t*)&bot_config.opener, opener_items, MENU_RECT);
+                scroll_items.push_back([&ui, &bot_config]() {
+                    std::vector<std::string> opener_items;
+                    for (uint32_t opener = 0; opener < BOT_OPENER_COUNT; opener++) {
+                        opener_items.push_back(std::string(bot_config_opener_str((BotOpener)opener)));
+                    }
+                    editor_menu_dropdown(ui, "Opener:", (uint32_t*)&bot_config.opener, opener_items, MENU_RECT);
+                });
 
-                std::vector<std::string> unit_comp_items;
-                for (uint32_t unit_comp = 0; unit_comp < BOT_UNIT_COMP_COUNT; unit_comp++) {
-                    unit_comp_items.push_back(std::string(bot_config_unit_comp_str((BotUnitComp)unit_comp)));
-                }
-                editor_menu_dropdown(ui, "Unit Comp:", (uint32_t*)&bot_config.preferred_unit_comp, unit_comp_items, MENU_RECT);
+                scroll_items.push_back([&ui, &bot_config]() {
+                    std::vector<std::string> unit_comp_items;
+                    for (uint32_t unit_comp = 0; unit_comp < BOT_UNIT_COMP_COUNT; unit_comp++) {
+                        unit_comp_items.push_back(std::string(bot_config_unit_comp_str((BotUnitComp)unit_comp)));
+                    }
+                    editor_menu_dropdown(ui, "Unit Comp:", (uint32_t*)&bot_config.preferred_unit_comp, unit_comp_items, MENU_RECT);
+                });
 
-                editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Attack First:", BOT_CONFIG_SHOULD_ATTACK_FIRST);
-                editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Attack:", BOT_CONFIG_SHOULD_ATTACK);
-                editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Harass:", BOT_CONFIG_SHOULD_HARASS);
-                editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Retreat:", BOT_CONFIG_SHOULD_RETREAT);
-                editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Scout:", BOT_CONFIG_SHOULD_SCOUT);
+                scroll_items.push_back([&ui, &bot_config]() {
+                    editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Attack First:", BOT_CONFIG_SHOULD_ATTACK_FIRST);
+                });
+                scroll_items.push_back([&ui, &bot_config]() {
+                    editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Attack:", BOT_CONFIG_SHOULD_ATTACK);
+                });
+                scroll_items.push_back([&ui, &bot_config]() {
+                    editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Harass:", BOT_CONFIG_SHOULD_HARASS);
+                });
+                scroll_items.push_back([&ui, &bot_config]() {
+                    editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Retreat:", BOT_CONFIG_SHOULD_RETREAT);
+                });
+                scroll_items.push_back([&ui, &bot_config]() {
+                    editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Scout:", BOT_CONFIG_SHOULD_SCOUT);
+                });
 
-                uint32_t target_base_count_selection = bot_config.target_base_count == BOT_TARGET_BASE_COUNT_MATCH_ENEMY
-                    ? TARGET_BASE_COUNT_MATCH_ENEMY_INDEX
-                    : bot_config.target_base_count;
-                if (editor_menu_dropdown(ui, "Target Base Count:", &target_base_count_selection, TARGET_BASE_COUNT_DROPDOWN_OPTIONS, MENU_RECT)) {
-                    bot_config.target_base_count = target_base_count_selection == TARGET_BASE_COUNT_MATCH_ENEMY_INDEX
-                        ? BOT_TARGET_BASE_COUNT_MATCH_ENEMY
-                        : target_base_count_selection;
-                }
+                scroll_items.push_back([&ui, &bot_config]() {
+                    uint32_t target_base_count_selection = bot_config.target_base_count == BOT_TARGET_BASE_COUNT_MATCH_ENEMY
+                        ? TARGET_BASE_COUNT_MATCH_ENEMY_INDEX
+                        : bot_config.target_base_count;
+                    if (editor_menu_dropdown(ui, "Target Base Count:", &target_base_count_selection, TARGET_BASE_COUNT_DROPDOWN_OPTIONS, MENU_RECT)) {
+                        bot_config.target_base_count = target_base_count_selection == TARGET_BASE_COUNT_MATCH_ENEMY_INDEX
+                            ? BOT_TARGET_BASE_COUNT_MATCH_ENEMY
+                            : target_base_count_selection;
+                    }
+                });
             }
 
-            // Edit tech button
-            if (editor_menu_prompt_and_button(ui, "Allowed Tech:", "Edit", MENU_RECT)) {
-                menu.mode = EDITOR_MENU_PLAYERS_MODE_TECH;
+            scroll_items.push_back([&ui, &menu]() {
+                // Edit tech button
+                if (editor_menu_prompt_and_button(ui, "Allowed Tech:", "Edit", MENU_RECT)) {
+                    menu.mode = EDITOR_MENU_PLAYERS_MODE_TECH;
+                }
+            });
+
+            for (int index = menu.scroll; index < std::min(menu.scroll + MAX_VISIBLE_SCROLL_ITEMS, (int)scroll_items.size()); index++) {
+                scroll_items[index]();
             }
+
+            const int scroll_max = std::max(0, (int)scroll_items.size() - MAX_VISIBLE_SCROLL_ITEMS);
+            menu.scroll = std::clamp(menu.scroll - input_get_mouse_scroll(), 0, scroll_max);
         } else if (menu.mode == EDITOR_MENU_PLAYERS_MODE_TECH) {
             // Player name text
             char player_name_text[128];

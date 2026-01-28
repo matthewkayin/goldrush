@@ -148,17 +148,17 @@ const char* bot_config_unit_comp_str(BotUnitComp unit_comp) {
         case BOT_UNIT_COMP_NONE:
             return "None";
         case BOT_UNIT_COMP_COWBOY_BANDIT:
-            return "Cowboy/Bandit";
+            return "Cwby/Bndt";
         case BOT_UNIT_COMP_COWBOY_BANDIT_PYRO:
-            return "Cowboy/Bandit/Pyro";
+            return "Cwby/Bndt/Pyro";
         case BOT_UNIT_COMP_COWBOY_SAPPER_PYRO:
-            return "Cowboy/Sapper/Pyro";
+            return "Cwby/Sppr/Pyro";
         case BOT_UNIT_COMP_COWBOY_WAGON:
-            return "Cowboy/Wagon";
+            return "Cwby/Wgn";
         case BOT_UNIT_COMP_SOLDIER_BANDIT:
-            return "Soldier/Bandit";
+            return "Sldr/Bndt";
         case BOT_UNIT_COMP_SOLDIER_CANNON:
-            return "Soldier/Cannon";
+            return "Sldr/Cnn";
         case BOT_UNIT_COMP_COUNT:
             GOLD_ASSERT(false);
             return "";
