@@ -262,7 +262,6 @@ MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
 
     // Init bots
     Difficulty difficulty = (Difficulty)network_get_match_setting(MATCH_SETTING_DIFFICULTY);
-    BotConfig bot_config = bot_config_init_from_difficulty(difficulty);
     int bot_lcg_seed = lcg_seed;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_BOT) {
@@ -270,9 +269,10 @@ MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
             continue;
         }
 
-        BotOpener opener = bot_roll_opener(&bot_lcg_seed, difficulty);
-        BotUnitComp preferred_unit_comp = bot_roll_preferred_unit_comp(&bot_lcg_seed);
-        state->bots[player_id] = bot_init(state->match_state, player_id, bot_config, opener, preferred_unit_comp);
+        BotConfig bot_config = bot_config_init_from_difficulty(difficulty);
+        bot_config.opener = bot_config_roll_opener(&bot_lcg_seed, difficulty);
+        bot_config.preferred_unit_comp = bot_config_roll_preferred_unit_comp(&bot_lcg_seed);
+        state->bots[player_id] = bot_init(state->match_state, player_id, bot_config);
     }
 
     // Scenario variables, allow all entities and upgrades 
@@ -366,12 +366,8 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
             continue;
         }
 
-        // TODO: load from scenario file
         BotConfig bot_config = scenario->bot_config[player_id - 1];
-        int bot_lcg_seed = lcg_seed;
-        BotOpener opener = bot_roll_opener(&bot_lcg_seed, DIFFICULTY_HARD);
-        BotUnitComp preferred_unit_comp = bot_roll_preferred_unit_comp(&bot_lcg_seed);
-        state->bots[player_id] = bot_init(state->match_state, player_id, bot_config, opener, preferred_unit_comp);
+        state->bots[player_id] = bot_init(state->match_state, player_id, bot_config);
 
         // Squads
         for (const ScenarioSquad& squad : scenario->squads) {

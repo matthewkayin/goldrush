@@ -7,33 +7,6 @@
 #include "core/match_setting.h"
 #include <unordered_map>
 
-enum BotOpener {
-    BOT_OPENER_BANDIT_RUSH,
-    BOT_OPENER_BUNKER,
-    BOT_OPENER_EXPAND_FIRST,
-#ifdef GOLD_DEBUG
-    BOT_OPENER_TECH_FIRST,
-#endif
-    BOT_OPENER_COUNT
-};
-
-enum BotUnitComp {
-    BOT_UNIT_COMP_NONE,
-    BOT_UNIT_COMP_COWBOY_BANDIT,
-    BOT_UNIT_COMP_COWBOY_BANDIT_PYRO,
-    BOT_UNIT_COMP_COWBOY_SAPPER_PYRO,
-    BOT_UNIT_COMP_COWBOY_WAGON,
-    BOT_UNIT_COMP_SOLDIER_BANDIT,
-    BOT_UNIT_COMP_SOLDIER_CANNON
-};
-
-enum BotMetric {
-    BOT_METRIC_ENTITY_COUNT,
-    BOT_METRIC_UNRESERVED_ENTITY_COUNT,
-    BOT_METRIC_IN_PROGRESS_ENTITY_COUNT,
-    BOT_METRIC_AVAILABLE_PRODUCTION_BUILDING_COUNT
-};
-
 enum BotSquadType {
     BOT_SQUAD_TYPE_ATTACK,
     BOT_SQUAD_TYPE_DEFEND,
@@ -81,7 +54,6 @@ struct Bot {
 
     // Production
     BotUnitComp unit_comp;
-    BotUnitComp preferred_unit_comp;
     EntityCount desired_buildings;
     EntityCount desired_army_ratio;
     std::vector<BotDesiredSquad> desired_squads;
@@ -108,9 +80,7 @@ struct Bot {
 };
 
 Bot bot_empty();
-Bot bot_init(const MatchState& state, uint8_t player_id, BotConfig config, BotOpener opener, BotUnitComp preferred_unit_comp);
-BotOpener bot_roll_opener(int* lcg_seed, Difficulty difficulty);
-BotUnitComp bot_roll_preferred_unit_comp(int* lcg_seed);
+Bot bot_init(const MatchState& state, uint8_t player_id, BotConfig config);
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_timer);
 
 // Strategy

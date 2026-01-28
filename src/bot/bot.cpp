@@ -39,7 +39,6 @@ Bot bot_empty() {
     bot.player_id = PLAYER_NONE;
 
     bot.unit_comp = BOT_UNIT_COMP_NONE;
-    bot.preferred_unit_comp = BOT_UNIT_COMP_NONE;
     bot.macro_cycle_timer = 0;
     bot.macro_cycle_count = 0;
 
@@ -53,14 +52,13 @@ Bot bot_empty() {
     return bot;
 }
 
-Bot bot_init(const MatchState& state, uint8_t player_id, BotConfig config, BotOpener opener, BotUnitComp preferred_unit_comp) {
+Bot bot_init(const MatchState& state, uint8_t player_id, BotConfig config) {
     Bot bot = bot_empty();
 
     bot.player_id = player_id;
     bot.config = config;
-    bot.preferred_unit_comp = preferred_unit_comp;
 
-    switch (opener) {
+    switch (config.opener) {
         case BOT_OPENER_BANDIT_RUSH: {
             BotDesiredSquad desired_squad;
             desired_squad.type = BOT_SQUAD_TYPE_ATTACK;
@@ -86,13 +84,11 @@ Bot bot_init(const MatchState& state, uint8_t player_id, BotConfig config, BotOp
 
             break;
         }
-    #ifdef GOLD_DEBUG
         case BOT_OPENER_TECH_FIRST: {
-            bot.unit_comp = preferred_unit_comp;
+            bot.unit_comp = bot.config.preferred_unit_comp;
 
             break;
         }
-    #endif
         case BOT_OPENER_COUNT: {
             GOLD_ASSERT(false);
             break;
@@ -112,32 +108,9 @@ Bot bot_init(const MatchState& state, uint8_t player_id, BotConfig config, BotOp
         bot.retreat_memory.push_back(retreat_memory);
     }
 
-    log_info("BOT with player id %u initialized with opener %u preferred comp %u", bot.player_id, opener, preferred_unit_comp);
+    log_info("BOT with player id %u initialized with opener %u preferred comp %u", bot.player_id, bot.config.opener, bot.config.preferred_unit_comp);
 
     return bot;
-}
-
-BotOpener bot_roll_opener(int* lcg_seed, Difficulty difficulty) {
-    if (difficulty == DIFFICULTY_EASY) {
-        return BOT_OPENER_BUNKER;
-    }
-
-    int opener_roll = lcg_rand(lcg_seed) % BOT_OPENER_COUNT;
-    return (BotOpener)opener_roll;
-}
-
-BotUnitComp bot_roll_preferred_unit_comp(int* lcg_seed) {
-    static const int UNIT_COMP_COUNT = 5;
-    static BotUnitComp unit_comps[5] = {
-        BOT_UNIT_COMP_COWBOY_BANDIT_PYRO,
-        BOT_UNIT_COMP_COWBOY_SAPPER_PYRO,
-        BOT_UNIT_COMP_COWBOY_WAGON,
-        BOT_UNIT_COMP_SOLDIER_BANDIT,
-        BOT_UNIT_COMP_SOLDIER_CANNON
-    };
-    int unit_comp_roll = lcg_rand(lcg_seed) % UNIT_COMP_COUNT;
-
-    return unit_comps[unit_comp_roll];
 }
 
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_timer) {
@@ -309,9 +282,9 @@ void bot_strategy_update(const MatchState& state, Bot& bot) {
     }
 
     // Tech up
-    if (bot.unit_comp != bot.preferred_unit_comp && 
+    if (bot.unit_comp != bot.config.preferred_unit_comp && 
             bot_should_tech_into_preferred_unit_comp(state, bot)) {
-        bot_set_unit_comp(bot, bot.preferred_unit_comp);
+        bot_set_unit_comp(bot, bot.config.preferred_unit_comp);
     }
 
     // Request landmines squad
@@ -934,6 +907,10 @@ void bot_update_desired_production(Bot& bot) {
 
             bot.desired_army_ratio[ENTITY_SOLDIER] = 8;
             bot.desired_army_ratio[ENTITY_CANNON] = 1;
+            break;
+        }
+        case BOT_UNIT_COMP_COUNT: {
+            GOLD_ASSERT(false);
             break;
         }
     }

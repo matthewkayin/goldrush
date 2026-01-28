@@ -121,7 +121,6 @@ Json* json_object_get(const Json* json, const char* key) {
         }
     }
 
-    GOLD_ASSERT(false);
     return NULL;
 }
 

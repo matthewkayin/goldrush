@@ -265,7 +265,6 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot 
 
         // Production
         desync_write_value<BotUnitComp>(bot.unit_comp);
-        desync_write_value<BotUnitComp>(bot.preferred_unit_comp);
         desync_write_value<EntityCount>(bot.desired_buildings);
         desync_write_value<EntityCount>(bot.desired_army_ratio);
         desync_write_vector<BotDesiredSquad>(bot.desired_squads);
@@ -531,7 +530,6 @@ void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2) {
         state_buffer_offset += desync_compare_unordered_map<EntityId, bool>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
 
         // Production
-        state_buffer_offset += desync_compare_value<BotUnitComp>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
         state_buffer_offset += desync_compare_value<BotUnitComp>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
         state_buffer_offset += desync_compare_value<EntityCount>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
         state_buffer_offset += desync_compare_value<EntityCount>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);

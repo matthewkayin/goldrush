@@ -4,6 +4,7 @@
 #include "core/filesystem.h"
 #include "util/bitflag.h"
 #include "util/json.h"
+#include "util/util.h"
 
 static const uint32_t MAP_FILE_SIGNATURE = 0x46536877;
 static const uint32_t MAP_FILE_VERSION = 0;
@@ -169,14 +170,7 @@ const char* scenario_squad_type_str(ScenarioSquadType type) {
 }
 
 ScenarioSquadType scenario_squad_type_from_str(const char* str) {
-    uint32_t squad_type;
-    for (squad_type = 0; squad_type < SCENARIO_SQUAD_TYPE_COUNT; squad_type++) {
-        if (strcmp(str, scenario_squad_type_str((ScenarioSquadType)squad_type)) == 0) {
-            break;
-        }
-    }
-
-    return (ScenarioSquadType)squad_type;
+    return (ScenarioSquadType)enum_from_str(str, (EnumToStrFn)scenario_squad_type_str, SCENARIO_CONSTANT_TYPE_COUNT);
 }
 
 const char* scenario_constant_type_str(ScenarioConstantType type) {
@@ -192,14 +186,7 @@ const char* scenario_constant_type_str(ScenarioConstantType type) {
 }
 
 ScenarioConstantType scenario_constant_type_from_str(const char* str) {
-    uint32_t constant_type;
-    for (constant_type = 0; constant_type < SCENARIO_CONSTANT_TYPE_COUNT; constant_type++) {
-        if (strcmp(str, scenario_constant_type_str((ScenarioConstantType)constant_type)) == 0) {
-            break;
-        }
-    }
-
-    return (ScenarioConstantType)constant_type;
+    return (ScenarioConstantType)enum_from_str(str, (EnumToStrFn)scenario_constant_type_str, SCENARIO_CONSTANT_TYPE_COUNT);
 }
 
 void scenario_constant_set_type(ScenarioConstant& constant, ScenarioConstantType type) {
@@ -283,6 +270,12 @@ bool scenario_save_file(const Scenario* scenario, const char* json_full_path, co
             // Player config
             if (index != 0) {
                 const BotConfig& bot_config = scenario->bot_config[index - 1];
+
+                // Opener
+                json_object_set(player_json, "opener", json_string(bot_config_opener_str(bot_config.opener)));
+
+                // Unit comp
+                json_object_set(player_json, "preferred_unit_comp", json_string(bot_config_unit_comp_str(bot_config.preferred_unit_comp)));
 
                 // Bot flags
                 Json* flags_json = json_array();
@@ -503,14 +496,26 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
                 scenario->bot_config[index - 1] = bot_config_init();
                 BotConfig& bot_config = scenario->bot_config[index - 1];
 
+                // Opener
+                Json* opener_json = json_object_get(player_json, "opener");
+                if (opener_json != NULL) {
+                    bot_config.opener = bot_config_opener_from_str(opener_json->string.value);
+                }
+
+                // Unit comp
+                Json* preferred_unit_comp_json = json_object_get(player_json, "preferred_unit_comp");
+                if (preferred_unit_comp_json != NULL) {
+                    bot_config.preferred_unit_comp = bot_config_unit_comp_from_str(preferred_unit_comp_json->string.value);
+                }
+
                 // Bot flags
                 Json* flags_json = json_object_get(player_json, "flags");
                 for (size_t flag_index = 0; flag_index < flags_json->array.length; flag_index++) {
                     const char* flag_str = json_array_get_string(flags_json, flag_index);
                     uint32_t flag = bot_config_flag_from_str(flag_str);
                     if (flag == BOT_CONFIG_FLAG_COUNT) {
-                        log_error("Bot config flag %s for player %u not recognized.", flag_str, index);
-                        goto error;
+                        log_warn("Bot config flag %s for player %u not recognized.", flag_str, index);
+                        continue;
                     }
                     bot_config.flags |= flag;
                 }
@@ -540,8 +545,8 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
                     uint32_t upgrade = 1U << upgrade_index;
                     *allowed_upgrades |= upgrade;
                 } else {
-                    log_error("Allowed upgrade %s for player %u not recognized.", upgrade_str.c_str(), index);
-                    goto error;
+                    log_warn("Allowed upgrade %s for player %u not recognized.", upgrade_str.c_str(), index);
+                    continue;
                 }
             }
 
@@ -557,8 +562,8 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
                 if (entity_type < ENTITY_TYPE_COUNT) {
                     allowed_entities[entity_type] = true;
                 } else {
-                    log_error("Allowed entity %s for player %u not recognized.", entity_str, index);
-                    goto error;
+                    log_warn("Allowed entity %s for player %u not recognized.", entity_str, index);
+                    continue;
                 }
             }
         } // End for each player
@@ -571,8 +576,8 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
             const char* entity_str = json_object_get_string(entity_json, "type");
             EntityType entity_type = entity_type_from_str(entity_str);
             if (entity_type == ENTITY_TYPE_COUNT) {
-                log_error("Entity type %s for entity index %u not recognized.", entity_str, entity_index);
-                goto error;
+                log_warn("Entity type %s for entity index %u not recognized.", entity_str, entity_index);
+                continue;
             }
 
             ScenarioEntity entity;
@@ -586,7 +591,6 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
         }
 
         // Squads
-        // TODO: pretty sure this doesn't work 
         Json* squads_json = json_object_get(scenario_json, "squads");
         for (size_t squad_index = 0; squad_index < squads_json->array.length; squad_index++) {
             Json* squad_json = json_array_get(squads_json, squad_index);
@@ -594,8 +598,8 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
             const char* squad_type_str = json_object_get_string(squad_json, "type");
             ScenarioSquadType squad_type = scenario_squad_type_from_str(squad_type_str);
             if (squad_type == SCENARIO_SQUAD_TYPE_COUNT) {
-                log_error("Squad type %s for squad %u not recognized.", squad_type_str, squad_index);
-                goto error;
+                log_warn("Squad type %s for squad %u not recognized.", squad_type_str, squad_index);
+                continue;
             }
 
             ScenarioSquad squad;
@@ -608,8 +612,8 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
             for (size_t squad_entities_index = 0; squad_entities_index < squad_entities_json->array.length; squad_entities_index++) {
                 uint32_t entity_index = (uint32_t)json_array_get_number(squad_entities_json, squad_entities_index);
                 if (entity_index >= scenario->entity_count) {
-                    log_error("Entity index %u for squad %u (%s) is out of range.", entity_index, squad_index, squad.name);
-                    goto error;
+                    log_warn("Entity index %u for squad %u (%s) is out of range.", entity_index, squad_index, squad.name);
+                    continue;
                 }
                 squad.entities[squad.entity_count] = entity_index;
                 squad.entity_count++;
@@ -629,8 +633,8 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
             const char* constant_type_str = json_object_get_string(constant_json, "type");
             constant.type = scenario_constant_type_from_str(constant_type_str);
             if (constant.type == SCENARIO_CONSTANT_TYPE_COUNT) {
-                log_error("Constant type %s for constant %u:%s not recognized.", constant_type_str, constant_index, constant.name);
-                goto error;
+                log_warn("Constant type %s for constant %u:%s not recognized.", constant_type_str, constant_index, constant.name);
+                continue;
             }
 
             switch (constant.type) {

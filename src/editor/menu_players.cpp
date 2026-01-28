@@ -75,6 +75,18 @@ void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorMenuMode&
             if (menu.selected_player_id != 0) {
                 BotConfig& bot_config = scenario->bot_config[menu.selected_player_id - 1];
 
+                std::vector<std::string> opener_items;
+                for (uint32_t opener = 0; opener < BOT_OPENER_COUNT; opener++) {
+                    opener_items.push_back(std::string(bot_config_opener_str((BotOpener)opener)));
+                }
+                editor_menu_dropdown(ui, "Opener:", (uint32_t*)&bot_config.opener, opener_items, MENU_RECT);
+
+                std::vector<std::string> unit_comp_items;
+                for (uint32_t unit_comp = 0; unit_comp < BOT_UNIT_COMP_COUNT; unit_comp++) {
+                    unit_comp_items.push_back(std::string(bot_config_unit_comp_str((BotUnitComp)unit_comp)));
+                }
+                editor_menu_dropdown(ui, "Unit Comp:", (uint32_t*)&bot_config.preferred_unit_comp, unit_comp_items, MENU_RECT);
+
                 editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Attack First:", BOT_CONFIG_SHOULD_ATTACK_FIRST);
                 editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Attack:", BOT_CONFIG_SHOULD_ATTACK);
                 editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Harass:", BOT_CONFIG_SHOULD_HARASS);

@@ -295,9 +295,9 @@ void game_test_set_mode(GameState& state, GameMode mode) {
         #endif
         log_debug("TEST MODE lcg_seed set to %u", lcg_seed);
         BotConfig bot_config = bot_config_init_from_difficulty(DIFFICULTY_HARD);
-        BotOpener opener = BOT_OPENER_TECH_FIRST;
-        BotUnitComp unit_comp = bot_roll_preferred_unit_comp(&lcg_seed);
-        state.test_bot = bot_init(state.match_shell_state->match_state, network_get_player_id(), bot_config, opener, unit_comp);
+        bot_config.opener = BOT_OPENER_TECH_FIRST;
+        bot_config.preferred_unit_comp = bot_config_roll_preferred_unit_comp(&lcg_seed);
+        state.test_bot = bot_init(state.match_shell_state->match_state, network_get_player_id(), bot_config);
     }
 }
 

@@ -4,6 +4,25 @@
 
 #include "match/entity.h"
 
+enum BotOpener {
+    BOT_OPENER_BANDIT_RUSH,
+    BOT_OPENER_BUNKER,
+    BOT_OPENER_EXPAND_FIRST,
+    BOT_OPENER_TECH_FIRST,
+    BOT_OPENER_COUNT
+};
+
+enum BotUnitComp {
+    BOT_UNIT_COMP_NONE,
+    BOT_UNIT_COMP_COWBOY_BANDIT,
+    BOT_UNIT_COMP_COWBOY_BANDIT_PYRO,
+    BOT_UNIT_COMP_COWBOY_SAPPER_PYRO,
+    BOT_UNIT_COMP_COWBOY_WAGON,
+    BOT_UNIT_COMP_SOLDIER_BANDIT,
+    BOT_UNIT_COMP_SOLDIER_CANNON,
+    BOT_UNIT_COMP_COUNT
+};
+
 const uint32_t BOT_CONFIG_SHOULD_ATTACK_FIRST = 1U << 0U;
 const uint32_t BOT_CONFIG_SHOULD_ATTACK = 1U << 1U;
 const uint32_t BOT_CONFIG_SHOULD_HARASS = 1U << 2U;
@@ -21,13 +40,19 @@ struct BotConfig {
     bool is_entity_allowed[ENTITY_TYPE_COUNT];
     uint8_t padding1 = 0;
     uint8_t padding2 = 0;
+    BotOpener opener;
+    BotUnitComp preferred_unit_comp;
 };
-STATIC_ASSERT(sizeof(BotConfig) == 40ULL);
+STATIC_ASSERT(sizeof(BotConfig) == 48ULL);
 
 BotConfig bot_config_init();
 BotConfig bot_config_init_from_difficulty(Difficulty difficulty);
+BotOpener bot_config_roll_opener(int* lcg_seed, Difficulty difficulty);
+BotUnitComp bot_config_roll_preferred_unit_comp(int* lcg_seed);
 
-#ifdef GOLD_DEBUG
 const char* bot_config_flag_str(uint32_t flag);
 uint32_t bot_config_flag_from_str(const char* str);
-#endif
+const char* bot_config_opener_str(BotOpener opener);
+BotOpener bot_config_opener_from_str(const char* str);
+const char* bot_config_unit_comp_str(BotUnitComp unit_comp);
+BotUnitComp bot_config_unit_comp_from_str(const char* str);
