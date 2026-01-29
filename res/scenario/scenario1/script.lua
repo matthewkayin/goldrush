@@ -129,12 +129,12 @@ function scenario_update()
             actions.wait(2.0)
             scenario.fog_reveal({
                 player_id = scenario.PLAYER_ID,
-                cell = scenario.constants.BANDIT_BASE_CELL,
+                cell = scenario.constants.BANDIT_BASE_CELL_1,
                 cell_size = 1,
                 sight = 13,
                 duration = 5.0
             })
-            actions.camera_pan(scenario.constants.BANDIT_BASE_CELL, 1.5)
+            actions.camera_pan(scenario.constants.BANDIT_BASE_CELL_1, 1.5)
             objectives.announce_new_objective(OBJECTIVE_DEFEAT_BANDITS)
             objectives.add_objective({
                 objective = {
@@ -144,6 +144,16 @@ function scenario_update()
                     return scenario.is_player_defeated(ENEMY_BANDITS_PLAYER_ID)
                 end
             })
+            scenario.free_camera()
+            scenario.fog_reveal({
+                player_id = scenario.PLAYER_ID,
+                cell = scenario.constants.BANDIT_BASE_CELL_2,
+                cell_size = 1,
+                sight = 13,
+                duration = 5.0
+            })
+            actions.camera_pan(scenario.constants.BANDIT_BASE_CELL_2, 1.5)
+            actions.wait(2.0)
             actions.camera_return(2.0)
         end)
         bandit_attack_squad_id = nil
