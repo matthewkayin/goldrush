@@ -15,8 +15,6 @@ enum ScriptChatColor {
     SCRIPT_CHAT_COLOR_BLUE
 };
 
-static const int SQUAD_ID_NULL = -1;
-
 struct ScriptConstant {
     const char* name;
     int value;
@@ -82,7 +80,7 @@ static const ScriptConstant GOLD_CONSTANTS[] = {
     { "CHAT_COLOR_WHITE", SCRIPT_CHAT_COLOR_WHITE },
     { "CHAT_COLOR_GOLD", SCRIPT_CHAT_COLOR_GOLD },
     { "CHAT_COLOR_BLUE", SCRIPT_CHAT_COLOR_GOLD },
-    { "SQUAD_ID_NULL", SQUAD_ID_NULL },
+    { "SQUAD_ID_NULL", BOT_SQUAD_ID_NULL },
     { "CAMERA_MODE_FREE", CAMERA_MODE_FREE },
     { "CAMERA_MODE_MINIMAP_DRAG", CAMERA_MODE_MINIMAP_DRAG },
     { "CAMERA_MODE_PAN", CAMERA_MODE_PAN },
@@ -1087,9 +1085,13 @@ static int script_spawn_enemy_squad(lua_State* lua_state) {
         squad_entity_list.push_back(entity_id);
     }
 
-    int squad_id = SQUAD_ID_NULL;
+    int squad_id = BOT_SQUAD_ID_NULL;
     if (!squad_entity_list.empty()) {
-        squad_id = bot_squad_create(state->bots[player_id], BOT_SQUAD_TYPE_ATTACK, target_cell, squad_entity_list);
+        squad_id = bot_add_squad(state->bots[player_id], {
+            .type = BOT_SQUAD_TYPE_ATTACK,
+            .target_cell = target_cell,
+            .entities = squad_entity_list
+        });
     }
 
     lua_pushnumber(lua_state, squad_id);
@@ -1113,7 +1115,7 @@ static int script_does_squad_exist(lua_State* lua_state) {
     }
 
     int squad_id = (int)lua_tonumber(lua_state, 2);
-    if (squad_id == SQUAD_ID_NULL) {
+    if (squad_id == BOT_SQUAD_ID_NULL) {
         script_error(lua_state, "Squad ID NULL is not valid.");
     }
 

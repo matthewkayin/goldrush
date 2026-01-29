@@ -240,7 +240,11 @@ void bot_strategy_update(const MatchState& state, Bot& bot) {
                 std::vector<EntityId> entity_list = bot_create_entity_list_from_entity_count(state, bot, bot.desired_squads[desired_squad_index].entity_count);
                 BotSquadType type = bot.desired_squads[desired_squad_index].type;
                 ivec2 target_cell = bot_squad_choose_target_cell(state, bot, type, entity_list);
-                bot_squad_create(bot, type, target_cell, entity_list);
+                bot_add_squad(bot, {
+                    .type = type,
+                    .target_cell = target_cell,
+                    .entities = entity_list
+                });
 
                 // Subtract squad units from unreserved entity count
                 unreserved_entity_count = unreserved_entity_count.subtract(bot.desired_squads[desired_squad_index].entity_count);
@@ -330,7 +334,11 @@ void bot_strategy_update(const MatchState& state, Bot& bot) {
     if (bot_should_attack(state, bot)) {
         std::vector<EntityId> army = bot_create_entity_list_from_entity_count(state, bot, unreserved_army_count);
         ivec2 target_cell = bot_squad_get_attack_target_cell(state, bot, army);
-        bot_squad_create(bot, BOT_SQUAD_TYPE_ATTACK, target_cell, army);
+        bot_add_squad(bot, {
+            .type = BOT_SQUAD_TYPE_ATTACK,
+            .target_cell = target_cell,
+            .entities = army
+        });
     }
 }
 
@@ -585,7 +593,11 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
         ivec2 unreserved_army_center = bot_entity_list_get_center(state, unreserved_army);
         if (defending_score + unreserved_army_score >= enemy_score &&
                 ivec2::manhattan_distance(unreserved_army_center, location) < BOT_MEDIUM_DISTANCE) {
-            uint32_t squad_id = bot_squad_create(bot, BOT_SQUAD_TYPE_RESERVES, location, unreserved_army);
+            int squad_id = bot_add_squad(bot, {
+                .type = BOT_SQUAD_TYPE_RESERVES,
+                .target_cell = location,
+                .entities = unreserved_army
+            });
             log_debug("BOT %u defend_location, send in unreserved army %u, squad %u", bot.player_id, unreserved_army.size(), squad_id);
             return;
         }
@@ -637,7 +649,11 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
             !unreserved_army.empty() &&
             unreserved_army_score > bot.base_info.at(least_defended_enemy_base_goldmine_id).defense_score) {
         ivec2 counterattack_squad_target_cell = bot_squad_get_attack_target_cell(state, bot, unreserved_army);
-        uint32_t squad_id = bot_squad_create(bot, BOT_SQUAD_TYPE_ATTACK, counterattack_squad_target_cell, unreserved_army);
+        int squad_id = bot_add_squad(bot, {
+            .type = BOT_SQUAD_TYPE_ATTACK,
+            .target_cell = counterattack_squad_target_cell,
+            .entities = unreserved_army
+        });
         log_debug("BOT %u defend_location, counterattack %u with squad %u", bot.player_id, unreserved_army.size(), squad_id);
         return;
     }
@@ -651,7 +667,11 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
             ivec2::manhattan_distance(entity.cell, location) < BOT_NEAR_DISTANCE;
     });
     if (should_defend_with_workers && !workers.empty()) {
-        uint32_t squad_id = bot_squad_create(bot, BOT_SQUAD_TYPE_RESERVES, location, workers);
+        int squad_id = bot_add_squad(bot, {
+            .type = BOT_SQUAD_TYPE_RESERVES,
+            .target_cell = location,
+            .entities = workers
+        });
         log_debug("BOT %u defend_location, worker defense, squad %u", bot.player_id, squad_id);
         return;
     }
@@ -1725,24 +1745,27 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
 
 // SQUADS
 
-uint32_t bot_squad_create(Bot& bot, BotSquadType type, ivec2 target_cell, const std::vector<EntityId>& entity_list) {
-    if (entity_list.empty()) {
+int bot_add_squad(Bot& bot, BotAddSquadParams params) {
+    GOLD_ASSERT(!params.entities.empty());
+    if (params.entities.empty()) {
         log_warn("BOT %u squad_create, entity_list is empty.", bot.player_id);
+        return BOT_SQUAD_ID_NULL;
     }
-    GOLD_ASSERT(!entity_list.empty());
 
     BotSquad squad;
     squad.id = bot.next_squad_id;
-    squad.type = type;
-    squad.target_cell = target_cell;
-    squad.entities.reserve(entity_list.size());
+    squad.type = params.type;
+    squad.target_cell = params.target_cell;
+    squad.patrol_cell = squad.type == BOT_SQUAD_TYPE_PATROL
+        ? params.patrol_cell : ivec2(-1, -1);
+    squad.entities = params.entities;
     bot.next_squad_id++;
 
     {
         char debug_buffer[1024];
         char* debug_ptr = debug_buffer;
         debug_ptr += sprintf(debug_ptr, "BOT %u squad_create, id %u type ", bot.player_id, squad.id);
-        switch (type) {
+        switch (squad.type) {
             case BOT_SQUAD_TYPE_ATTACK:
                 debug_ptr += sprintf(debug_ptr, "ATTACK");
                 break;
@@ -1755,18 +1778,22 @@ uint32_t bot_squad_create(Bot& bot, BotSquadType type, ivec2 target_cell, const 
             case BOT_SQUAD_TYPE_DEFEND:
                 debug_ptr += sprintf(debug_ptr, "DEFEND");
                 break;
+            case BOT_SQUAD_TYPE_PATROL:
+                debug_ptr += sprintf(debug_ptr, "PATROL");
+                break;
             case BOT_SQUAD_TYPE_RETURN:
                 GOLD_ASSERT(false);
         }
-        debug_ptr += sprintf(debug_ptr, " target cell <%i, %i> entities [", target_cell.x, target_cell.y);
-        for (EntityId entity_id : entity_list) {
+        debug_ptr += sprintf(debug_ptr, " target cell <%i, %i> patrol cell <%i, %i> entities [", 
+            squad.target_cell.x, squad.target_cell.y,
+            squad.patrol_cell.x, squad.patrol_cell.y);
+        for (EntityId entity_id : squad.entities) {
             debug_ptr += sprintf(debug_ptr, "%u,", entity_id);
         }
         debug_ptr += sprintf(debug_ptr, "]");
         log_debug(debug_buffer);
     }
-    for (EntityId entity_id : entity_list) {
-        squad.entities.push_back(entity_id);
+    for (EntityId entity_id : squad.entities) {
         bot_reserve_entity(bot, entity_id, false);
     }
 
@@ -1954,6 +1981,37 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
     // Landmine Squad Micro
     if (squad.type == BOT_SQUAD_TYPE_LANDMINES) {
         return bot_squad_landmines_micro(state, bot, squad, match_timer);
+    }
+
+    // Patrol squad micro
+    if (squad.type == BOT_SQUAD_TYPE_PATROL) {
+        for (EntityId entity_id : unengaged_units) {
+            const Entity& entity = state.entities.get_by_id(entity_id);
+
+            // Don't interrupt a unit that is already patrolling
+            if (entity.mode != MODE_UNIT_IDLE && entity.target.type != TARGET_NONE) {
+                continue;
+            }
+
+            int distance_to_patrol_cell = ivec2::manhattan_distance(entity.cell, squad.patrol_cell);
+            int distance_to_source_cell = ivec2::manhattan_distance(entity.cell, squad.target_cell);
+            ivec2 cell_to_move_to = distance_to_patrol_cell < distance_to_source_cell
+                ? squad.target_cell
+                : squad.patrol_cell;
+
+            MatchInput input;
+            input.type = MATCH_INPUT_MOVE_CELL;
+            input.move.shift_command = 0;
+            input.move.target_id = ID_NULL;
+            input.move.target_cell = cell_to_move_to;
+            input.move.entity_count = 1;
+            input.move.entity_ids[0] = entity_id;
+            return input;
+        }
+
+        return (MatchInput) {
+            .type = MATCH_INPUT_NONE
+        };
     }
 
     // Divide unengaged units into distant infantry (can be garrisoned) and distant cavalry (cannot be garrisoned)
@@ -2776,6 +2834,7 @@ ivec2 bot_squad_choose_target_cell(const MatchState& state, const Bot& bot, BotS
             return bot_squad_get_landmine_target_cell(state, bot, state.entities.get_by_id(entity_list[0]).cell);
         case BOT_SQUAD_TYPE_RESERVES:
         case BOT_SQUAD_TYPE_RETURN:
+        case BOT_SQUAD_TYPE_PATROL:
             GOLD_ASSERT_MESSAGE(false, "This squad type should not be used with squad_choose_target_cell.");
             return ivec2(-1, -1);
     }

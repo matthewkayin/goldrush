@@ -137,6 +137,7 @@ ScenarioSquad scenario_squad_init() {
     sprintf(squad.name, "New Squad");
     squad.player_id = 1;
     squad.type = SCENARIO_SQUAD_TYPE_DEFEND;
+    squad.patrol_cell = ivec2(-1, -1);
     squad.entity_count = 0;
 
     return squad;
@@ -146,7 +147,10 @@ bool scenario_squads_are_equal(const ScenarioSquad& a, const ScenarioSquad& b) {
     if (strcmp(a.name, b.name) != 0) {
         return false;
     }
-    if (a.player_id != b.player_id || a.type != b.type || a.entity_count != b.entity_count) {
+    if (a.player_id != b.player_id || 
+            a.type != b.type || 
+            a.entity_count != b.entity_count ||
+            a.patrol_cell != b.patrol_cell) {
         return false;
     }
     for (uint32_t index = 0; index < a.entity_count; index++) {
@@ -163,6 +167,8 @@ const char* scenario_squad_type_str(ScenarioSquadType type) {
             return "Defend";
         case SCENARIO_SQUAD_TYPE_LANDMINES:
             return "Landmines";
+        case SCENARIO_SQUAD_TYPE_PATROL:
+            return "Patrol";
         case SCENARIO_SQUAD_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
@@ -349,6 +355,10 @@ bool scenario_save_file(const Scenario* scenario, const char* json_full_path, co
             json_object_set_string(squad_json, "name", squad.name);
             json_object_set_number(squad_json, "player_id", squad.player_id);
             json_object_set_string(squad_json, "type", scenario_squad_type_str(squad.type));
+
+            if (squad.type == SCENARIO_SQUAD_TYPE_PATROL) {
+                json_object_set(squad_json, "patrol_cell", json_from_ivec2(squad.patrol_cell));
+            }
             
             Json* squad_entities_json = json_array();
             for (uint32_t entity_index = 0; entity_index < squad.entity_count; entity_index++) {
@@ -606,6 +616,11 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
             strncpy(squad.name, json_object_get_string(squad_json, "name"), MAX_USERNAME_LENGTH);
             squad.type = squad_type;
             squad.player_id = (uint8_t)json_object_get_number(squad_json, "player_id");
+
+            Json* squad_patrol_cell_json = json_object_get(squad_json, "patrol_cell");
+            if (squad_patrol_cell_json != NULL) {
+                squad.patrol_cell = json_to_ivec2(squad_patrol_cell_json);
+            }
 
             Json* squad_entities_json = json_object_get(squad_json, "entities");
             squad.entity_count = 0;

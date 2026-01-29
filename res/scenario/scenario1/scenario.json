@@ -24,7 +24,7 @@
 			"name": "Bandits",
 			"starting_gold": 50.000000,
 			"opener": "Tech First",
-			"preferred_unit_comp": "Cowboy/Bandit",
+			"preferred_unit_comp": "None",
 			"flags": [],
 			"target_base_count": 0.000000,
 			"macro_cycle_cooldown": 0.000000,

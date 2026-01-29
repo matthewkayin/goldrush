@@ -385,6 +385,10 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
                     squad_type = BOT_SQUAD_TYPE_LANDMINES;
                     break;
                 }
+                case SCENARIO_SQUAD_TYPE_PATROL: {
+                    squad_type = BOT_SQUAD_TYPE_PATROL;
+                    break;
+                }
                 case SCENARIO_SQUAD_TYPE_COUNT: {
                     GOLD_ASSERT(false);
                     break;
@@ -402,10 +406,20 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
                 squad_average_position += scenario->entities[entity_index].cell;
             }
 
-            // TODO: allow us to set squad target pos?
             GOLD_ASSERT(!squad_entity_list.empty());
             ivec2 squad_target_cell = squad_average_position / squad_entity_list.size();
-            bot_squad_create(state->bots[player_id], squad_type, squad_target_cell, squad_entity_list);
+
+            if (squad_type == BOT_SQUAD_TYPE_PATROL) {
+                GOLD_ASSERT(squad.patrol_cell.x != -1);
+            }
+            bot_add_squad(state->bots[player_id], {
+                .type = squad_type,
+                .target_cell = squad_target_cell,
+                .patrol_cell = squad_type == BOT_SQUAD_TYPE_PATROL
+                    ? squad.patrol_cell
+                    : ivec2(-1, -1),
+                .entities = squad_entity_list
+            });
         }
     }
 

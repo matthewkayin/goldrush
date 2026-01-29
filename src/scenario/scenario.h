@@ -25,6 +25,7 @@ struct ScenarioEntity {
 enum ScenarioSquadType {
     SCENARIO_SQUAD_TYPE_DEFEND,
     SCENARIO_SQUAD_TYPE_LANDMINES,
+    SCENARIO_SQUAD_TYPE_PATROL,
     SCENARIO_SQUAD_TYPE_COUNT
 };
 
@@ -32,6 +33,7 @@ struct ScenarioSquad {
     char name[MAX_USERNAME_LENGTH + 1];
     uint8_t player_id;
     ScenarioSquadType type;
+    ivec2 patrol_cell;
     uint32_t entity_count;
     uint32_t entities[SCENARIO_SQUAD_MAX_ENTITIES];
 };

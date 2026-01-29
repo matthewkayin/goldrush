@@ -7,18 +7,29 @@
 #include "core/match_setting.h"
 #include <unordered_map>
 
+const int BOT_SQUAD_ID_NULL = -1;
+
 enum BotSquadType {
     BOT_SQUAD_TYPE_ATTACK,
     BOT_SQUAD_TYPE_DEFEND,
     BOT_SQUAD_TYPE_RESERVES,
     BOT_SQUAD_TYPE_LANDMINES,
-    BOT_SQUAD_TYPE_RETURN
+    BOT_SQUAD_TYPE_RETURN,
+    BOT_SQUAD_TYPE_PATROL
+};
+
+struct BotAddSquadParams {
+    BotSquadType type;
+    ivec2 target_cell;
+    ivec2 patrol_cell;
+    std::vector<EntityId> entities;
 };
 
 struct BotSquad {
     int id;
     BotSquadType type;
     ivec2 target_cell;
+    ivec2 patrol_cell;
     std::vector<EntityId> entities;
 };
 
@@ -142,7 +153,7 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
 
 // Squads
 
-uint32_t bot_squad_create(Bot& bot, BotSquadType type, ivec2 target_cell, const std::vector<EntityId>& entity_list);
+int bot_add_squad(Bot& bot, BotAddSquadParams params);
 void bot_squad_dissolve(Bot& bot, BotSquad& squad);
 void bot_squad_remove_entity_by_id(Bot& bot, BotSquad& squad, EntityId entity_id);
 MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, uint32_t match_timer);
