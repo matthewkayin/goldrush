@@ -899,6 +899,18 @@ bool match_player_has_buildings(const MatchState& state, uint8_t player_id) {
     return false;
 }
 
+bool match_player_has_entities(const MatchState& state, uint8_t player_id) {
+    for (const Entity& entity : state.entities) {
+        if (entity.player_id == player_id &&
+                entity.type != ENTITY_LANDMINE &&
+                entity.health != 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // ENTITY
 
 EntityId entity_create(MatchState& state, EntityType type, ivec2 cell, uint8_t player_id) {
@@ -1085,9 +1097,11 @@ void entity_update(MatchState& state, uint32_t entity_index) {
         }
 
         // Check if player has lost
-        if (entity_is_building(entity.type) && 
-                entity.type != ENTITY_LANDMINE &&
-                !match_player_has_buildings(state, entity.player_id)) {
+        if (entity.type != ENTITY_LANDMINE &&
+                ((entity_is_building(entity.type) && 
+                    !match_player_has_buildings(state, entity.player_id)) ||
+                (!entity_is_building(entity.type) && 
+                    !match_player_has_entities(state, entity.player_id)))) {
             state.players[entity.player_id].active = false;
             state.events.push_back((MatchEvent) {
                 .type = MATCH_EVENT_PLAYER_DEFEATED,

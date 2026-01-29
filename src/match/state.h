@@ -351,6 +351,7 @@ EntityId match_get_nearest_builder(const MatchState& state, const std::vector<En
 
 bool match_is_target_invalid(const MatchState& state, const Target& target, uint8_t player_id);
 bool match_player_has_buildings(const MatchState& state, uint8_t player_id);
+bool match_player_has_entities(const MatchState& state, uint8_t player_id);
 
 // Entity
 
