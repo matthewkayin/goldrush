@@ -83,7 +83,7 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
 
             map_set_cell_rect(scenario->map, entity_data.cell_layer, scenario->entities[action_data.index].cell, entity_data.cell_size, (Cell) {
                 .type = CELL_UNIT,
-                .id = (uint16_t)scenario->entity_count
+                .id = (uint16_t)action_data.index
             });
             break;
         }
@@ -98,6 +98,12 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
                 scenario->entities[action_data.index] = action_data.value;
                 scenario->entity_count++;
             }
+
+            Cell cell_value = mode == EDITOR_ACTION_MODE_DO 
+                ? (Cell) { .type = CELL_EMPTY, .id = ID_NULL }
+                : (Cell) { .type = CELL_UNIT, .id = (uint16_t)scenario->entity_count };
+            const EntityData& entity_data = entity_get_data(action_data.value.type);
+            map_set_cell_rect(scenario->map, entity_data.cell_layer, action_data.value.cell, entity_data.cell_size, cell_value);
 
             break;
         }
