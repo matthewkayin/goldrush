@@ -24,7 +24,7 @@
 			"name": "Bandits",
 			"starting_gold": 50.000000,
 			"opener": "Tech First",
-			"preferred_unit_comp": "None",
+			"preferred_unit_comp": "Cwby/Bndt",
 			"flags": [],
 			"target_base_count": 0.000000,
 			"macro_cycle_cooldown": 0.000000,
@@ -35,7 +35,7 @@
 			"name": "Enemy 2",
 			"starting_gold": 50.000000,
 			"opener": "Tech First",
-			"preferred_unit_comp": "None",
+			"preferred_unit_comp": "Cwby/Bndt",
 			"flags": [
 				"attack_first",
 				"attack",
@@ -60,7 +60,7 @@
 			"name": "Enemy 3",
 			"starting_gold": 50.000000,
 			"opener": "Tech First",
-			"preferred_unit_comp": "None",
+			"preferred_unit_comp": "Cwby/Bndt",
 			"flags": [
 				"attack_first",
 				"attack",

@@ -95,10 +95,13 @@ void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorMenuMode&
 
                 scroll_items.push_back([&ui, &bot_config]() {
                     std::vector<std::string> unit_comp_items;
-                    for (uint32_t unit_comp = 0; unit_comp < BOT_UNIT_COMP_COUNT; unit_comp++) {
+                    for (uint32_t unit_comp = BOT_UNIT_COMP_NONE + 1; unit_comp < BOT_UNIT_COMP_COUNT; unit_comp++) {
                         unit_comp_items.push_back(std::string(bot_config_unit_comp_str((BotUnitComp)unit_comp)));
                     }
-                    editor_menu_dropdown(ui, "Unit Comp:", (uint32_t*)&bot_config.preferred_unit_comp, unit_comp_items, MENU_RECT);
+                    uint32_t selection = bot_config.preferred_unit_comp - 1;
+                    if (editor_menu_dropdown(ui, "Unit Comp:", &selection, unit_comp_items, MENU_RECT)) {
+                        bot_config.preferred_unit_comp = (BotUnitComp)(selection + 1);
+                    }
                 });
 
                 scroll_items.push_back([&ui, &bot_config]() {

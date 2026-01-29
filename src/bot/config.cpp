@@ -14,7 +14,7 @@ BotConfig bot_config_init() {
     config.allowed_upgrades = 0;
     memset(config.is_entity_allowed, 0, sizeof(config.is_entity_allowed));
     config.opener = BOT_OPENER_TECH_FIRST;
-    config.preferred_unit_comp = BOT_UNIT_COMP_NONE;
+    config.preferred_unit_comp = BOT_UNIT_COMP_COWBOY_BANDIT;
 
     return config;
 }
