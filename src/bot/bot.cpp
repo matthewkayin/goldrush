@@ -343,6 +343,10 @@ void bot_strategy_update(const MatchState& state, Bot& bot) {
 }
 
 bool bot_should_surrender(const MatchState& state, const Bot& bot, uint32_t match_timer) {
+    if (!bitflag_check(bot.config.flags, BOT_CONFIG_SHOULD_SURRENDER)) {
+        return false;
+    }
+
     if (bot_has_non_miner_army(state, bot)) {
         return false;
     }

@@ -29,7 +29,7 @@ static const std::vector<std::string> YES_NO_DROPDOWN_OPTIONS = { "No", "Yes" };
 static const std::vector<std::string> TARGET_BASE_COUNT_DROPDOWN_OPTIONS = { "0", "1", "2", "Match Enemy" };
 static const uint32_t TARGET_BASE_COUNT_MATCH_ENEMY_INDEX = 3;
 
-void editor_menu_players_bot_config_dropdown(UI& ui, BotConfig& bot_config, const char* prompt, uint32_t flag);
+void editor_menu_players_bot_config_dropdown(UI& ui, BotConfig& bot_config, uint32_t flag);
 bool editor_menu_players_is_tech_allowed(const Scenario* scenario, uint32_t player_id, uint32_t tech_index);
 void editor_menu_players_set_tech_allowed(Scenario* scenario, uint32_t player_id, uint32_t tech_index, bool value);
 
@@ -104,21 +104,12 @@ void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorMenuMode&
                     }
                 });
 
-                scroll_items.push_back([&ui, &bot_config]() {
-                    editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Attack First:", BOT_CONFIG_SHOULD_ATTACK_FIRST);
-                });
-                scroll_items.push_back([&ui, &bot_config]() {
-                    editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Attack:", BOT_CONFIG_SHOULD_ATTACK);
-                });
-                scroll_items.push_back([&ui, &bot_config]() {
-                    editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Harass:", BOT_CONFIG_SHOULD_HARASS);
-                });
-                scroll_items.push_back([&ui, &bot_config]() {
-                    editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Retreat:", BOT_CONFIG_SHOULD_RETREAT);
-                });
-                scroll_items.push_back([&ui, &bot_config]() {
-                    editor_menu_players_bot_config_dropdown(ui, bot_config, "Should Scout:", BOT_CONFIG_SHOULD_SCOUT);
-                });
+                for (uint32_t flag_index = 0; flag_index < BOT_CONFIG_FLAG_COUNT; flag_index++) {
+                    scroll_items.push_back([&ui, &bot_config, flag_index]() {
+                        uint32_t flag = 1U << flag_index;
+                        editor_menu_players_bot_config_dropdown(ui, bot_config, flag);
+                    });
+                }
 
                 scroll_items.push_back([&ui, &bot_config]() {
                     uint32_t target_base_count_selection = bot_config.target_base_count == BOT_TARGET_BASE_COUNT_MATCH_ENEMY
@@ -193,7 +184,9 @@ void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorMenuMode&
     }
 }
 
-void editor_menu_players_bot_config_dropdown(UI& ui, BotConfig& bot_config, const char* prompt, uint32_t flag) {
+void editor_menu_players_bot_config_dropdown(UI& ui, BotConfig& bot_config, uint32_t flag) {
+    char prompt[64];
+    sprintf(prompt, "Should %s", bot_config_flag_str(flag));
     uint32_t value = (uint32_t)bitflag_check(bot_config.flags, flag);
     if (editor_menu_dropdown(ui, prompt, &value, YES_NO_DROPDOWN_OPTIONS, MENU_RECT)) {
         bitflag_set(&bot_config.flags, flag, (bool)value);
