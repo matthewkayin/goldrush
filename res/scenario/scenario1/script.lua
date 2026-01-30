@@ -7,6 +7,8 @@ local OBJECTIVE_ESTABLISH_BASE = "Establish a Base"
 local OBJECTIVE_DEFEAT_BANDITS = "Destroy the Bandit's Base"
 
 local ENEMY_BANDITS_PLAYER_ID = 1
+local BANDIT_ATTACK_2_TRIGGER_RADIUS = 12
+
 local bandit_attack_squad_id = nil
 local has_sent_bandit_attack2 = false
 
@@ -139,7 +141,6 @@ function scenario_update()
             local camera_return_cell = scenario.get_camera_centered_cell()
             actions.camera_pan(scenario.constants.BANDIT_BASE_CELL_1, 1.5)
             objectives.announce_new_objective(OBJECTIVE_DEFEAT_BANDITS)
-            actions.hold_camera(2.0)
             scenario.fog_reveal({
                 player_id = scenario.PLAYER_ID,
                 cell = scenario.constants.BANDIT_BASE_CELL_2,
@@ -165,8 +166,8 @@ function scenario_update()
     -- Send second bandit harass
     if objectives.current_objective == OBJECTIVE_DEFEAT_BANDITS and 
             not has_sent_bandit_attack2 and 
-            (scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.BANDIT_BASE_CELL_1, 8) or
-             scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.BANDIT_BASE_CELL_2, 8)) then
+            (scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.BANDIT_BASE_CELL_1, BANDIT_ATTACK_2_TRIGGER_RADIUS) or
+             scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.BANDIT_BASE_CELL_2, BANDIT_ATTACK_2_TRIGGER_RADIUS)) then
         local squad_entities = {}
         table.insert(squad_entities, scenario.entity_type.BANDIT)
         table.insert(squad_entities, scenario.entity_type.BANDIT)

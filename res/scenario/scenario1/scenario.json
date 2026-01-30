@@ -313,16 +313,16 @@
 			"gold_held": 0.000000,
 			"cell": {
 				"x": 41.000000,
-				"y": 54.000000
+				"y": 49.000000
 			}
 		},
 		{
-			"type": "Bandit",
+			"type": "Miner",
 			"player_id": 1.000000,
 			"gold_held": 0.000000,
 			"cell": {
-				"x": 40.000000,
-				"y": 56.000000
+				"x": 87.000000,
+				"y": 29.000000
 			}
 		},
 		{
@@ -331,7 +331,7 @@
 			"gold_held": 0.000000,
 			"cell": {
 				"x": 39.000000,
-				"y": 55.000000
+				"y": 50.000000
 			}
 		},
 		{
@@ -438,17 +438,17 @@
 			"player_id": 1.000000,
 			"gold_held": 0.000000,
 			"cell": {
-				"x": 36.000000,
-				"y": 62.000000
+				"x": 33.000000,
+				"y": 63.000000
 			}
 		},
 		{
-			"type": "Cowboy",
+			"type": "Miner",
 			"player_id": 1.000000,
 			"gold_held": 0.000000,
 			"cell": {
-				"x": 39.000000,
-				"y": 58.000000
+				"x": 87.000000,
+				"y": 28.000000
 			}
 		},
 		{
@@ -558,56 +558,11 @@
 				"x": 86.000000,
 				"y": 29.000000
 			}
-		},
-		{
-			"type": "Miner",
-			"player_id": 1.000000,
-			"gold_held": 0.000000,
-			"cell": {
-				"x": 87.000000,
-				"y": 29.000000
-			}
-		},
-		{
-			"type": "Miner",
-			"player_id": 1.000000,
-			"gold_held": 0.000000,
-			"cell": {
-				"x": 87.000000,
-				"y": 28.000000
-			}
-		},
-		{
-			"type": "Cowboy",
-			"player_id": 1.000000,
-			"gold_held": 0.000000,
-			"cell": {
-				"x": 81.000000,
-				"y": 33.000000
-			}
-		},
-		{
-			"type": "Cowboy",
-			"player_id": 1.000000,
-			"gold_held": 0.000000,
-			"cell": {
-				"x": 81.000000,
-				"y": 28.000000
-			}
-		},
-		{
-			"type": "Cowboy",
-			"player_id": 1.000000,
-			"gold_held": 0.000000,
-			"cell": {
-				"x": 33.000000,
-				"y": 63.000000
-			}
 		}
 	],
 	"squads": [
 		{
-			"name": "Squad 1",
+			"name": "bunker",
 			"player_id": 1.000000,
 			"type": "Defend",
 			"entities": [
@@ -618,57 +573,20 @@
 			]
 		},
 		{
-			"name": "Squad 2",
+			"name": "hallway",
 			"player_id": 1.000000,
 			"type": "Patrol",
 			"patrol_cell": {
 				"x": 40.000000,
-				"y": 44.000000
+				"y": 36.000000
 			},
 			"entities": [
 				28.000000,
-				27.000000,
 				26.000000
 			]
 		},
 		{
-			"name": "Squad 3",
-			"player_id": 1.000000,
-			"type": "Defend",
-			"entities": [
-				40.000000,
-				42.000000,
-				43.000000,
-				44.000000,
-				58.000000
-			]
-		},
-		{
-			"name": "Squad 4",
-			"player_id": 1.000000,
-			"type": "Patrol",
-			"patrol_cell": {
-				"x": 39.000000,
-				"y": 67.000000
-			},
-			"entities": [
-				41.000000
-			]
-		},
-		{
-			"name": "Squad 5",
-			"player_id": 1.000000,
-			"type": "Patrol",
-			"patrol_cell": {
-				"x": 41.000000,
-				"y": 64.000000
-			},
-			"entities": [
-				45.000000
-			]
-		},
-		{
-			"name": "Squad 6",
+			"name": "lake1",
 			"player_id": 1.000000,
 			"type": "Defend",
 			"entities": [
@@ -678,7 +596,7 @@
 			]
 		},
 		{
-			"name": "Squad 7",
+			"name": "lake2",
 			"player_id": 1.000000,
 			"type": "Defend",
 			"entities": [
@@ -687,39 +605,60 @@
 			]
 		},
 		{
-			"name": "Squad 8",
+			"name": "base1.1",
 			"player_id": 1.000000,
 			"type": "Patrol",
 			"patrol_cell": {
-				"x": 66.000000,
-				"y": 27.000000
+				"x": 38.000000,
+				"y": 63.000000
 			},
 			"entities": [
+				40.000000
+			]
+		},
+		{
+			"name": "base1.2",
+			"player_id": 1.000000,
+			"type": "Defend",
+			"entities": [
+				42.000000,
+				44.000000,
+				45.000000
+			]
+		},
+		{
+			"name": "base1.3",
+			"player_id": 1.000000,
+			"type": "Patrol",
+			"patrol_cell": {
+				"x": 41.000000,
+				"y": 68.000000
+			},
+			"entities": [
+				43.000000
+			]
+		},
+		{
+			"name": "base2.1",
+			"player_id": 1.000000,
+			"type": "Defend",
+			"entities": [
+				33.000000,
+				32.000000,
+				30.000000,
 				31.000000
 			]
 		},
 		{
-			"name": "Squad 9",
+			"name": "base2.2",
 			"player_id": 1.000000,
 			"type": "Patrol",
 			"patrol_cell": {
-				"x": 73.000000,
-				"y": 21.000000
+				"x": 82.000000,
+				"y": 28.000000
 			},
 			"entities": [
 				29.000000
-			]
-		},
-		{
-			"name": "Squad 10",
-			"player_id": 1.000000,
-			"type": "Defend",
-			"entities": [
-				30.000000,
-				32.000000,
-				33.000000,
-				56.000000,
-				57.000000
 			]
 		}
 	],
