@@ -98,7 +98,8 @@ enum TargetType {
     TARGET_UNLOAD,
     TARGET_MOLOTOV,
     TARGET_BUILD,
-    TARGET_BUILD_ASSIST
+    TARGET_BUILD_ASSIST,
+    TARGET_PATROL
 };
 
 struct TargetBuild {
@@ -107,13 +108,21 @@ struct TargetBuild {
     EntityType building_type;
 };
 
+struct TargetPatrol {
+    ivec2 cell_a;
+    ivec2 cell_b;
+};
+
 struct Target {
     TargetType type;
     EntityId id;
     uint8_t padding = 0;
     uint8_t padding2 = 0;
     ivec2 cell;
-    TargetBuild build;
+    union {
+        TargetBuild build;
+        TargetPatrol patrol;
+    };
 };
 
 enum BuildingQueueItemType {

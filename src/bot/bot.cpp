@@ -1989,33 +1989,34 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
 
     // Patrol squad micro
     if (squad.type == BOT_SQUAD_TYPE_PATROL) {
+        MatchInput input;
+        input.type = MATCH_INPUT_PATROL;
+        input.patrol.target_cell_a = squad.patrol_cell;
+        input.patrol.target_cell_b = squad.target_cell;
+        input.patrol.unit_count = 0;
+
         for (EntityId entity_id : unengaged_units) {
             const Entity& entity = state.entities.get_by_id(entity_id);
 
             // Don't interrupt a unit that is already patrolling
-            if (entity.mode != MODE_UNIT_IDLE && entity.target.type != TARGET_NONE) {
+            if (entity.target.type == TARGET_PATROL) {
                 continue;
             }
 
-            int distance_to_patrol_cell = ivec2::manhattan_distance(entity.cell, squad.patrol_cell);
-            int distance_to_source_cell = ivec2::manhattan_distance(entity.cell, squad.target_cell);
-            ivec2 cell_to_move_to = distance_to_patrol_cell < distance_to_source_cell
-                ? squad.target_cell
-                : squad.patrol_cell;
-
-            MatchInput input;
-            input.type = MATCH_INPUT_MOVE_CELL;
-            input.move.shift_command = 0;
-            input.move.target_id = ID_NULL;
-            input.move.target_cell = cell_to_move_to;
-            input.move.entity_count = 1;
-            input.move.entity_ids[0] = entity_id;
-            return input;
+            input.patrol.unit_ids[input.patrol.unit_count] = entity_id;
+            input.patrol.unit_count++;
+            if (input.patrol.unit_count == SELECTION_LIMIT) {
+                break;
+            }
         }
 
-        return (MatchInput) {
-            .type = MATCH_INPUT_NONE
-        };
+        if (input.patrol.unit_count == 0) {
+            return (MatchInput) {
+                .type = MATCH_INPUT_NONE
+            };
+        }
+
+        return input;
     }
 
     // Divide unengaged units into distant infantry (can be garrisoned) and distant cavalry (cannot be garrisoned)

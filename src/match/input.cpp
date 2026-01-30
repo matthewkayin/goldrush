@@ -121,6 +121,20 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += input.camo.unit_count * sizeof(EntityId);
             break;
         }
+        case MATCH_INPUT_PATROL: {
+            memcpy(out_buffer + out_buffer_length, &input.patrol.target_cell_a, sizeof(ivec2));
+            out_buffer_length += sizeof(ivec2);
+
+            memcpy(out_buffer + out_buffer_length, &input.patrol.target_cell_b, sizeof(ivec2));
+            out_buffer_length += sizeof(ivec2);
+
+            memcpy(out_buffer + out_buffer_length, &input.patrol.unit_count, sizeof(uint8_t));
+            out_buffer_length += sizeof(uint8_t);
+
+            memcpy(out_buffer + out_buffer_length, input.patrol.unit_ids, input.patrol.unit_count * sizeof(EntityId));
+            out_buffer_length += input.patrol.unit_count * sizeof(EntityId);
+            break;
+        }
     }
 }
 
@@ -241,6 +255,20 @@ MatchInput match_input_deserialize(const uint8_t* in_buffer, size_t& in_buffer_h
             in_buffer_head += input.camo.unit_count * sizeof(EntityId);
             break;
         }
+        case MATCH_INPUT_PATROL: {
+            memcpy(&input.patrol.target_cell_a, in_buffer + in_buffer_head, sizeof(ivec2));
+            in_buffer_head += sizeof(ivec2);
+
+            memcpy(&input.patrol.target_cell_b, in_buffer + in_buffer_head, sizeof(ivec2));
+            in_buffer_head += sizeof(ivec2);
+
+            memcpy(&input.patrol.unit_count, in_buffer + in_buffer_head, sizeof(uint8_t));
+            in_buffer_head += sizeof(uint8_t);
+
+            memcpy(input.patrol.unit_ids, in_buffer + in_buffer_head, input.patrol.unit_count * sizeof(EntityId));
+            in_buffer_head += input.patrol.unit_count * sizeof(EntityId);
+            break;
+        }
     }
 
     return input;
@@ -347,6 +375,17 @@ void match_input_print(char* out_ptr, const MatchInput& input) {
             out_ptr += sprintf(out_ptr, "%s count %u ids[", input.type == MATCH_INPUT_CAMO ? "camo" : "decamo", input.camo.unit_count);
             for (int index = 0; index < input.camo.unit_count; index++) {
                 out_ptr += sprintf(out_ptr, "%u,", input.camo.unit_ids[index]);
+            }
+            out_ptr += sprintf(out_ptr, "]");
+            break;
+        }
+        case MATCH_INPUT_PATROL: {
+            out_ptr += sprintf(out_ptr, "patrol A <%i, %i> -> B <%i, %i> count %u ids[",
+                    input.patrol.target_cell_a.x, input.patrol.target_cell_a.y,
+                    input.patrol.target_cell_b.x, input.patrol.target_cell_b.y,
+                    input.patrol.unit_count);
+            for (uint8_t index = 0; index < input.patrol.unit_count; index++) {
+                out_ptr += sprintf(out_ptr, "%u, ", input.patrol.unit_ids[index]);
             }
             out_ptr += sprintf(out_ptr, "]");
             break;

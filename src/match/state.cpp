@@ -636,6 +636,26 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
             }
             break;
         }
+        case MATCH_INPUT_PATROL: {
+            Target patrol_target;
+            patrol_target.type = TARGET_PATROL;
+            patrol_target.cell = ivec2(-1, -1);
+            patrol_target.id = ID_NULL;
+            patrol_target.patrol.cell_a = input.patrol.target_cell_a;
+            patrol_target.patrol.cell_b = input.patrol.target_cell_b;
+
+            for (uint32_t id_index = 0; id_index < input.patrol.unit_count; id_index++) {
+                EntityId entity_id = input.patrol.unit_ids[id_index];
+                uint32_t entity_index = state.entities.get_index_of(entity_id);
+                if (entity_index == INDEX_INVALID || 
+                        !entity_can_be_given_orders(state, state.entities[entity_index])) {
+                    continue;
+                }
+
+                entity_set_target(state, state.entities[entity_index], patrol_target);
+            }
+            break;
+        }
     }
 }
 
@@ -1181,6 +1201,15 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                     break;
                 }
 
+                // Set patrol target cell
+                if (entity.target.type == TARGET_PATROL) {
+                    int distance_to_a = ivec2::manhattan_distance(entity.cell, entity.target.patrol.cell_a);
+                    int distance_to_b = ivec2::manhattan_distance(entity.cell, entity.target.patrol.cell_b);
+                    entity.target.cell = distance_to_a < distance_to_b
+                        ? entity.target.patrol.cell_b
+                        : entity.target.patrol.cell_a;
+                }
+
                 if (entity_is_target_invalid(state, entity)) {
                     entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
                     entity.target = target_none();
@@ -1405,7 +1434,8 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                 switch (entity.target.type) {
                     case TARGET_NONE:
                     case TARGET_ATTACK_CELL:
-                    case TARGET_CELL: {
+                    case TARGET_CELL:
+                    case TARGET_PATROL: {
                         entity.target = target_none();
                         entity.attack_move_cell = ivec2(-1, -1);
                         entity.mode = MODE_UNIT_IDLE;
@@ -2636,6 +2666,8 @@ bool entity_has_reached_target(const MatchState& state, const Entity& entity) {
         case TARGET_MOLOTOV: {
             return ivec2::euclidean_distance_squared(entity.cell, entity.target.cell) <= MOLOTOV_RANGE_SQUARED;
         }
+        case TARGET_PATROL:
+            return false;
     }
 }
 
@@ -2710,7 +2742,8 @@ ivec2 entity_get_target_cell_helper(const MatchState& state, const Entity& entit
         case TARGET_CELL:
         case TARGET_ATTACK_CELL:
         case TARGET_UNLOAD:
-        case TARGET_MOLOTOV: {
+        case TARGET_MOLOTOV: 
+        case TARGET_PATROL: {
             return entity.target.cell;
         }
         case TARGET_ENTITY:

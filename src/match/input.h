@@ -23,7 +23,8 @@ enum MatchInputType {
     MATCH_INPUT_SINGLE_UNLOAD,
     MATCH_INPUT_UNLOAD,
     MATCH_INPUT_CAMO,
-    MATCH_INPUT_DECAMO
+    MATCH_INPUT_DECAMO,
+    MATCH_INPUT_PATROL
 };
 
 struct MatchInputMove {
@@ -83,6 +84,13 @@ struct MatchInputCamo {
     EntityId unit_ids[SELECTION_LIMIT];
 };
 
+struct MatchInputPatrol {
+    ivec2 target_cell_a;
+    ivec2 target_cell_b;
+    uint8_t unit_count;
+    EntityId unit_ids[SELECTION_LIMIT];
+};
+
 struct MatchInput {
     uint8_t type;
     union {
@@ -96,6 +104,7 @@ struct MatchInput {
         MatchInputSingleUnload single_unload;
         MatchInputUnload unload;
         MatchInputCamo camo;
+        MatchInputPatrol patrol;
     };
 };
 

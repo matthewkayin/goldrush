@@ -4823,6 +4823,7 @@ ivec2 match_shell_get_queued_target_position(const MatchShellState* state, const
         case TARGET_NONE:
         case TARGET_BUILD:
         case TARGET_BUILD_ASSIST:
+        case TARGET_PATROL:
             return ivec2(-1, -1);
     }
 }
