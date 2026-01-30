@@ -37,10 +37,12 @@ static int script_entity_is_visible_to_player(lua_State* lua_state);
 static int script_highlight_entity(lua_State* lua_state);
 static int script_get_player_entity_count(lua_State* lua_state);
 static int script_get_player_full_bunker_count(lua_State* lua_state);
+static int script_player_has_entity_near_cell(lua_State* lua_state);
 static int script_fog_reveal(lua_State* lua_state);
+static int script_get_camera_centered_cell(lua_State* lua_state);
 static int script_begin_camera_pan(lua_State* lua_state);
-static int script_begin_camera_return(lua_State* lua_state);
-static int script_free_camera(lua_State* lua_state);
+static int script_hold_camera(lua_State* lua_state);
+static int script_release_camera(lua_State* lua_state);
 static int script_get_camera_mode(lua_State* lua_state);
 static int script_spawn_enemy_squad(lua_State* lua_state);
 static int script_does_squad_exist(lua_State* lua_state);
@@ -65,10 +67,12 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "highlight_entity", script_highlight_entity },
     { "get_player_entity_count", script_get_player_entity_count },
     { "get_player_full_bunker_count", script_get_player_full_bunker_count },
+    { "player_has_entity_near_cell", script_player_has_entity_near_cell },
     { "fog_reveal", script_fog_reveal },
+    { "get_camera_centered_cell", script_get_camera_centered_cell },
     { "begin_camera_pan", script_begin_camera_pan },
-    { "begin_camera_return", script_begin_camera_return },
-    { "free_camera", script_free_camera },
+    { "hold_camera", script_hold_camera },
+    { "release_camera", script_release_camera },
     { "get_camera_mode", script_get_camera_mode },
     { "spawn_enemy_squad", script_spawn_enemy_squad },
     { "does_squad_exist", script_does_squad_exist },
@@ -84,8 +88,7 @@ static const ScriptConstant GOLD_CONSTANTS[] = {
     { "CAMERA_MODE_FREE", CAMERA_MODE_FREE },
     { "CAMERA_MODE_MINIMAP_DRAG", CAMERA_MODE_MINIMAP_DRAG },
     { "CAMERA_MODE_PAN", CAMERA_MODE_PAN },
-    { "CAMERA_MODE_PAN_HOLD", CAMERA_MODE_PAN_HOLD },
-    { "CAMERA_MODE_PAN_RETURN", CAMERA_MODE_PAN_RETURN },
+    { "CAMERA_MODE_HELD", CAMERA_MODE_HELD },
     { NULL, 0 }
 };
 
@@ -803,6 +806,9 @@ static int script_are_objectives_complete(lua_State* lua_state) {
     bool result = true;
 
     const MatchShellState* state = script_get_match_shell_state(lua_state);
+    if (state->scenario_objectives.empty()) {
+        result = false;
+    }
     for (uint32_t index = 0; index < state->scenario_objectives.size(); index++) {
         if (!state->scenario_objectives[index].is_complete) {
             result = false;
@@ -866,8 +872,8 @@ static int script_get_player_entity_count(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER, LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 2);
 
-    uint8_t player_id = lua_tonumber(lua_state, 1);
-    int entity_type = lua_tonumber(lua_state, 2);
+    uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
+    int entity_type = (int)lua_tonumber(lua_state, 2);
     script_validate_entity_type(lua_state, entity_type);
 
     const MatchShellState* state = script_get_match_shell_state(lua_state);
@@ -911,6 +917,37 @@ static int script_get_player_full_bunker_count(lua_State* lua_state) {
 
     return 1;
 }
+
+// Returns true if the specified player has an entity near the cell within the given distance
+// @param player_id number
+// @param cell ivec2
+// @param distance number
+// @return boolean
+static int script_player_has_entity_near_cell(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER, LUA_TTABLE, LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 3);
+
+    uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
+    ivec2 cell = script_validate_ivec2(lua_state, 2, "arg 2");
+    int distance = (int)lua_tonumber(lua_state, 3);
+
+    const MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    bool result = false;
+    for (const Entity& entity : state->match_state.entities) {
+        if (entity.player_id == player_id && 
+                entity.health != 0 && 
+                ivec2::manhattan_distance(entity.cell, cell) < distance) {
+            result = true;
+            break;
+        }
+    }
+
+    lua_pushboolean(lua_state, result);
+
+    return 1;
+}
+
 
 // Reveals fog at the specified cell.
 // @param params { player_id: number, cell: ivec2, cell_size: number, sight: number, duration: number }
@@ -961,6 +998,27 @@ static int script_fog_reveal(lua_State* lua_state) {
     return 0;
 }
 
+// Returns the cell the camera is currently centered on
+// @return ivec2
+static int script_get_camera_centered_cell(lua_State* lua_state) {
+    script_validate_arguments(lua_state, NULL, 0);
+
+    const MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    ivec2 camera_center = state->camera_offset + ivec2(SCREEN_WIDTH / 2, ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / 2));
+    ivec2 cell = camera_center / TILE_SIZE;
+
+    lua_newtable(lua_state);
+
+    lua_pushnumber(lua_state, cell.x);
+    lua_setfield(lua_state, -2, "x");
+
+    lua_pushnumber(lua_state, cell.y);
+    lua_setfield(lua_state, -2, "y");
+
+    return 1;
+}
+
 // Gradually pans the camera to center on the specified cell. 
 // @param cell ivec2 The cell to pan the camera to
 // @param duration number The duration in seconds of the camera pan
@@ -974,12 +1032,12 @@ static int script_begin_camera_pan(lua_State* lua_state) {
     MatchShellState* state = script_get_match_shell_state(lua_state);
 
     // Convert to cell into camera offset
-    state->camera_pan_offset.x = (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
-    state->camera_pan_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / 2);
-    state->camera_pan_offset.x = std::clamp(state->camera_pan_offset.x, 0, (state->match_state.map.width * TILE_SIZE) - SCREEN_WIDTH);
-    state->camera_pan_offset.y = std::clamp(state->camera_pan_offset.y, 0, (state->match_state.map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
+    state->camera_pan_end_offset.x = (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
+    state->camera_pan_end_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / 2);
+    state->camera_pan_end_offset.x = std::clamp(state->camera_pan_end_offset.x, 0, (state->match_state.map.width * TILE_SIZE) - SCREEN_WIDTH);
+    state->camera_pan_end_offset.y = std::clamp(state->camera_pan_end_offset.y, 0, (state->match_state.map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
 
-    state->camera_pan_return_offset = state->camera_offset;
+    state->camera_pan_start_offset = state->camera_offset;
     state->camera_pan_timer = (uint32_t)(duration * (double)UPDATES_PER_SECOND);
     state->camera_pan_duration = state->camera_pan_timer;
 
@@ -988,25 +1046,18 @@ static int script_begin_camera_pan(lua_State* lua_state) {
     return 0;
 }
 
-// Gradually returns the camera to the position it was at before the most recent camera pan started.
-// @param duration number The duration in seconds of the camera return
-static int script_begin_camera_return(lua_State* lua_state) {
-    const int arg_types[] = { LUA_TNUMBER };
-    script_validate_arguments(lua_state, arg_types, 1);
-
-    double duration = lua_tonumber(lua_state, 1);
+// Removes camera movement from the player and holds the camera in place
+static int script_hold_camera(lua_State* lua_state) {
+    script_validate_arguments(lua_state, NULL, 0);
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
-
-    state->camera_pan_timer = (uint32_t)(duration * (double)UPDATES_PER_SECOND);
-    state->camera_pan_duration = state->camera_pan_timer;
-    state->camera_mode = CAMERA_MODE_PAN_RETURN;
+    state->camera_mode = CAMERA_MODE_HELD;
 
     return 0;
 }
 
-// Ends the current camera pan and returns free camera movement to the player.
-static int script_free_camera(lua_State* lua_state) {
+// Returns camera movement to the player
+static int script_release_camera(lua_State* lua_state) {
     script_validate_arguments(lua_state, NULL, 0);
 
     MatchShellState* state = script_get_match_shell_state(lua_state);

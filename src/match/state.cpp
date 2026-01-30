@@ -1158,10 +1158,14 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                 }
 
                 // If unit is idle, try to find a nearby target
-                if (entity.target.type == TARGET_NONE && entity.type != ENTITY_MINER && 
+                if ((entity.target.type == TARGET_NONE || entity.target.type == TARGET_PATROL) && 
+                        entity.type != ENTITY_MINER && 
                         !(entity.type == ENTITY_DETECTIVE && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE)) &&
                         entity_data.unit_data.damage != 0) {
-                    entity.target = entity_target_nearest_enemy(state, entity); 
+                    Target nearest_enemy_target = entity_target_nearest_enemy(state, entity); 
+                    if (nearest_enemy_target.type != TARGET_NONE) {
+                        entity.target = nearest_enemy_target;
+                    }
                 }
 
                 // If unit is attacking, check if there's a higher priority target nearby

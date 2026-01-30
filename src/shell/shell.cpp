@@ -1294,29 +1294,18 @@ void match_shell_update(MatchShellState* state) {
     if (state->control_group_double_tap_timer != 0) {
         state->control_group_double_tap_timer--;
     }
-    if (state->camera_mode == CAMERA_MODE_PAN || state->camera_mode == CAMERA_MODE_PAN_RETURN) {
+    if (state->camera_mode == CAMERA_MODE_PAN) {
         state->camera_pan_timer--;
 
-        ivec2 start_pos, end_pos;
-        if (state->camera_mode == CAMERA_MODE_PAN) {
-            start_pos = state->camera_pan_return_offset;
-            end_pos = state->camera_pan_offset;
-        } else {
-            start_pos = state->camera_pan_offset;
-            end_pos = state->camera_pan_return_offset;
-        }
-
         if (state->camera_pan_timer == 0) {
-            state->camera_offset = end_pos;
-            state->camera_mode = state->camera_mode == CAMERA_MODE_PAN
-                ? CAMERA_MODE_PAN_HOLD
-                : CAMERA_MODE_FREE;
+            state->camera_offset = state->camera_pan_end_offset;
+            state->camera_mode = CAMERA_MODE_FREE;
         } else {
             float percent = 
                 (float)(state->camera_pan_duration - state->camera_pan_timer) / 
                 (float)state->camera_pan_duration;
-            ivec2 difference = end_pos - start_pos;
-            state->camera_offset = start_pos + ivec2((int)((float)difference.x * percent), (int)((float)difference.y * percent));
+            ivec2 difference = state->camera_pan_end_offset - state->camera_pan_start_offset;
+            state->camera_offset = state->camera_pan_start_offset + ivec2((int)((float)difference.x * percent), (int)((float)difference.y * percent));
         }
     }
     for (int sound = 0; sound < SOUND_COUNT; sound++) {
@@ -2329,12 +2318,6 @@ void match_shell_center_camera_on_cell(MatchShellState* state, ivec2 cell) {
 
 bool match_shell_is_camera_free(const MatchShellState* state) {
     return state->camera_mode == CAMERA_MODE_FREE;
-}
-
-bool match_shell_is_camera_panning(const MatchShellState* state) {
-    return state->camera_mode == CAMERA_MODE_PAN || 
-        state->camera_mode == CAMERA_MODE_PAN_HOLD ||
-        state->camera_mode == CAMERA_MODE_PAN_RETURN;
 }
 
 // SELECTION

@@ -32,14 +32,13 @@ function actions.camera_pan(cell, duration)
     scenario.begin_camera_pan(cell, duration)
     repeat
         coroutine.yield()
-    until scenario.get_camera_mode() == scenario.CAMERA_MODE_PAN_HOLD
+    until scenario.get_camera_mode() == scenario.CAMERA_MODE_FREE
 end
 
-function actions.camera_return(duration)
-    scenario.begin_camera_return(duration)
-    repeat
-        coroutine.yield()
-    until scenario.get_camera_mode() == scenario.CAMERA_MODE_FREE
+function actions.hold_camera(duration)
+    scenario.hold_camera()
+    actions.wait(duration)
+    scenario.release_camera()
 end
 
 return actions

@@ -8,6 +8,7 @@ local OBJECTIVE_DEFEAT_BANDITS = "Destroy the Bandit's Base"
 
 local ENEMY_BANDITS_PLAYER_ID = 1
 local bandit_attack_squad_id = nil
+local has_sent_bandit_attack2 = false
 
 function scenario_init()
     actions.run(function()
@@ -111,10 +112,11 @@ function scenario_update()
                 sight = 9,
                 duration = 3.0
             })
+            local camera_return_cell = scenario.get_camera_centered_cell()
             actions.camera_pan(scenario.constants.BANDIT_SPAWN_CELL, 0.75)
             scenario.chat(scenario.CHAT_COLOR_WHITE, "", "It's a bandit attack! Hold steady!")
-            actions.wait(2.0)
-            scenario.begin_camera_return(0.75)
+            actions.hold_camera(2.0)
+            actions.camera_pan(camera_return_cell, 0.75)
         end)
     elseif objectives.current_objective == OBJECTIVE_DEFEAT_BANDITS and scenario.are_objectives_complete() then
         actions.run(function()
@@ -126,7 +128,7 @@ function scenario_update()
     -- Handle bandit attack defeated
     if bandit_attack_squad_id ~= nil and not scenario.does_squad_exist(ENEMY_BANDITS_PLAYER_ID, bandit_attack_squad_id) then
         actions.run(function()
-            actions.wait(2.0)
+            actions.wait(3.0)
             scenario.fog_reveal({
                 player_id = scenario.PLAYER_ID,
                 cell = scenario.constants.BANDIT_BASE_CELL_1,
@@ -134,17 +136,10 @@ function scenario_update()
                 sight = 13,
                 duration = 5.0
             })
+            local camera_return_cell = scenario.get_camera_centered_cell()
             actions.camera_pan(scenario.constants.BANDIT_BASE_CELL_1, 1.5)
             objectives.announce_new_objective(OBJECTIVE_DEFEAT_BANDITS)
-            objectives.add_objective({
-                objective = {
-                    description = OBJECTIVE_DEFEAT_BANDITS
-                },
-                complete_fn = function()
-                    return scenario.is_player_defeated(ENEMY_BANDITS_PLAYER_ID)
-                end
-            })
-            scenario.free_camera()
+            actions.hold_camera(2.0)
             scenario.fog_reveal({
                 player_id = scenario.PLAYER_ID,
                 cell = scenario.constants.BANDIT_BASE_CELL_2,
@@ -153,10 +148,37 @@ function scenario_update()
                 duration = 5.0
             })
             actions.camera_pan(scenario.constants.BANDIT_BASE_CELL_2, 1.5)
-            actions.wait(2.0)
-            actions.camera_return(2.0)
+            actions.hold_camera(2.0)
+            actions.camera_pan(camera_return_cell, 1.5)
+            objectives.add_objective({
+                objective = {
+                    description = OBJECTIVE_DEFEAT_BANDITS
+                },
+                complete_fn = function()
+                    return scenario.is_player_defeated(ENEMY_BANDITS_PLAYER_ID)
+                end
+            })
         end)
         bandit_attack_squad_id = nil
+    end
+
+    -- Send second bandit harass
+    if objectives.current_objective == OBJECTIVE_DEFEAT_BANDITS and 
+            not has_sent_bandit_attack2 and 
+            (scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.BANDIT_BASE_CELL_1, 8) or
+             scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.BANDIT_BASE_CELL_2, 8)) then
+        local squad_entities = {}
+        table.insert(squad_entities, scenario.entity_type.BANDIT)
+        table.insert(squad_entities, scenario.entity_type.BANDIT)
+        table.insert(squad_entities, scenario.entity_type.BANDIT)
+        table.insert(squad_entities, scenario.entity_type.BANDIT)
+        scenario.spawn_enemy_squad({
+            player_id = ENEMY_BANDITS_PLAYER_ID,
+            spawn_cell = scenario.constants.BANDIT_SPAWN_CELL,
+            target_cell = scenario.constants.BANDIT_TARGET_CELL,
+            entities = squad_entities
+        })
+        has_sent_bandit_attack2 = true
     end
 
     -- This is placed on the bottom so that any actions can begin running on the frame they are kicked off

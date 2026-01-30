@@ -13,8 +13,7 @@ scenario.SQUAD_ID_NULL = -1
 scenario.CAMERA_MODE_FREE = 0
 scenario.CAMERA_MODE_MINIMAP_DRAG = 1
 scenario.CAMERA_MODE_PAN = 2
-scenario.CAMERA_MODE_PAN_HOLD = 3
-scenario.CAMERA_MODE_PAN_RETURN = 4
+scenario.CAMERA_MODE_HELD = 3
 
 --- Scenario constants
 scenario.constants = {}
@@ -157,21 +156,31 @@ function scenario.get_player_entity_count(player_id, entity_type) end
 --- @return number
 function scenario.get_player_full_bunker_count(player_id) end
 
+--- Returns true if the specified player has an entity near the cell within the given distance
+--- @param player_id number
+--- @param cell ivec2
+--- @param distance number
+--- @return boolean
+function scenario.player_has_entity_near_cell(player_id, cell, distance) end
+
 --- Reveals fog at the specified cell.
 --- @param params { player_id: number, cell: ivec2, cell_size: number, sight: number, duration: number }
 function scenario.fog_reveal(params) end
+
+--- Returns the cell the camera is currently centered on
+--- @return ivec2
+function scenario.get_camera_centered_cell() end
 
 --- Gradually pans the camera to center on the specified cell. 
 --- @param cell ivec2 The cell to pan the camera to
 --- @param duration number The duration in seconds of the camera pan
 function scenario.begin_camera_pan(cell, duration) end
 
---- Gradually returns the camera to the position it was at before the most recent camera pan started.
---- @param duration number The duration in seconds of the camera return
-function scenario.begin_camera_return(duration) end
+--- Removes camera movement from the player and holds the camera in place
+function scenario.hold_camera() end
 
---- Ends the current camera pan and returns free camera movement to the player.
-function scenario.free_camera() end
+--- Returns camera movement to the player
+function scenario.release_camera() end
 
 --- Returns the current camera mode.
 --- @return number

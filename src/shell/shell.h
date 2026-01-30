@@ -65,8 +65,7 @@ enum CameraMode {
     CAMERA_MODE_FREE,
     CAMERA_MODE_MINIMAP_DRAG,
     CAMERA_MODE_PAN,
-    CAMERA_MODE_PAN_HOLD,
-    CAMERA_MODE_PAN_RETURN
+    CAMERA_MODE_HELD
 };
 
 struct Alert {
@@ -127,8 +126,8 @@ struct MatchShellState {
     // Camera
     CameraMode camera_mode;
     ivec2 camera_offset;
-    ivec2 camera_pan_return_offset;
-    ivec2 camera_pan_offset;
+    ivec2 camera_pan_start_offset;
+    ivec2 camera_pan_end_offset;
     uint32_t camera_pan_timer;
     uint32_t camera_pan_duration;
     ivec2 camera_hotkeys[MATCH_SHELL_CAMERA_HOTKEY_COUNT];
@@ -254,7 +253,6 @@ bool match_shell_is_targeting(const MatchShellState* state);
 void match_shell_clamp_camera(MatchShellState* state);
 void match_shell_center_camera_on_cell(MatchShellState* state, ivec2 cell);
 bool match_shell_is_camera_free(const MatchShellState* state);
-bool match_shell_is_camera_panning(const MatchShellState* state);
 
 // Selection
 std::vector<EntityId> match_shell_create_selection(const MatchShellState* state, Rect select_rect);
