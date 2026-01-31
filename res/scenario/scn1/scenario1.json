@@ -1,0 +1,130 @@
+{
+	"map": "map.dat",
+	"script": "scenario1.lua",
+	"player_spawn": {
+		"x": 46.000000,
+		"y": 12.000000
+	},
+	"players": [
+		{
+			"name": "Player",
+			"starting_gold": 50.000000,
+			"allowed_upgrades": [
+				"Wagon Armor",
+				"Land Mines",
+				"Bayonets",
+				"Private Eye",
+				"Stakeout",
+				"Serrated Knives",
+				"Tailwind",
+				"Iron Sights"
+			],
+			"allowed_entities": [
+				"Gold Mine",
+				"Miner",
+				"Cowboy",
+				"Bandit",
+				"Wagon",
+				"Jockey",
+				"Sapper",
+				"Pyro",
+				"Soldier",
+				"Cannoneer",
+				"Detective",
+				"Balloon",
+				"Town Hall",
+				"House",
+				"Saloon",
+				"Bunker",
+				"Workshop",
+				"Blacksmith",
+				"Chicken Coop",
+				"Barracks",
+				"Sheriff's Office",
+				"Land Mine"
+			]
+		},
+		{
+			"name": "Enemy 1",
+			"starting_gold": 50.000000,
+			"opener": "Tech First",
+			"preferred_unit_comp": "Cwby/Bndt",
+			"flags": [],
+			"target_base_count": 0.000000,
+			"macro_cycle_cooldown": 0.000000,
+			"allowed_upgrades": [],
+			"allowed_entities": []
+		},
+		{
+			"name": "Enemy 2",
+			"starting_gold": 50.000000,
+			"opener": "Tech First",
+			"preferred_unit_comp": "Cwby/Bndt",
+			"flags": [],
+			"target_base_count": 0.000000,
+			"macro_cycle_cooldown": 0.000000,
+			"allowed_upgrades": [],
+			"allowed_entities": []
+		},
+		{
+			"name": "Enemy 3",
+			"starting_gold": 50.000000,
+			"opener": "Tech First",
+			"preferred_unit_comp": "Cwby/Bndt",
+			"flags": [],
+			"target_base_count": 0.000000,
+			"macro_cycle_cooldown": 0.000000,
+			"allowed_upgrades": [],
+			"allowed_entities": []
+		}
+	],
+	"entities": [
+		{
+			"type": "Gold Mine",
+			"player_id": 4.000000,
+			"gold_held": 20000.000000,
+			"cell": {
+				"x": 5.000000,
+				"y": 88.000000
+			}
+		},
+		{
+			"type": "Gold Mine",
+			"player_id": 4.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 24.000000,
+				"y": 30.000000
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 0.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 45.000000,
+				"y": 7.000000
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 0.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 46.000000,
+				"y": 7.000000
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 0.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 47.000000,
+				"y": 7.000000
+			}
+		}
+	],
+	"squads": [],
+	"constants": []
+}

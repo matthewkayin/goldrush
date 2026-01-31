@@ -1154,7 +1154,7 @@ bool map_is_cell_rect_blocked(const Map& map, ivec2 cell, int cell_size) {
     return false;
 }
 
-void map_calculate_unreachable_cells(Map& map) {
+void map_calculate_unreachable_cells(Map& map, ivec2 main_island_cell) {
     // Determine map "islands"
     std::vector<int> map_tile_islands = std::vector<int>(map.width * map.height, MAP_ISLAND_UNASSIGNED);
     std::vector<int> island_size;
@@ -1215,16 +1215,36 @@ void map_calculate_unreachable_cells(Map& map) {
             }
         }
     }
-    int biggest_island = 0;
-    for (int island_index = 1; island_index < (int)island_size.size(); island_index++) {
-        if (island_size[island_index] > island_size[biggest_island]) {
-            biggest_island = island_index;
+
+    /**
+     * The main island is the area that is reachable. 
+     * This should be a contigous space that all units can access.
+     * 
+     * In a standard game, main_island_cell will be the default value (ivec2(-1, -1))
+     * and the main island will be calculated as the biggest island. Unreachable cells,
+     * in this case, are an anomaly.
+     * 
+     * In a standard game, however, the main walkable area might not be the biggest 
+     * island (such as when the level is a maze, with a large area of contigous but
+     * unreachable highground). Because of this, the scenario will pass in main_island_cell
+     * to be used as a reference for where the main island is.
+     */
+    int main_island;
+    if (main_island_cell.x != -1) {
+        main_island = map_tile_islands[main_island_cell.x + (main_island_cell.y * map.width)];
+    } else {
+        main_island = 0;
+        for (int island_index = 1; island_index < (int)island_size.size(); island_index++) {
+            if (island_size[island_index] > island_size[main_island]) {
+                main_island = island_index;
+            }
         }
     }
+
     // Everything that's not on the main "island" is considered blocked
     // This makes it so that we don't place any player spawns or gold at these locations
     for (int index = 0; index < map.width * map.height; index++) {
-        if (map.cells[CELL_LAYER_GROUND][index].type == CELL_EMPTY && map_tile_islands[index] != biggest_island) {
+        if (map.cells[CELL_LAYER_GROUND][index].type == CELL_EMPTY && map_tile_islands[index] != main_island) {
             map.cells[CELL_LAYER_GROUND][index].type = CELL_UNREACHABLE;
         }
     }

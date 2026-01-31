@@ -324,6 +324,7 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
 
     // Init map
     state->match_state.map = scenario->map;
+    map_calculate_unreachable_cells(state->match_state.map, scenario->entities[0].cell);
     map_init_regions(state->match_state.map);
 
     // Clear any cells that are of type unit, 

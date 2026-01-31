@@ -1002,7 +1002,9 @@ EntityId entity_create(MatchState& state, EntityType type, ivec2 cell, uint8_t p
 EntityId entity_goldmine_create(MatchState& state, ivec2 cell, uint32_t gold_left) {
     Entity entity;
     entity.type = ENTITY_GOLDMINE;
-    entity.mode = MODE_GOLDMINE;
+    entity.mode = gold_left != 0 
+        ? MODE_GOLDMINE
+        : MODE_GOLDMINE_COLLAPSED;
     entity.player_id = PLAYER_NONE;
     entity.flags = 0;
 
