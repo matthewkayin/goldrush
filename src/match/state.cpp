@@ -991,7 +991,7 @@ EntityId entity_create(MatchState& state, EntityType type, ivec2 cell, uint8_t p
     match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, true);
 
     if (entity_is_building(type)) {
-        map_calculate_unreachable_cells(state.map, cell);
+        map_calculate_unreachable_cells(state.map);
     }
 
     log_info("Created entity %s ID %u player %u cell <%i, %i>", entity_data.name, id, player_id, cell.x, cell.y);
@@ -1103,7 +1103,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                         }
                     }
                 }
-                map_calculate_unreachable_cells(state.map, entity.cell);
+                map_calculate_unreachable_cells(state.map);
             }
         }
 
@@ -1386,7 +1386,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                                 entity_set_flag(mine, ENTITY_FLAG_INVISIBLE, false);
                             }
                         }
-                        if (entity.target.type == TARGET_ATTACK_CELL) {
+                        if (entity.target.type == TARGET_ATTACK_CELL || entity.target.type == TARGET_PATROL) {
                             Target attack_target = entity_target_nearest_enemy(state, entity);
                             if (attack_target.type != TARGET_NONE) {
                                 entity.target = attack_target;

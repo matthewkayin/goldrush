@@ -861,6 +861,19 @@ static int script_highlight_entity(lua_State* lua_state) {
     state->highlight_animation = animation_create(ANIMATION_UI_HIGHLIGHT_ENTITY);
     state->highlight_entity_id = entity_id;
 
+    // Do a fog reveal on the highlighted entity
+    const Entity& entity = state->match_state.entities.get_by_id(entity_id);
+    FogReveal fog_reveal = (FogReveal) {
+        .team = state->match_state.players[network_get_player_id()].team,
+        .cell = entity.cell,
+        .cell_size = entity_get_data(entity.type).cell_size,
+        .sight = 3,
+        .timer = 160U // this is the duration of animation_ui_highlight_entity
+    };
+
+    match_fog_update(state->match_state, fog_reveal.team, fog_reveal.cell, fog_reveal.cell_size, fog_reveal.sight, false, CELL_LAYER_GROUND, true);
+    state->match_state.fog_reveals.push_back(fog_reveal);
+
     return 0;
 }
 
@@ -955,12 +968,6 @@ static int script_fog_reveal(lua_State* lua_state) {
     const int arg_types[] = { LUA_TTABLE };
     script_validate_arguments(lua_state, arg_types, 1);
 
-    // Team
-    lua_getfield(lua_state, 1, "player_id");
-    script_validate_type(lua_state, -1, "player_id", LUA_TNUMBER);
-    uint8_t player_id = (uint8_t)lua_tonumber(lua_state, -1);
-    lua_pop(lua_state, 1);
-
     // Cell
     lua_getfield(lua_state, 1, "cell");
     ivec2 cell = script_validate_ivec2(lua_state, -1, "cell");
@@ -985,8 +992,8 @@ static int script_fog_reveal(lua_State* lua_state) {
     lua_pop(lua_state, 1);
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
-    uint8_t team = state->match_state.players[player_id].team;
-    match_fog_update(state->match_state, team, cell, cell_size, sight, false, CELL_LAYER_SKY, true);
+    uint8_t team = state->match_state.players[network_get_player_id()].team;
+    match_fog_update(state->match_state, team, cell, cell_size, sight, false, CELL_LAYER_GROUND, true);
     state->match_state.fog_reveals.push_back((FogReveal) {
         .team = team,
         .cell = cell,

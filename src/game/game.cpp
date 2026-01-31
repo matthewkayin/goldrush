@@ -73,6 +73,7 @@ void game_set_mode(GameState& state, GameSetModeParams params) {
     if (params.mode == GAME_MODE_MATCH_TEST_SCENARIO) {
         network_set_backend(NETWORK_BACKEND_LAN);
         network_open_lobby("Test Game", NETWORK_LOBBY_PRIVACY_SINGLEPLAYER);
+        network_set_username("Player");
         state.match_shell_state = match_shell_init_from_scenario(params.match_scenario.scenario, params.match_scenario.script_path);
         if (state.match_shell_state->mode != MATCH_SHELL_MODE_LEAVE_MATCH) {
             for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {

@@ -2009,7 +2009,8 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
             const Entity& entity = state.entities.get_by_id(entity_id);
 
             // Don't interrupt a unit that is already patrolling
-            if (entity.target.type == TARGET_PATROL) {
+            // Also don't interrupt a unit that has a target
+            if (entity.target.type == TARGET_PATROL || entity.target.type == TARGET_ATTACK_ENTITY) {
                 continue;
             }
 

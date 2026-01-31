@@ -107,7 +107,7 @@ SpriteName map_get_plain_ground_tile_sprite(MapType map_type);
 SpriteName map_get_decoration_sprite(MapType map_type);
 bool map_is_cell_blocked(Cell cell);
 bool map_is_cell_rect_blocked(const Map& map, ivec2 cell, int cell_size);
-void map_calculate_unreachable_cells(Map& map, ivec2 main_island_cell = ivec2(-1, -1));
+void map_calculate_unreachable_cells(Map& map);
 
 uint32_t map_neighbors_to_autotile_index(uint32_t neighbors);
 void map_generate_decorations(Map& map, Noise* noise, int* lcg_seed, const std::vector<ivec2>& goldmine_cells);

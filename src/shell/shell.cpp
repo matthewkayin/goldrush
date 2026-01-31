@@ -310,7 +310,9 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
         }
 
         players[player_id].active = true;
-        strcpy(players[player_id].name, scenario->players[player_id].name);
+        strcpy(players[player_id].name, player_id == network_get_player_id()
+            ? network_get_username()
+            : scenario->players[player_id].name);
         players[player_id].team = player_id;
         players[player_id].recolor_id = player_id;
         players[player_id].gold = scenario->players[player_id].starting_gold;
@@ -324,7 +326,7 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
 
     // Init map
     state->match_state.map = scenario->map;
-    map_calculate_unreachable_cells(state->match_state.map, scenario->entities[0].cell);
+    map_calculate_unreachable_cells(state->match_state.map);
     map_init_regions(state->match_state.map);
 
     // Clear any cells that are of type unit, 

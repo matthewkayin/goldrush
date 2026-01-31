@@ -1154,9 +1154,7 @@ bool map_is_cell_rect_blocked(const Map& map, ivec2 cell, int cell_size) {
     return false;
 }
 
-void map_calculate_unreachable_cells(Map& map, ivec2 main_island_cell) {
-    log_debug("main island cell <%i, %i>", main_island_cell.x, main_island_cell.y);
-
+void map_calculate_unreachable_cells(Map& map) {
     // Determine map "islands"
     std::vector<int> map_tile_islands = std::vector<int>(map.width * map.height, MAP_ISLAND_UNASSIGNED);
     std::vector<int> island_size;
@@ -1218,28 +1216,10 @@ void map_calculate_unreachable_cells(Map& map, ivec2 main_island_cell) {
         }
     }
 
-    /**
-     * The main island is the area that is reachable. 
-     * This should be a contigous space that all units can access.
-     * 
-     * In a standard game, main_island_cell will be the default value (ivec2(-1, -1))
-     * and the main island will be calculated as the biggest island. Unreachable cells,
-     * in this case, are an anomaly.
-     * 
-     * In a standard game, however, the main walkable area might not be the biggest 
-     * island (such as when the level is a maze, with a large area of contigous but
-     * unreachable highground). Because of this, the scenario will pass in main_island_cell
-     * to be used as a reference for where the main island is.
-     */
-    int main_island;
-    if (main_island_cell.x != -1) {
-        main_island = map_tile_islands[main_island_cell.x + (main_island_cell.y * map.width)];
-    } else {
-        main_island = 0;
-        for (int island_index = 1; island_index < (int)island_size.size(); island_index++) {
-            if (island_size[island_index] > island_size[main_island]) {
-                main_island = island_index;
-            }
+    int main_island = 0;
+    for (int island_index = 1; island_index < (int)island_size.size(); island_index++) {
+        if (island_size[island_index] > island_size[main_island]) {
+            main_island = island_index;
         }
     }
 
