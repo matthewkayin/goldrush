@@ -5,6 +5,7 @@
 #include "match/lcg.h"
 #include "profile/profile.h"
 #include "util/bitflag.h"
+#include "util/util.h"
 
 // Scout info
 static const uint32_t BOT_SCOUT_INFO_ENEMY_HAS_DETECTIVES = 1;
@@ -1749,6 +1750,32 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
 
 // SQUADS
 
+const char* bot_squad_type_str(BotSquadType type) {
+    switch (type) {
+        case BOT_SQUAD_TYPE_ATTACK:
+            return "Attack";
+        case BOT_SQUAD_TYPE_DEFEND:
+            return "Defend";
+        case BOT_SQUAD_TYPE_RESERVES:
+            return "Reserves";
+        case BOT_SQUAD_TYPE_LANDMINES:
+            return "Landmines";
+        case BOT_SQUAD_TYPE_RETURN:
+            return "Return";
+        case BOT_SQUAD_TYPE_PATROL:
+            return "Patrol";
+        case BOT_SQUAD_TYPE_HOLD_POSITION:
+            return "Hold Position";
+        case BOT_SQUAD_TYPE_COUNT:
+            GOLD_ASSERT(false);
+            return "";
+    }
+}
+
+BotSquadType bot_squad_type_from_str(const char* str) {
+    return (BotSquadType)enum_from_str(str, (EnumToStrFn)bot_squad_type_str, BOT_SQUAD_TYPE_COUNT);
+}
+
 int bot_add_squad(Bot& bot, BotAddSquadParams params) {
     GOLD_ASSERT(!params.entities.empty());
     if (params.entities.empty()) {
@@ -1768,27 +1795,10 @@ int bot_add_squad(Bot& bot, BotAddSquadParams params) {
     {
         char debug_buffer[1024];
         char* debug_ptr = debug_buffer;
-        debug_ptr += sprintf(debug_ptr, "BOT %u squad_create, id %u type ", bot.player_id, squad.id);
-        switch (squad.type) {
-            case BOT_SQUAD_TYPE_ATTACK:
-                debug_ptr += sprintf(debug_ptr, "ATTACK");
-                break;
-            case BOT_SQUAD_TYPE_RESERVES:
-                debug_ptr += sprintf(debug_ptr, "RESERVES");
-                break;
-            case BOT_SQUAD_TYPE_LANDMINES:
-                debug_ptr += sprintf(debug_ptr, "LANDMINES");
-                break;
-            case BOT_SQUAD_TYPE_DEFEND:
-                debug_ptr += sprintf(debug_ptr, "DEFEND");
-                break;
-            case BOT_SQUAD_TYPE_PATROL:
-                debug_ptr += sprintf(debug_ptr, "PATROL");
-                break;
-            case BOT_SQUAD_TYPE_RETURN:
-                GOLD_ASSERT(false);
-        }
-        debug_ptr += sprintf(debug_ptr, " target cell <%i, %i> patrol cell <%i, %i> entities [", 
+        debug_ptr += sprintf(debug_ptr, "BOT %u squad_create, id %u type %s target cell <%i, %i> patrol cell <%i, %i> entities [", 
+            bot.player_id, 
+            squad.id,
+            bot_squad_type_str(squad.type),
             squad.target_cell.x, squad.target_cell.y,
             squad.patrol_cell.x, squad.patrol_cell.y);
         for (EntityId entity_id : squad.entities) {
@@ -2011,6 +2021,36 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
         }
 
         if (input.patrol.unit_count == 0) {
+            return (MatchInput) {
+                .type = MATCH_INPUT_NONE
+            };
+        }
+
+        return input;
+    }
+
+    // Hold position squad micro
+    if (squad.type == BOT_SQUAD_TYPE_HOLD_POSITION) {
+        MatchInput input;
+        input.type = MATCH_INPUT_DEFEND;
+        input.stop.entity_count = 0;
+
+        for (EntityId entity_id : unengaged_units) {
+            const Entity& entity = state.entities.get_by_id(entity_id);
+
+            // If it's already holding position, then no need to give any orders
+            if (entity_check_flag(entity, ENTITY_FLAG_HOLD_POSITION)) {
+                continue;
+            }
+
+            input.stop.entity_ids[input.stop.entity_count] = entity_id;
+            input.stop.entity_count++;
+            if (input.stop.entity_count == SELECTION_LIMIT) {
+                break;
+            }
+        }
+
+        if (input.stop.entity_count == 0) {
             return (MatchInput) {
                 .type = MATCH_INPUT_NONE
             };
@@ -2840,6 +2880,8 @@ ivec2 bot_squad_choose_target_cell(const MatchState& state, const Bot& bot, BotS
         case BOT_SQUAD_TYPE_RESERVES:
         case BOT_SQUAD_TYPE_RETURN:
         case BOT_SQUAD_TYPE_PATROL:
+        case BOT_SQUAD_TYPE_HOLD_POSITION:
+        case BOT_SQUAD_TYPE_COUNT:
             GOLD_ASSERT_MESSAGE(false, "This squad type should not be used with squad_choose_target_cell.");
             return ivec2(-1, -1);
     }

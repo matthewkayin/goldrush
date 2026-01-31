@@ -15,7 +15,9 @@ enum BotSquadType {
     BOT_SQUAD_TYPE_RESERVES,
     BOT_SQUAD_TYPE_LANDMINES,
     BOT_SQUAD_TYPE_RETURN,
-    BOT_SQUAD_TYPE_PATROL
+    BOT_SQUAD_TYPE_PATROL,
+    BOT_SQUAD_TYPE_HOLD_POSITION,
+    BOT_SQUAD_TYPE_COUNT
 };
 
 struct BotAddSquadParams {
@@ -152,6 +154,9 @@ EntityType bot_get_unit_type_to_train(Bot& bot, EntityCount desired_entities, En
 MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type, uint32_t match_time_minutes);
 
 // Squads
+
+const char* bot_squad_type_str(BotSquadType type);
+BotSquadType bot_squad_type_from_str(const char* str);
 
 int bot_add_squad(Bot& bot, BotAddSquadParams params);
 void bot_squad_dissolve(Bot& bot, BotSquad& squad);

@@ -375,26 +375,6 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
                 continue;
             }
 
-            BotSquadType squad_type;
-            switch (squad.type) {
-                case SCENARIO_SQUAD_TYPE_DEFEND: {
-                    squad_type = BOT_SQUAD_TYPE_DEFEND;
-                    break;
-                }
-                case SCENARIO_SQUAD_TYPE_LANDMINES: {
-                    squad_type = BOT_SQUAD_TYPE_LANDMINES;
-                    break;
-                }
-                case SCENARIO_SQUAD_TYPE_PATROL: {
-                    squad_type = BOT_SQUAD_TYPE_PATROL;
-                    break;
-                }
-                case SCENARIO_SQUAD_TYPE_COUNT: {
-                    GOLD_ASSERT(false);
-                    break;
-                }
-            }
-
             ivec2 squad_average_position = ivec2(0, 0);
             std::vector<EntityId> squad_entity_list;
             for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entity_count; squad_entity_index++) {
@@ -409,13 +389,13 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
             GOLD_ASSERT(!squad_entity_list.empty());
             ivec2 squad_target_cell = squad_average_position / squad_entity_list.size();
 
-            if (squad_type == BOT_SQUAD_TYPE_PATROL) {
+            if (squad.type == BOT_SQUAD_TYPE_PATROL) {
                 GOLD_ASSERT(squad.patrol_cell.x != -1);
             }
             bot_add_squad(state->bots[player_id], {
-                .type = squad_type,
+                .type = squad.type,
                 .target_cell = squad_target_cell,
-                .patrol_cell = squad_type == BOT_SQUAD_TYPE_PATROL
+                .patrol_cell = squad.type == BOT_SQUAD_TYPE_PATROL
                     ? squad.patrol_cell
                     : ivec2(-1, -1),
                 .entities = squad_entity_list

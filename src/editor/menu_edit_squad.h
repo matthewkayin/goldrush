@@ -11,12 +11,14 @@
 struct EditorMenuEditSquad {
     std::string squad_name;
     uint32_t squad_player;
-    uint32_t squad_type;
+    uint32_t squad_type_index;
     std::vector<std::string> squad_player_items;
     std::vector<std::string> squad_type_items;
+    std::vector<BotSquadType> squad_type_values;
 };
 
 EditorMenuEditSquad editor_menu_edit_squad_open(const ScenarioSquad& squad, const Scenario* scenario);
 void editor_menu_edit_squad_update(EditorMenuEditSquad& menu, UI& ui, EditorMenuMode& mode);
+BotSquadType editor_menu_edit_squad_get_selected_squad_type(const EditorMenuEditSquad& menu);
 
 #endif

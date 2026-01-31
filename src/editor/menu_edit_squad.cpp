@@ -13,7 +13,6 @@ EditorMenuEditSquad editor_menu_edit_squad_open(const ScenarioSquad& squad, cons
     EditorMenuEditSquad menu;
     menu.squad_name = std::string(squad.name);
     menu.squad_player = squad.player_id - 1;
-    menu.squad_type = squad.type;
 
     for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
         char player_text[64];
@@ -21,9 +20,25 @@ EditorMenuEditSquad editor_menu_edit_squad_open(const ScenarioSquad& squad, cons
         menu.squad_player_items.push_back(std::string(player_text));
     }
 
-    for (uint32_t squad_type = 0; squad_type < SCENARIO_SQUAD_TYPE_COUNT; squad_type++) {
-        menu.squad_type_items.push_back(std::string(scenario_squad_type_str((ScenarioSquadType)squad_type)));
+    menu.squad_type_values = {
+        BOT_SQUAD_TYPE_DEFEND,
+        BOT_SQUAD_TYPE_LANDMINES,
+        BOT_SQUAD_TYPE_PATROL,
+        BOT_SQUAD_TYPE_HOLD_POSITION
+    };
+
+    for (BotSquadType squad_type : menu.squad_type_values) {
+        menu.squad_type_items.push_back(std::string(bot_squad_type_str(squad_type)));
     }
+
+    uint32_t index;
+    for (index = 0; index < menu.squad_type_values.size(); index++) {
+        if (squad.type == menu.squad_type_values[index]) {
+            break;
+        }
+    }
+    GOLD_ASSERT(index != menu.squad_type_values.size());
+    menu.squad_type_index = index;
 
     return menu;
 }
@@ -39,10 +54,14 @@ void editor_menu_edit_squad_update(EditorMenuEditSquad& menu, UI& ui, EditorMenu
         editor_menu_dropdown(ui, "Player:", &menu.squad_player, menu.squad_player_items, MENU_RECT);
 
         // Squad type
-        editor_menu_dropdown(ui, "Type:", &menu.squad_type, menu.squad_type_items, MENU_RECT);
+        editor_menu_dropdown(ui, "Type:", &menu.squad_type_index, menu.squad_type_items, MENU_RECT);
     ui_end_container(ui);
 
     editor_menu_back_save_buttons(ui, MENU_RECT, mode);
+}
+
+BotSquadType editor_menu_edit_squad_get_selected_squad_type(const EditorMenuEditSquad& menu) {
+    return menu.squad_type_values[menu.squad_type_index];
 }
 
 #endif

@@ -136,7 +136,7 @@ ScenarioSquad scenario_squad_init() {
     ScenarioSquad squad;
     sprintf(squad.name, "New Squad");
     squad.player_id = 1;
-    squad.type = SCENARIO_SQUAD_TYPE_DEFEND;
+    squad.type = BOT_SQUAD_TYPE_DEFEND;
     squad.patrol_cell = ivec2(-1, -1);
     squad.entity_count = 0;
 
@@ -159,24 +159,6 @@ bool scenario_squads_are_equal(const ScenarioSquad& a, const ScenarioSquad& b) {
         }
     }
     return true;
-}
-
-const char* scenario_squad_type_str(ScenarioSquadType type) {
-    switch (type) {
-        case SCENARIO_SQUAD_TYPE_DEFEND:
-            return "Defend";
-        case SCENARIO_SQUAD_TYPE_LANDMINES:
-            return "Landmines";
-        case SCENARIO_SQUAD_TYPE_PATROL:
-            return "Patrol";
-        case SCENARIO_SQUAD_TYPE_COUNT:
-            GOLD_ASSERT(false);
-            return "";
-    }
-}
-
-ScenarioSquadType scenario_squad_type_from_str(const char* str) {
-    return (ScenarioSquadType)enum_from_str(str, (EnumToStrFn)scenario_squad_type_str, SCENARIO_CONSTANT_TYPE_COUNT);
 }
 
 const char* scenario_constant_type_str(ScenarioConstantType type) {
@@ -354,9 +336,9 @@ bool scenario_save_file(const Scenario* scenario, const char* json_full_path, co
             Json* squad_json = json_object();
             json_object_set_string(squad_json, "name", squad.name);
             json_object_set_number(squad_json, "player_id", squad.player_id);
-            json_object_set_string(squad_json, "type", scenario_squad_type_str(squad.type));
+            json_object_set_string(squad_json, "type", bot_squad_type_str(squad.type));
 
-            if (squad.type == SCENARIO_SQUAD_TYPE_PATROL) {
+            if (squad.type == BOT_SQUAD_TYPE_PATROL) {
                 json_object_set(squad_json, "patrol_cell", json_from_ivec2(squad.patrol_cell));
             }
             
@@ -606,8 +588,8 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
             Json* squad_json = json_array_get(squads_json, squad_index);
 
             const char* squad_type_str = json_object_get_string(squad_json, "type");
-            ScenarioSquadType squad_type = scenario_squad_type_from_str(squad_type_str);
-            if (squad_type == SCENARIO_SQUAD_TYPE_COUNT) {
+            BotSquadType squad_type = bot_squad_type_from_str(squad_type_str);
+            if (squad_type == BOT_SQUAD_TYPE_COUNT) {
                 log_warn("Squad type %s for squad %u not recognized.", squad_type_str, squad_index);
                 continue;
             }

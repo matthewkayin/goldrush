@@ -436,10 +436,10 @@ void editor_update() {
                     if (!state.scenario->squads.empty()) {
                         const ScenarioSquad& squad = state.scenario->squads[state.tool_value];
                         char squad_info_text[64];
-                        sprintf(squad_info_text, "%s / %s", state.scenario->players[squad.player_id].name, scenario_squad_type_str(squad.type));
+                        sprintf(squad_info_text, "%s / %s", state.scenario->players[squad.player_id].name, bot_squad_type_str(squad.type));
                         ui_text(state.ui, FONT_HACK_GOLD, squad_info_text);
 
-                        if (squad.type == SCENARIO_SQUAD_TYPE_PATROL) {
+                        if (squad.type == BOT_SQUAD_TYPE_PATROL) {
                             char patrol_cell_text[64];
                             sprintf(patrol_cell_text, "Patrol Cell: <%i, %i>", squad.patrol_cell.x, squad.patrol_cell.y);
                             ui_text(state.ui, FONT_HACK_GOLD, patrol_cell_text);
@@ -657,7 +657,7 @@ void editor_update() {
                     ScenarioSquad edited_squad = previous_squad;
                     strncpy(edited_squad.name, menu.squad_name.c_str(), MAX_USERNAME_LENGTH);
                     edited_squad.player_id = menu.squad_player + 1;
-                    edited_squad.type = (ScenarioSquadType)menu.squad_type;
+                    edited_squad.type = editor_menu_edit_squad_get_selected_squad_type(menu);
                     if (edited_squad.player_id != previous_squad.player_id) {
                         edited_squad.entity_count = 0;
                     }
@@ -802,7 +802,7 @@ void editor_update() {
     if (state.tool == EDITOR_TOOL_SQUADS &&
             !state.scenario->squads.empty() &&
             editor_can_single_use_tool_be_used() &&
-            state.scenario->squads[state.tool_value].type == SCENARIO_SQUAD_TYPE_PATROL &&
+            state.scenario->squads[state.tool_value].type == BOT_SQUAD_TYPE_PATROL &&
             input_is_action_pressed(INPUT_ACTION_SHIFT) &&
             editor_is_hovered_cell_valid() &&
             input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
@@ -1238,7 +1238,7 @@ bool editor_is_hovered_cell_valid() {
         return !map_is_cell_rect_occupied(state.scenario->map, entity_data.cell_layer, cell, entity_data.cell_size);
     }
     if (state.tool == EDITOR_TOOL_SQUADS && !state.scenario->squads.empty()) {
-        if (state.scenario->squads[state.tool_value].type == SCENARIO_SQUAD_TYPE_PATROL && 
+        if (state.scenario->squads[state.tool_value].type == BOT_SQUAD_TYPE_PATROL && 
                 input_is_action_pressed(INPUT_ACTION_SHIFT)) {
             return true;
         }
@@ -2209,7 +2209,7 @@ void editor_render() {
     // Squad patrol cell
     if (state.tool == EDITOR_TOOL_SQUADS && 
             !state.scenario->squads.empty() &&
-            state.scenario->squads[state.tool_value].type == SCENARIO_SQUAD_TYPE_PATROL &&
+            state.scenario->squads[state.tool_value].type == BOT_SQUAD_TYPE_PATROL &&
             state.scenario->squads[state.tool_value].patrol_cell.x != -1) {
         ivec2 cell = state.scenario->squads[state.tool_value].patrol_cell;
         Rect rect = (Rect) {

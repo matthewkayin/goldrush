@@ -6,6 +6,7 @@
 #include "match/map.h"
 #include "match/upgrade.h"
 #include "bot/config.h"
+#include "bot/bot.h"
 
 #define SCENARIO_SQUAD_MAX_ENTITIES SELECTION_LIMIT
 #define SCENARIO_CONSTANT_NAME_BUFFER_LENGTH 32
@@ -22,17 +23,10 @@ struct ScenarioEntity {
     ivec2 cell;
 };
 
-enum ScenarioSquadType {
-    SCENARIO_SQUAD_TYPE_DEFEND,
-    SCENARIO_SQUAD_TYPE_LANDMINES,
-    SCENARIO_SQUAD_TYPE_PATROL,
-    SCENARIO_SQUAD_TYPE_COUNT
-};
-
 struct ScenarioSquad {
     char name[MAX_USERNAME_LENGTH + 1];
     uint8_t player_id;
-    ScenarioSquadType type;
+    BotSquadType type;
     ivec2 patrol_cell;
     uint32_t entity_count;
     uint32_t entities[SCENARIO_SQUAD_MAX_ENTITIES];
@@ -78,8 +72,6 @@ void scenario_free(Scenario* scenario);
 
 ScenarioSquad scenario_squad_init();
 bool scenario_squads_are_equal(const ScenarioSquad& a, const ScenarioSquad& b);
-const char* scenario_squad_type_str(ScenarioSquadType type);
-ScenarioSquadType scenario_squad_type_from_str(const char* str);
 
 const char* scenario_constant_type_str(ScenarioConstantType type);
 ScenarioConstantType scenario_constant_type_from_str(const char* str);
