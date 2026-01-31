@@ -1155,6 +1155,8 @@ bool map_is_cell_rect_blocked(const Map& map, ivec2 cell, int cell_size) {
 }
 
 void map_calculate_unreachable_cells(Map& map, ivec2 main_island_cell) {
+    log_debug("main island cell <%i, %i>", main_island_cell.x, main_island_cell.y);
+
     // Determine map "islands"
     std::vector<int> map_tile_islands = std::vector<int>(map.width * map.height, MAP_ISLAND_UNASSIGNED);
     std::vector<int> island_size;

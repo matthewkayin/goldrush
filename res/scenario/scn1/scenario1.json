@@ -45,7 +45,7 @@
 			]
 		},
 		{
-			"name": "Enemy 1",
+			"name": "Bandits",
 			"starting_gold": 50.000000,
 			"opener": "Tech First",
 			"preferred_unit_comp": "Cwby/Bndt",
@@ -123,8 +123,185 @@
 				"x": 47.000000,
 				"y": 7.000000
 			}
+		},
+		{
+			"type": "Saloon",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 80.000000,
+				"y": 32.000000
+			}
+		},
+		{
+			"type": "House",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 72.000000,
+				"y": 37.000000
+			}
+		},
+		{
+			"type": "House",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 82.000000,
+				"y": 38.000000
+			}
+		},
+		{
+			"type": "Bandit",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 71.000000,
+				"y": 39.000000
+			}
+		},
+		{
+			"type": "Bandit",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 72.000000,
+				"y": 40.000000
+			}
+		},
+		{
+			"type": "Bandit",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 73.000000,
+				"y": 39.000000
+			}
+		},
+		{
+			"type": "Bandit",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 79.000000,
+				"y": 35.000000
+			}
+		},
+		{
+			"type": "Bandit",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 80.000000,
+				"y": 36.000000
+			}
+		},
+		{
+			"type": "Bandit",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 81.000000,
+				"y": 35.000000
+			}
+		},
+		{
+			"type": "Bandit",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 68.000000,
+				"y": 58.000000
+			}
+		},
+		{
+			"type": "Bandit",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 70.000000,
+				"y": 56.000000
+			}
+		},
+		{
+			"type": "Bandit",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 84.000000,
+				"y": 86.000000
+			}
 		}
 	],
-	"squads": [],
-	"constants": []
+	"squads": [
+		{
+			"name": "Squad 1",
+			"player_id": 1.000000,
+			"type": "Defend",
+			"entities": [
+				8.000000,
+				9.000000,
+				10.000000
+			]
+		},
+		{
+			"name": "Squad 2",
+			"player_id": 1.000000,
+			"type": "Defend",
+			"entities": [
+				11.000000,
+				12.000000,
+				13.000000
+			]
+		},
+		{
+			"name": "Squad 3",
+			"player_id": 1.000000,
+			"type": "Defend",
+			"entities": [
+				14.000000,
+				15.000000
+			]
+		},
+		{
+			"name": "Squad 4",
+			"player_id": 1.000000,
+			"type": "Patrol",
+			"patrol_cell": {
+				"x": 56.000000,
+				"y": 83.000000
+			},
+			"entities": [
+				16.000000
+			]
+		}
+	],
+	"constants": [
+		{
+			"name": "GOLDMINE2",
+			"type": "Entity",
+			"entity_index": 0.000000
+		},
+		{
+			"name": "GOLDMINE1",
+			"type": "Entity",
+			"entity_index": 1.000000
+		},
+		{
+			"name": "BANDIT_ATTACK_SPAWN_CELL",
+			"type": "Cell",
+			"cell": {
+				"x": 32.000000,
+				"y": 87.000000
+			}
+		},
+		{
+			"name": "BANDIT_ATTACK_TARGET_CELL",
+			"type": "Cell",
+			"cell": {
+				"x": 9.000000,
+				"y": 89.000000
+			}
+		}
+	]
 }
