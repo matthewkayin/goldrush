@@ -553,7 +553,6 @@ bool bot_is_under_attack(const Bot& bot) {
 void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint32_t options) {
     bool should_counterattack = (options & BOT_DEFEND_COUNTERATTACK) == BOT_DEFEND_COUNTERATTACK;
     bool should_defend_with_workers = (options & BOT_DEFEND_WITH_WORKERS) == BOT_DEFEND_WITH_WORKERS;
-    log_debug("BOT %u defend_location, <%i, %i> options %u", bot.player_id, location.x, location.y, options);
 
     // Determine enemy score
     int enemy_score = bot_score_entities_at_location(state, bot, location, [&state, &bot](const Entity& enemy, EntityId /*enemy_id*/) {

@@ -635,6 +635,7 @@ void editor_update() {
                         state.scenario = scenario_init_blank(map_type, map_size);
                     }
                     editor_set_scenario_paths_to_defaults();
+                    state.camera_offset = ivec2(0, 0);
                 }
 
                 break;

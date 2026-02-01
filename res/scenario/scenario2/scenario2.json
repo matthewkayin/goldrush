@@ -1,0 +1,187 @@
+{
+	"map": "map.dat",
+	"script": "scenario2.lua",
+	"player_spawn": {
+		"x": 85.000000,
+		"y": 87.000000
+	},
+	"players": [
+		{
+			"name": "Player",
+			"starting_gold": 50.000000,
+			"allowed_upgrades": [],
+			"allowed_entities": [
+				"Miner",
+				"Cowboy",
+				"Bandit",
+				"Town Hall",
+				"House",
+				"Saloon",
+				"Bunker"
+			]
+		},
+		{
+			"name": "Enemy 1",
+			"starting_gold": 50.000000,
+			"opener": "Tech First",
+			"preferred_unit_comp": "Cwby/Bndt",
+			"flags": [],
+			"target_base_count": 0.000000,
+			"macro_cycle_cooldown": 0.000000,
+			"allowed_upgrades": [],
+			"allowed_entities": []
+		},
+		{
+			"name": "Enemy 2",
+			"starting_gold": 50.000000,
+			"opener": "Tech First",
+			"preferred_unit_comp": "Cwby/Bndt",
+			"flags": [],
+			"target_base_count": 0.000000,
+			"macro_cycle_cooldown": 0.000000,
+			"allowed_upgrades": [],
+			"allowed_entities": []
+		},
+		{
+			"name": "Enemy 3",
+			"starting_gold": 50.000000,
+			"opener": "Tech First",
+			"preferred_unit_comp": "Cwby/Bndt",
+			"flags": [],
+			"target_base_count": 0.000000,
+			"macro_cycle_cooldown": 0.000000,
+			"allowed_upgrades": [],
+			"allowed_entities": []
+		}
+	],
+	"entities": [
+		{
+			"type": "Gold Mine",
+			"player_id": 4.000000,
+			"gold_held": 7500.000000,
+			"cell": {
+				"x": 88.000000,
+				"y": 86.000000
+			}
+		},
+		{
+			"type": "Town Hall",
+			"player_id": 0.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 80.000000,
+				"y": 85.000000
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 0.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 84.000000,
+				"y": 88.000000
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 0.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 84.000000,
+				"y": 87.000000
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 0.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 84.000000,
+				"y": 86.000000
+			}
+		},
+		{
+			"type": "Gold Mine",
+			"player_id": 4.000000,
+			"gold_held": 7500.000000,
+			"cell": {
+				"x": 4.000000,
+				"y": 4.000000
+			}
+		},
+		{
+			"type": "Town Hall",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 11.000000,
+				"y": 3.000000
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 10.000000,
+				"y": 6.000000
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 10.000000,
+				"y": 5.000000
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 10.000000,
+				"y": 4.000000
+			}
+		},
+		{
+			"type": "Gold Mine",
+			"player_id": 4.000000,
+			"gold_held": 7500.000000,
+			"cell": {
+				"x": 76.000000,
+				"y": 16.000000
+			}
+		},
+		{
+			"type": "Town Hall",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 68.000000,
+				"y": 15.000000
+			}
+		},
+		{
+			"type": "Gold Mine",
+			"player_id": 4.000000,
+			"gold_held": 7500.000000,
+			"cell": {
+				"x": 17.000000,
+				"y": 80.000000
+			}
+		},
+		{
+			"type": "Town Hall",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 24.000000,
+				"y": 79.000000
+			}
+		}
+	],
+	"squads": [],
+	"constants": []
+}
