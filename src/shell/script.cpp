@@ -47,6 +47,7 @@ static int script_get_camera_mode(lua_State* lua_state);
 static int script_spawn_enemy_squad(lua_State* lua_state);
 static int script_does_squad_exist(lua_State* lua_state);
 static int script_is_player_defeated(lua_State* lua_state);
+static int script_match_input_build(lua_State* lua_state);
 
 static const char* MODULE_NAME = "scenario";
 
@@ -77,6 +78,7 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "spawn_enemy_squad", script_spawn_enemy_squad },
     { "does_squad_exist", script_does_squad_exist },
     { "is_player_defeated", script_is_player_defeated },
+    { "match_input_build", script_match_input_build },
     { NULL, NULL }
 };
 
@@ -961,7 +963,6 @@ static int script_player_has_entity_near_cell(lua_State* lua_state) {
     return 1;
 }
 
-
 // Reveals fog at the specified cell.
 // @param params { player_id: number, cell: ivec2, cell_size: number, sight: number, duration: number }
 static int script_fog_reveal(lua_State* lua_state) {
@@ -1210,4 +1211,42 @@ static int script_is_player_defeated(lua_State* lua_state) {
     lua_pushboolean(lua_state, !state->match_state.players[player_id].active);
 
     return 1;
+}
+
+// Queues a build input
+// @param params { building_type: number, building_cell: ivec2, builder_id: number }
+static int script_match_input_build(lua_State* lua_state) {
+    int arg_types[] = { LUA_TTABLE };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    // Building type
+    lua_getfield(lua_state, 1, "building_type");
+    int building_type = (int)lua_tonumber(lua_state, -1);
+    script_validate_entity_type(lua_state, building_type);
+    lua_pop(lua_state, 1);
+
+    // Cell
+    lua_getfield(lua_state, 1, "building_cell");
+    ivec2 cell = script_validate_ivec2(lua_state, -1, "building_cell");
+    lua_pop(lua_state, 1);
+
+    // Builder ID
+    lua_getfield(lua_state, 1, "builder_id");
+    EntityId builder_id = (EntityId)lua_tonumber(lua_state, -1);
+    script_validate_entity_id(lua_state, state, builder_id);
+
+    MatchInput input;
+    input.type = MATCH_INPUT_BUILD;
+    input.build.shift_command = 0;
+    input.build.building_type = (EntityType)building_type;
+    input.build.target_cell = cell;
+    input.build.entity_count = 1;
+    input.build.entity_ids[0] = builder_id;
+
+    uint8_t player_id = state->match_state.entities.get_by_id(builder_id).player_id;
+    state->inputs[player_id].push({ input });
+
+    return 0;
 }
