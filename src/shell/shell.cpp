@@ -192,7 +192,7 @@ MatchShellState* match_shell_base_init() {
     }
 
     // Scenario
-    state->scenario_show_enemy_gold = false;
+    state->scenario_global_objective_counter.type = GLOBAL_OBJECTIVE_COUNTER_OFF;
     state->scenario_lua_state = NULL;
 
     // Replay file
@@ -316,6 +316,7 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
         players[player_id].team = player_id;
         players[player_id].recolor_id = player_id;
         players[player_id].gold = scenario->players[player_id].starting_gold;
+        players[player_id].gold_mined_total = 0;
         players[player_id].upgrades = 0;
         players[player_id].upgrades_in_progress = 0;
     }
@@ -900,19 +901,9 @@ void match_shell_update(MatchShellState* state) {
         if (!state->match_state.players[player_id].active) {
             continue;
         } 
-        int difference = std::abs((int)state->displayed_gold_amounts[player_id] - (int)state->match_state.players[player_id].gold);
-        int step = 1;
-        if (difference > 100) {
-            step = 10;
-        } else if (difference > 10) {
-            step = 5;
-        } else if (difference > 1) {
-            step = 2;
-        }
-        if (state->displayed_gold_amounts[player_id] < state->match_state.players[player_id].gold) {
-            state->displayed_gold_amounts[player_id] += step;
-        } else if (state->displayed_gold_amounts[player_id] > state->match_state.players[player_id].gold) {
-            state->displayed_gold_amounts[player_id] -= step;
+        state->displayed_gold_amounts[player_id] = match_shell_update_displayed_gold_amount(state->displayed_gold_amounts[player_id], state->match_state.players[player_id].gold);
+        if (state->scenario_global_objective_counter.type == GLOBAL_OBJECTIVE_COUNTER_GOLD) {
+            state->scenario_global_objective_counter.gold.values[player_id] = match_shell_update_displayed_gold_amount(state->scenario_global_objective_counter.gold.values[player_id], state->match_state.players[player_id].gold_mined_total);
         }
     }
 
@@ -2254,6 +2245,27 @@ ivec2 match_shell_spawn_enemy_squad_find_spawn_cell(const MatchShellState* state
     }
 
     return ivec2(-1, -1);
+}
+
+uint32_t match_shell_update_displayed_gold_amount(uint32_t current_displayed_value, uint32_t current_actual_value) {
+    if (current_displayed_value == current_actual_value) {
+        return current_displayed_value;
+    }
+
+    int difference = std::abs((int)current_displayed_value - (int)current_actual_value);
+    int step = 1;
+    if (difference > 100) {
+        step = 10;
+    } else if (difference > 10) {
+        step = 5;
+    } else if (difference > 1) {
+        step = 2;
+    }
+    if (current_displayed_value < current_actual_value) {
+        return current_displayed_value + step;
+    } else {
+        return current_displayed_value - step;
+    }
 }
 
 // STATE QUERIES
@@ -4137,11 +4149,11 @@ void match_shell_render(const MatchShellState* state) {
     const SpriteInfo& gold_icon_sprite_info = render_get_sprite_info(SPRITE_UI_GOLD_ICON);
     int resource_base_y = 0;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (!state->replay_mode && player_id != network_get_player_id()) {
+            continue;
+        }
         // TODO: is there a bug in replay mode where players will stop rendering their gold after they get defeated?
-        bool should_render_gold, should_render_population, should_render_name;
-        match_shell_should_render_player_resources(state, player_id, &should_render_gold, &should_render_population, &should_render_name);
-
-        if (!(should_render_gold || should_render_population || should_render_name)) {
+        if (state->replay_mode && !state->match_state.players[player_id].active) {
             continue;
         }
 
@@ -4152,7 +4164,7 @@ void match_shell_render(const MatchShellState* state) {
 
         // Population text
         render_x -= (render_get_text_size(FONT_HACK_WHITE, "200/200").x + 2);
-        if (should_render_population) {
+        {
             char population_text[8];
             sprintf(population_text, "%u/%u", match_get_player_population(state->match_state, player_id), match_get_player_max_population(state->match_state, player_id));
             render_text(FONT_HACK_SHADOW, population_text, ivec2(render_x, resource_base_y + 3) + text_shadow_offset);
@@ -4161,13 +4173,13 @@ void match_shell_render(const MatchShellState* state) {
 
         // Population icon
         render_x -= (population_icon_sprite_info.frame_width + 2);
-        if (should_render_population) {
+        {
             render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), ivec2(render_x, resource_base_y), RENDER_SPRITE_NO_CULL, 0);
         }
 
         // Gold text
         render_x -= (render_get_text_size(FONT_HACK_WHITE, "99999").x + 2);
-        if (should_render_gold) {
+        {
             char gold_text[8];
             sprintf(gold_text, "%u", state->displayed_gold_amounts[player_id]);
             render_text(FONT_HACK_SHADOW, gold_text, ivec2(render_x, resource_base_y + 3) + text_shadow_offset);
@@ -4176,12 +4188,12 @@ void match_shell_render(const MatchShellState* state) {
 
         // Gold icon
         render_x -= (gold_icon_sprite_info.frame_width + 2);
-        if (should_render_gold) {
+        {
             render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), ivec2(render_x, resource_base_y + 2), RENDER_SPRITE_NO_CULL, 0);
         }
 
         // Player name
-        if (should_render_name) {
+        if (state->replay_mode) {
             render_x -= (render_get_text_size(FONT_HACK_WHITE, state->match_state.players[player_id].name).x + 16);
             render_text(FONT_HACK_SHADOW, state->match_state.players[player_id].name, ivec2(render_x, resource_base_y + 3) + text_shadow_offset);
             render_text((FontName)(FONT_HACK_PLAYER0 + state->match_state.players[player_id].recolor_id), state->match_state.players[player_id].name, ivec2(render_x, resource_base_y + 3));
@@ -4223,6 +4235,30 @@ void match_shell_render(const MatchShellState* state) {
             render_text(FONT_HACK_GOLD_SATURATED, objective_text, text_pos);
 
             objectives_text_pos.y += checkbox_sprite_info.frame_height + 4;
+        }
+
+        if (state->scenario_global_objective_counter.type == GLOBAL_OBJECTIVE_COUNTER_GOLD) {
+            objectives_text_pos.x = 1;
+            render_text(FONT_HACK_SHADOW, "Gold Mined:", objectives_text_pos + ivec2(1, 1));
+            render_text(FONT_HACK_GOLD_SATURATED, "Gold Mined:", objectives_text_pos + ivec2(1, 1));
+            objectives_text_pos += ivec2(4, 20);
+
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (!state->match_state.players[player_id].active) {
+                    continue;
+                }
+
+                // Determine text
+                char text[64];
+                sprintf(text, "%s: %u", state->match_state.players[player_id].name, state->scenario_global_objective_counter.gold.values[player_id]);
+
+                // Render text
+                ivec2 text_pos = objectives_text_pos + ivec2(checkbox_sprite_info.frame_width + 2, 1);
+                render_text(FONT_HACK_SHADOW, text, text_pos + ivec2(1, 1));
+                render_text(FONT_HACK_GOLD_SATURATED, text, text_pos);
+
+                objectives_text_pos.y += checkbox_sprite_info.frame_height + 4;
+            }
         }
     }
 
@@ -4739,29 +4775,6 @@ void match_shell_render_tooltip(const MatchShellState* state, InputAction hotkey
         sprintf(energy_text, "%u", tooltip_energy_cost);
         render_text(FONT_WESTERN8_OFFBLACK, energy_text, tooltip_top_left + ivec2(22, tooltip_item_y));
     }
-}
-
-void match_shell_should_render_player_resources(const MatchShellState* state, uint8_t player_id, bool* should_render_gold, bool* should_render_population, bool* should_render_name) {
-    if (state->replay_mode) {
-        const bool should_render = state->match_state.players[player_id].active;
-        *should_render_gold = should_render;
-        *should_render_population = should_render;
-        *should_render_name = should_render;
-        return;
-    }
-
-    if (state->scenario_show_enemy_gold) {
-        const bool should_render = state->match_state.players[player_id].active;
-        *should_render_gold = should_render;
-        *should_render_population = player_id == network_get_player_id();
-        *should_render_name = should_render;
-        return;
-    }
-
-    const bool should_render = player_id == network_get_player_id();
-    *should_render_gold = should_render;
-    *should_render_population = should_render;
-    *should_render_name = false;
 }
 
 ivec2 match_shell_get_queued_target_position(const MatchShellState* state, const Target& target) {

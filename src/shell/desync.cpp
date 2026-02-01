@@ -9,7 +9,7 @@ STATIC_ASSERT(sizeof(BuildingQueueItem) == 8ULL);
 STATIC_ASSERT(sizeof(Particle) == 40ULL);
 STATIC_ASSERT(sizeof(Projectile) == 20ULL);
 STATIC_ASSERT(sizeof(FogReveal) == 24ULL);
-STATIC_ASSERT(sizeof(MatchPlayer) == 56ULL);
+STATIC_ASSERT(sizeof(MatchPlayer) == 60ULL);
 STATIC_ASSERT(sizeof(MapType) == 4ULL);
 STATIC_ASSERT(sizeof(Difficulty) == 4ULL);
 STATIC_ASSERT(sizeof(BotUnitComp) == 4ULL);

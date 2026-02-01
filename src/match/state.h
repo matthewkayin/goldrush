@@ -192,6 +192,7 @@ struct MatchPlayer {
     uint32_t team;
     int recolor_id;
     uint32_t gold;
+    uint32_t gold_mined_total;
     uint32_t upgrades;
     uint32_t upgrades_in_progress;
 };

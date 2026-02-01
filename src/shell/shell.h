@@ -95,6 +95,23 @@ struct Objective {
     uint32_t counter_target;
 };
 
+enum GlobalObjectiveCounterType {
+    GLOBAL_OBJECTIVE_COUNTER_OFF,
+    GLOBAL_OBJECTIVE_COUNTER_GOLD,
+    GLOBAL_OBJECTIVE_COUNTER_TYPE_COUNT
+};
+
+struct GlobalObjectiveCounterGold {
+    uint32_t values[MAX_PLAYERS];
+};
+
+struct GlobalObjectiveCounter {
+    GlobalObjectiveCounterType type;
+    union {
+        GlobalObjectiveCounterGold gold;
+    };
+};
+
 #ifdef GOLD_DEBUG
     enum DebugFog {
         DEBUG_FOG_ENABLED,
@@ -176,9 +193,9 @@ struct MatchShellState {
     // Scenario 
     uint32_t scenario_allowed_upgrades;
     bool scenario_allowed_entities[ENTITY_TYPE_COUNT];
-    bool scenario_show_enemy_gold;
     lua_State* scenario_lua_state;
     std::vector<Objective> scenario_objectives;
+    GlobalObjectiveCounter scenario_global_objective_counter;
 
     // Replay file (write)
     FILE* replay_file;
@@ -233,6 +250,7 @@ bool match_shell_does_player_meet_hotkey_requirements(const MatchState& state, I
 bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyButtonInfo& info);
 uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type);
 ivec2 match_shell_spawn_enemy_squad_find_spawn_cell(const MatchShellState* state, EntityType entity_type, ivec2 spawn_cell, ivec2 target_cell);
+uint32_t match_shell_update_displayed_gold_amount(uint32_t current_displayed_value, uint32_t current_actual_value);
 
 // Script
 bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, const char* script_path);
@@ -326,7 +344,6 @@ void match_shell_render_particle(const MatchShellState* state, const Particle& p
 bool match_shell_should_render_hotkey_toggled(const MatchShellState* state, InputAction hotkey);
 const char* match_shell_render_get_stat_tooltip(SpriteName sprite);
 void match_shell_render_tooltip(const MatchShellState* state, InputAction hotkey);
-void match_shell_should_render_player_resources(const MatchShellState* state, uint8_t player_id, bool* should_render_gold, bool* should_render_population, bool* should_render_name);
 ivec2 match_shell_get_queued_target_position(const MatchShellState* state, const Target& target);
 FireCellRender match_shell_get_fire_cell_render(const MatchShellState* state, const Fire& fire);
 MinimapPixel match_shell_get_minimap_pixel_for_cell(const MatchShellState* state, ivec2 cell);

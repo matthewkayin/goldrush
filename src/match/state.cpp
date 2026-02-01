@@ -119,6 +119,7 @@ MatchState match_init(int32_t lcg_seed, MapType map_type, Noise* noise, MatchPla
     // Init players
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         state.players[player_id].gold = MATCH_PLAYER_STARTING_GOLD;
+        state.players[player_id].gold_mined_total = 0;
         state.players[player_id].upgrades = 0;
         state.players[player_id].upgrades_in_progress = 0;
 
@@ -1629,6 +1630,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                                 target.mode == MODE_BUILDING_FINISHED && entity.player_id == target.player_id &&
                                 entity.gold_held != 0 && entity.target.type != TARGET_REPAIR) {
                             state.players[entity.player_id].gold += entity.gold_held;
+                            state.players[entity.player_id].gold_mined_total += entity.gold_held;
                             entity.gold_held = 0;
 
                             // First clear entity's target

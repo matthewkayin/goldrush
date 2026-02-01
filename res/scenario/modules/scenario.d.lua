@@ -5,90 +5,88 @@ scenario = {}
 --- @field x number
 --- @field y number
 
---- Script constants
 scenario.CHAT_COLOR_WHITE = 0
+scenario.SQUAD_ID_NULL = -1
 scenario.CHAT_COLOR_GOLD = 1
 scenario.CHAT_COLOR_BLUE = 1
-scenario.SQUAD_ID_NULL = -1
-scenario.CAMERA_MODE_FREE = 0
-scenario.CAMERA_MODE_MINIMAP_DRAG = 1
-scenario.CAMERA_MODE_PAN = 2
-scenario.CAMERA_MODE_HELD = 3
+scenario.global_objective_counter_type = {}
+scenario.global_objective_counter_type.OFF = 0
+scenario.global_objective_counter_type.GOLD = 1
 
---- Scenario constants
-scenario.constants = {}
-
---- Entity constants
-scenario.entity_type = {}
-scenario.entity_type.GOLDMINE = 0
-scenario.entity_type.MINER = 1
-scenario.entity_type.COWBOY = 2
-scenario.entity_type.BANDIT = 3
-scenario.entity_type.WAGON = 4
-scenario.entity_type.JOCKEY = 5
-scenario.entity_type.SAPPER = 6
-scenario.entity_type.PYRO = 7
-scenario.entity_type.SOLDIER = 8
-scenario.entity_type.CANNON = 9
-scenario.entity_type.DETECTIVE = 10
-scenario.entity_type.BALLOON = 11
-scenario.entity_type.HALL = 12
-scenario.entity_type.HOUSE = 13
-scenario.entity_type.SALOON = 14
-scenario.entity_type.BUNKER = 15
-scenario.entity_type.WORKSHOP = 16
-scenario.entity_type.SMITH = 17
-scenario.entity_type.COOP = 18
-scenario.entity_type.BARRACKS = 19
-scenario.entity_type.SHERIFFS = 20
-scenario.entity_type.LANDMINE = 21
-
---- Sound constants
-scenario.sound = {}
-scenario.sound.UI_CLICK = 0
-scenario.sound.DEATH = 1
-scenario.sound.MUSKET = 2
-scenario.sound.GUN = 3
-scenario.sound.EXPLOSION = 4
-scenario.sound.PICKAXE = 5
-scenario.sound.HAMMER = 6
-scenario.sound.BUILDING_PLACE = 7
-scenario.sound.SWORD = 8
-scenario.sound.DEATH_CHICKEN = 9
-scenario.sound.CANNON = 10
-scenario.sound.BUILDING_DESTROY = 11
-scenario.sound.BUNKER_DESTROY = 12
-scenario.sound.MINE_DESTROY = 13
-scenario.sound.MINE_INSERT = 14
-scenario.sound.MINE_PRIME = 15
-scenario.sound.THROW = 16
-scenario.sound.FLAG_THUMP = 17
-scenario.sound.GARRISON_IN = 18
-scenario.sound.GARRISON_OUT = 19
-scenario.sound.ALERT_BELL = 20
-scenario.sound.ALERT_BUILDING = 21
-scenario.sound.ALERT_RESEARCH = 22
-scenario.sound.ALERT_UNIT = 23
-scenario.sound.GOLD_MINE_COLLAPSE = 24
-scenario.sound.MOLOTOV_IMPACT = 25
-scenario.sound.FIRE_BURN = 26
-scenario.sound.PISTOL_SILENCED = 27
-scenario.sound.CAMO_ON = 28
-scenario.sound.CAMO_OFF = 29
-scenario.sound.BALLOON_DEATH = 30
-scenario.sound.RICOCHET = 31
-scenario.sound.OBJECTIVE_COMPLETE = 32
-scenario.sound.MATCH_START = 33
-
---- Bot config constants
 scenario.bot_config_flag = {}
+scenario.bot_config_flag.SHOULD_PAUSE = 64
 scenario.bot_config_flag.SHOULD_ATTACK_FIRST = 1
-scenario.bot_config_flag.SHOULD_ATTACK = 2
-scenario.bot_config_flag.SHOULD_HARASS = 4
-scenario.bot_config_flag.SHOULD_RETREAT = 8
 scenario.bot_config_flag.SHOULD_SCOUT = 16
 scenario.bot_config_flag.SHOULD_SURRENDER = 32
-scenario.bot_config_flag.SHOULD_PAUSE = 64
+scenario.bot_config_flag.SHOULD_HARASS = 4
+scenario.bot_config_flag.SHOULD_ATTACK = 2
+scenario.bot_config_flag.SHOULD_RETREAT = 8
+
+scenario.CAMERA_MODE_PAN = 2
+scenario.PLAYER_ID = 0
+scenario.CAMERA_MODE_MINIMAP_DRAG = 1
+scenario.sound = {}
+scenario.sound.BUILDING_DESTROY = 11
+scenario.sound.CAMO_OFF = 29
+scenario.sound.MINE_DESTROY = 13
+scenario.sound.GUN = 3
+scenario.sound.THROW = 16
+scenario.sound.GARRISON_IN = 18
+scenario.sound.BALLOON_DEATH = 30
+scenario.sound.PICKAXE = 5
+scenario.sound.GARRISON_OUT = 19
+scenario.sound.BUILDING_PLACE = 7
+scenario.sound.BUNKER_DESTROY = 12
+scenario.sound.FIRE_BURN = 26
+scenario.sound.DEATH_CHICKEN = 9
+scenario.sound.ALERT_RESEARCH = 22
+scenario.sound.OBJECTIVE_COMPLETE = 32
+scenario.sound.SWORD = 8
+scenario.sound.MINE_PRIME = 15
+scenario.sound.CANNON = 10
+scenario.sound.ALERT_BELL = 20
+scenario.sound.CAMO_ON = 28
+scenario.sound.DEATH = 1
+scenario.sound.MATCH_START = 33
+scenario.sound.HAMMER = 6
+scenario.sound.EXPLOSION = 4
+scenario.sound.GOLD_MINE_COLLAPSE = 24
+scenario.sound.RICOCHET = 31
+scenario.sound.UI_CLICK = 0
+scenario.sound.MINE_INSERT = 14
+scenario.sound.ALERT_BUILDING = 21
+scenario.sound.ALERT_UNIT = 23
+scenario.sound.PISTOL_SILENCED = 27
+scenario.sound.MOLOTOV_IMPACT = 25
+scenario.sound.FLAG_THUMP = 17
+scenario.sound.MUSKET = 2
+
+scenario.entity_type = {}
+scenario.entity_type.BARRACKS = 19
+scenario.entity_type.SHERIFFS = 20
+scenario.entity_type.HOUSE = 13
+scenario.entity_type.HALL = 12
+scenario.entity_type.LANDMINE = 21
+scenario.entity_type.BALLOON = 11
+scenario.entity_type.WORKSHOP = 16
+scenario.entity_type.BUNKER = 15
+scenario.entity_type.SALOON = 14
+scenario.entity_type.PYRO = 7
+scenario.entity_type.SOLDIER = 8
+scenario.entity_type.BANDIT = 3
+scenario.entity_type.GOLDMINE = 0
+scenario.entity_type.WAGON = 4
+scenario.entity_type.COOP = 18
+scenario.entity_type.MINER = 1
+scenario.entity_type.JOCKEY = 5
+scenario.entity_type.COWBOY = 2
+scenario.entity_type.SAPPER = 6
+scenario.entity_type.DETECTIVE = 10
+scenario.entity_type.SMITH = 17
+scenario.entity_type.CANNON = 9
+
+scenario.CAMERA_MODE_FREE = 0
+scenario.CAMERA_MODE_HELD = 3
 
 --- Send a debug log. If debug logging is disabled, this function does nothing.
 --- @param ... any Values to print
@@ -222,4 +220,8 @@ function scenario.match_input_build(params) end
 --- @param flag number
 --- @param value boolean
 function scenario.set_bot_flag(player_id, flag, value) end
+
+--- Sets the global objective counter
+--- @param value number
+function scenario.set_global_objective_counter(value) end
 

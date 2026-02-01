@@ -51,6 +51,7 @@ static int script_does_squad_exist(lua_State* lua_state);
 static int script_is_player_defeated(lua_State* lua_state);
 static int script_match_input_build(lua_State* lua_state);
 static int script_set_bot_flag(lua_State* lua_state);
+static int script_set_global_objective_counter(lua_State* lua_state);
 
 static const char* MODULE_NAME = "scenario";
 
@@ -83,6 +84,7 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "is_player_defeated", script_is_player_defeated },
     { "match_input_build", script_match_input_build },
     { "set_bot_flag", script_set_bot_flag },
+    { "set_global_objective_counter", script_set_global_objective_counter },
     { NULL, NULL }
 };
 
@@ -98,7 +100,9 @@ static const ScriptConstant GOLD_CONSTANTS[] = {
     { NULL, 0 }
 };
 
+void match_shell_script_register_scenario_constants(lua_State* lua_state);
 const char* match_shell_script_get_entity_type_str(EntityType type);
+const char* match_shell_script_get_global_objective_counter_type_str(GlobalObjectiveCounterType type);
 void match_shell_script_handle_error(MatchShellState* state);
 
 bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, const char* script_path) {
@@ -132,58 +136,11 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
     lua_pushlightuserdata(state->scenario_lua_state, state);
     lua_setfield(state->scenario_lua_state, LUA_REGISTRYINDEX, "__match_shell_state");
 
-    // Scenario module constants
-
-    // Script constants
-    lua_getglobal(state->scenario_lua_state, MODULE_NAME);
-    size_t const_index = 0;
-    while (GOLD_CONSTANTS[const_index].name != NULL) {
-        lua_pushinteger(state->scenario_lua_state, GOLD_CONSTANTS[const_index].value);
-        lua_setfield(state->scenario_lua_state, -2, GOLD_CONSTANTS[const_index].name);
-
-        const_index++;
-    }
-
-    // Player ID constant
-    // It's gonna be 0 anyways, but we may as well
-    lua_pushinteger(state->scenario_lua_state, network_get_player_id());
-    lua_setfield(state->scenario_lua_state, -2, "PLAYER_ID");
-
-    // Entity constants
-    lua_newtable(state->scenario_lua_state);
-    for (int entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
-        lua_pushinteger(state->scenario_lua_state, entity_type);
-        lua_setfield(state->scenario_lua_state, -2, match_shell_script_get_entity_type_str((EntityType)entity_type));
-    }
-    lua_setfield(state->scenario_lua_state, -2, "entity_type");
-
-    // Sound constants
-    lua_newtable(state->scenario_lua_state);
-    for (int sound_name = 0; sound_name < SOUND_COUNT; sound_name++) {
-        char const_name[64];
-        strcpy_to_upper(const_name, sound_get_name((SoundName)sound_name));
-
-        lua_pushinteger(state->scenario_lua_state, sound_name);
-        lua_setfield(state->scenario_lua_state, -2, const_name);
-    }
-    lua_setfield(state->scenario_lua_state, -2, "sound");
-
-    // Bot config constants
-    lua_newtable(state->scenario_lua_state);
-    for (uint32_t flag_index = 0; flag_index < BOT_CONFIG_FLAG_COUNT; flag_index++) {
-        uint32_t flag_value = 1U << flag_index;
-
-        char const_name[64];
-        char* const_name_ptr = const_name;
-        const_name_ptr += sprintf(const_name_ptr, "SHOULD_");
-        strcpy_to_upper(const_name_ptr, bot_config_flag_str(flag_value));
-
-        lua_pushinteger(state->scenario_lua_state, flag_value);
-        lua_setfield(state->scenario_lua_state, -2, const_name);
-    }
-    lua_setfield(state->scenario_lua_state, -2, "bot_config_flag");
+    // Register scenario constants
+    match_shell_script_register_scenario_constants(state->scenario_lua_state);
 
     // Scenario file constants
+    lua_getglobal(state->scenario_lua_state, MODULE_NAME);
     lua_newtable(state->scenario_lua_state);
     for (const ScenarioConstant& constant : scenario->constants) {
         switch (constant.type) {
@@ -244,6 +201,72 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
     }
 
     return true;
+}
+
+void match_shell_script_register_scenario_constants(lua_State* lua_state) {
+    // Push scenario table onto the stack
+    lua_getglobal(lua_state, MODULE_NAME);
+
+    // The scenario table should always exist when this function is called
+    GOLD_ASSERT(!lua_isnil(lua_state, -1));
+
+    // Script constants
+    size_t const_index = 0;
+    while (GOLD_CONSTANTS[const_index].name != NULL) {
+        lua_pushinteger(lua_state, GOLD_CONSTANTS[const_index].value);
+        lua_setfield(lua_state, -2, GOLD_CONSTANTS[const_index].name);
+
+        const_index++;
+    }
+
+    // Player ID constant
+    lua_pushinteger(lua_state, 0);
+    lua_setfield(lua_state, -2, "PLAYER_ID");
+
+    // Entity constants
+    lua_newtable(lua_state);
+    for (int entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+        lua_pushinteger(lua_state, entity_type);
+        lua_setfield(lua_state, -2, match_shell_script_get_entity_type_str((EntityType)entity_type));
+    }
+    lua_setfield(lua_state, -2, "entity_type");
+
+    // Sound constants
+    lua_newtable(lua_state);
+    for (int sound_name = 0; sound_name < SOUND_COUNT; sound_name++) {
+        char const_name[64];
+        strcpy_to_upper(const_name, sound_get_name((SoundName)sound_name));
+
+        lua_pushinteger(lua_state, sound_name);
+        lua_setfield(lua_state, -2, const_name);
+    }
+    lua_setfield(lua_state, -2, "sound");
+
+    // Bot config constants
+    lua_newtable(lua_state);
+    for (uint32_t flag_index = 0; flag_index < BOT_CONFIG_FLAG_COUNT; flag_index++) {
+        uint32_t flag_value = 1U << flag_index;
+
+        char const_name[64];
+        char* const_name_ptr = const_name;
+        const_name_ptr += sprintf(const_name_ptr, "SHOULD_");
+        strcpy_to_upper(const_name_ptr, bot_config_flag_str(flag_value));
+
+        lua_pushinteger(lua_state, flag_value);
+        lua_setfield(lua_state, -2, const_name);
+    }
+    lua_setfield(lua_state, -2, "bot_config_flag");
+
+    // Objective counter type constants
+    lua_newtable(lua_state);
+    for (uint32_t counter_type = 0; counter_type < GLOBAL_OBJECTIVE_COUNTER_TYPE_COUNT; counter_type++) {
+        lua_pushnumber(lua_state, counter_type);
+        lua_setfield(lua_state, -2, match_shell_script_get_global_objective_counter_type_str((GlobalObjectiveCounterType)counter_type));
+    }
+    lua_setfield(lua_state, -2, "global_objective_counter_type");
+
+    // Pops scenario table off the stack
+    lua_pop(lua_state, 1);
 }
 
 void match_shell_script_update(MatchShellState* state) {
@@ -328,6 +351,18 @@ const char* match_shell_script_get_entity_type_str(EntityType type) {
     }
 }
 
+const char* match_shell_script_get_global_objective_counter_type_str(GlobalObjectiveCounterType type) {
+    switch (type) {
+        case GLOBAL_OBJECTIVE_COUNTER_OFF:
+            return "OFF";
+        case GLOBAL_OBJECTIVE_COUNTER_GOLD:
+            return "GOLD";
+        case GLOBAL_OBJECTIVE_COUNTER_TYPE_COUNT:
+            GOLD_ASSERT(false);
+            return "";
+    }
+}
+
 #ifdef GOLD_DEBUG
 void match_shell_script_generate_doc() {
     std::string doc_path = filesystem_get_resource_path() + "scenario" + GOLD_PATH_SEPARATOR + "modules" + GOLD_PATH_SEPARATOR + "scenario.d.lua";
@@ -344,47 +379,40 @@ void match_shell_script_generate_doc() {
     fprintf(file, "--- @field x number\n");
     fprintf(file, "--- @field y number\n\n");
 
-    fprintf(file, "--- Script constants\n");
-    size_t index = 0;
-    while (GOLD_CONSTANTS[index].name != NULL) {
-        fprintf(file, "%s.%s = %i\n", MODULE_NAME, GOLD_CONSTANTS[index].name, GOLD_CONSTANTS[index].value);
-        index++;
+    // Create and populate the scenario table with all of the constants
+    lua_State* lua_state = luaL_newstate();
+    lua_newtable(lua_state);
+    lua_setglobal(lua_state, MODULE_NAME);
+    match_shell_script_register_scenario_constants(lua_state);
+
+    // Now that we have the constants, we can read them to create documentation
+    lua_getglobal(lua_state, MODULE_NAME);
+    lua_pushnil(lua_state);
+    while (lua_next(lua_state, -2) != 0) {
+        const char* const_name = lua_tostring(lua_state, -2);
+        int type = lua_type(lua_state, -1);
+
+        if (type == LUA_TTABLE) {
+            fprintf(file, "%s.%s = {}\n", MODULE_NAME, const_name);
+            lua_pushnil(lua_state);
+            while (lua_next(lua_state, -2) != 0) {
+                const char* table_const_name = lua_tostring(lua_state, -2);
+                int table_const_value = lua_tonumber(lua_state, -1);
+
+                fprintf(file, "%s.%s.%s = %i\n", MODULE_NAME, const_name, table_const_name, table_const_value);
+
+                lua_pop(lua_state, 1);
+            }
+            fprintf(file, "\n");
+        } else if (type == LUA_TNUMBER) {
+            fprintf(file, "%s.%s = %i\n", MODULE_NAME, const_name, (int)lua_tonumber(lua_state, -1));
+        }
+        lua_pop(lua_state, 1);
     }
+    lua_pop(lua_state, 1);
     fprintf(file, "\n");
 
-    fprintf(file, "--- Scenario constants\n");
-    fprintf(file, "%s.constants = {}\n\n", MODULE_NAME);
-
-    fprintf(file, "--- Entity constants\n");
-    fprintf(file, "%s.entity_type = {}\n", MODULE_NAME);
-    for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
-        fprintf(file, "%s.entity_type.%s = %u\n", MODULE_NAME, match_shell_script_get_entity_type_str((EntityType)entity_type), entity_type);
-    }
-    fprintf(file, "\n");
-
-    fprintf(file, "--- Sound constants\n");
-    fprintf(file, "%s.sound = {}\n", MODULE_NAME);
-    for (uint32_t sound = 0; sound < SOUND_COUNT; sound++) {
-        char const_name[64];
-        strcpy_to_upper(const_name, sound_get_name((SoundName)sound));
-
-        fprintf(file, "%s.sound.%s = %u\n", MODULE_NAME, const_name, sound);
-    }
-    fprintf(file, "\n");
-
-    fprintf(file, "--- Bot config constants\n");
-    fprintf(file, "%s.bot_config_flag = {}\n", MODULE_NAME);
-    for (uint32_t flag_index = 0; flag_index < BOT_CONFIG_FLAG_COUNT; flag_index++) {
-        uint32_t flag_value = 1U << flag_index;
-
-        char const_name[64];
-        char* const_name_ptr = const_name;
-        const_name_ptr += sprintf(const_name_ptr, "SHOULD_");
-        strcpy_to_upper(const_name_ptr, bot_config_flag_str(flag_value));
-
-        fprintf(file, "%s.bot_config_flag.%s = %u\n", MODULE_NAME, const_name, flag_value);
-    }
-    fprintf(file, "\n");
+    lua_close(lua_state);
 
     std::ifstream script_cpp_ifstream("../src/shell/script.cpp");
     std::vector<std::string> comments;
@@ -409,7 +437,7 @@ void match_shell_script_generate_doc() {
         comments.clear();
     }
 
-    index = 0;
+    size_t index = 0;
     while (GOLD_FUNCS[index].name != NULL) {
         std::vector<std::string> param_names;
         for (const std::string& comment : function_comments[GOLD_FUNCS[index].name]) {
@@ -1288,6 +1316,36 @@ static int script_set_bot_flag(lua_State* lua_state) {
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
     bitflag_set(&state->bots[player_id].config.flags, flag, value);
+
+    return 0;
+}
+
+// Sets the global objective counter
+// @param value number
+static int script_set_global_objective_counter(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    uint32_t value = (uint32_t)lua_tonumber(lua_state, 1);
+    if (value >= GLOBAL_OBJECTIVE_COUNTER_TYPE_COUNT) {
+        script_error(lua_state, "Global objective counter value of %u is invalid.", value);
+    }
+
+    GlobalObjectiveCounter counter;
+    counter.type = (GlobalObjectiveCounterType)value;
+    switch (counter.type) {
+        case GLOBAL_OBJECTIVE_COUNTER_GOLD: {
+            memset(&counter.gold, 0, sizeof(counter.gold));
+            break;
+        }
+        case GLOBAL_OBJECTIVE_COUNTER_OFF:
+            break;
+        case GLOBAL_OBJECTIVE_COUNTER_TYPE_COUNT:
+            GOLD_ASSERT(false);
+    }
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    state->scenario_global_objective_counter = counter;
 
     return 0;
 }
