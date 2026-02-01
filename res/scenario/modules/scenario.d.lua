@@ -203,3 +203,7 @@ function scenario.does_squad_exist(player_id, squad_id) end
 --- @return boolean 
 function scenario.is_player_defeated(player_id) end
 
+--- Queues a build input
+--- @param params { building_type: number, building_cell: ivec2, builder_id: number }
+function scenario.match_input_build(params) end
+

@@ -2,58 +2,42 @@
 	"map": "map.dat",
 	"script": "scenario2.lua",
 	"player_spawn": {
-		"x": 0.000000,
-		"y": 0.000000
+		"x": 117.000000,
+		"y": 116.000000
 	},
 	"players": [
 		{
 			"name": "Player",
 			"starting_gold": 50.000000,
-			"allowed_upgrades": [
-				"Wagon Armor",
-				"Land Mines",
-				"Bayonets",
-				"Private Eye",
-				"Stakeout",
-				"Serrated Knives",
-				"Tailwind",
-				"Iron Sights"
-			],
+			"allowed_upgrades": [],
 			"allowed_entities": [
-				"Gold Mine",
 				"Miner",
 				"Cowboy",
 				"Bandit",
-				"Wagon",
-				"Jockey",
-				"Sapper",
-				"Pyro",
-				"Soldier",
-				"Cannoneer",
-				"Detective",
-				"Balloon",
 				"Town Hall",
 				"House",
 				"Saloon",
-				"Bunker",
-				"Workshop",
-				"Blacksmith",
-				"Chicken Coop",
-				"Barracks",
-				"Sheriff's Office",
-				"Land Mine"
+				"Bunker"
 			]
 		},
 		{
-			"name": "Enemy 1",
-			"starting_gold": 50.000000,
+			"name": "Prospectors",
+			"starting_gold": 1000.000000,
 			"opener": "Tech First",
 			"preferred_unit_comp": "Cwby/Bndt",
 			"flags": [],
 			"target_base_count": 0.000000,
 			"macro_cycle_cooldown": 0.000000,
 			"allowed_upgrades": [],
-			"allowed_entities": []
+			"allowed_entities": [
+				"Miner",
+				"Cowboy",
+				"Bandit",
+				"Town Hall",
+				"House",
+				"Saloon",
+				"Bunker"
+			]
 		},
 		{
 			"name": "Enemy 2",
@@ -204,8 +188,53 @@
 				"x": 121.000000,
 				"y": 33.000000
 			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 38.000000,
+				"y": 87.000000
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 1.000000,
+			"gold_held": 0.000000,
+			"cell": {
+				"x": 66.000000,
+				"y": 59.000000
+			}
 		}
 	],
 	"squads": [],
-	"constants": []
+	"constants": [
+		{
+			"name": "HALL_CELL1",
+			"type": "Cell",
+			"cell": {
+				"x": 38.000000,
+				"y": 91.000000
+			}
+		},
+		{
+			"name": "HALL_CELL2",
+			"type": "Cell",
+			"cell": {
+				"x": 58.000000,
+				"y": 59.000000
+			}
+		},
+		{
+			"name": "HALL_BUILDER1",
+			"type": "Entity",
+			"entity_index": 14.000000
+		},
+		{
+			"name": "HALL_BUILDER2",
+			"type": "Entity",
+			"entity_index": 15.000000
+		}
+	]
 }
