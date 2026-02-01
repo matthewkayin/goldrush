@@ -23,3 +23,16 @@ uint32_t enum_from_str(const char* str, EnumToStrFn enum_to_str, uint32_t enum_c
     log_warn("enum_from_str could not find a value for str %s. Falling back to %s.", str, enum_to_str(fallback));
     return fallback;
 }
+
+void strcpy_to_upper(char* dest, const char* src) {
+    size_t index = 0;
+    while (src[index] != '\0') {
+        if (src[index] == ' ') {
+            dest[index] = '_';
+        } else {
+            dest[index] = toupper(src[index]);
+        }
+        index++;
+    }
+    dest[index] = '\0';
+}

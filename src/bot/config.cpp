@@ -111,6 +111,8 @@ const char* bot_config_flag_str(uint32_t flag) {
             return "Scout";
         case BOT_CONFIG_SHOULD_SURRENDER:
             return "Surrender";
+        case BOT_CONFIG_SHOULD_PAUSE:
+            return "Pause";
     }
 
     GOLD_ASSERT(false);

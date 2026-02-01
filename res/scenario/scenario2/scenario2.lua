@@ -1,6 +1,9 @@
 local actions = require("actions")
 
+local ENEMY_PLAYER_ID = 1
+
 function scenario_init()
+    scenario.set_bot_flag(ENEMY_PLAYER_ID, scenario.bot_config_flag.SHOULD_PAUSE, true)
     actions.run(function ()
         actions.wait(1.0)
         scenario.fog_reveal({
@@ -17,6 +20,7 @@ function scenario_init()
             builder_id = scenario.constants.HALL_BUILDER1
         })
         scenario.release_camera()
+        -- scenario.set_bot_flag(ENEMY_PLAYER_ID, scenario.bot_config_flag.SHOULD_PAUSE, false)
     end)
 end
 

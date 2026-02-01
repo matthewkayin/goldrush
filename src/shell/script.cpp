@@ -3,6 +3,8 @@
 #include "core/logger.h"
 #include "core/filesystem.h"
 #include "network/network.h"
+#include "util/util.h"
+#include "util/bitflag.h"
 #include <algorithm>
 
 #ifdef GOLD_DEBUG
@@ -48,6 +50,7 @@ static int script_spawn_enemy_squad(lua_State* lua_state);
 static int script_does_squad_exist(lua_State* lua_state);
 static int script_is_player_defeated(lua_State* lua_state);
 static int script_match_input_build(lua_State* lua_state);
+static int script_set_bot_flag(lua_State* lua_state);
 
 static const char* MODULE_NAME = "scenario";
 
@@ -79,6 +82,7 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "does_squad_exist", script_does_squad_exist },
     { "is_player_defeated", script_is_player_defeated },
     { "match_input_build", script_match_input_build },
+    { "set_bot_flag", script_set_bot_flag },
     { NULL, NULL }
 };
 
@@ -156,20 +160,28 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
     // Sound constants
     lua_newtable(state->scenario_lua_state);
     for (int sound_name = 0; sound_name < SOUND_COUNT; sound_name++) {
-        const char* sound_name_str = sound_get_name((SoundName)sound_name);
         char const_name[64];
-
-        size_t index = 0;
-        while (sound_name_str[index] != '\0') {
-            const_name[index] = toupper(sound_name_str[index]);
-            index++;
-        }
-        const_name[index] = '\0';
+        strcpy_to_upper(const_name, sound_get_name((SoundName)sound_name));
 
         lua_pushinteger(state->scenario_lua_state, sound_name);
         lua_setfield(state->scenario_lua_state, -2, const_name);
     }
     lua_setfield(state->scenario_lua_state, -2, "sound");
+
+    // Bot config constants
+    lua_newtable(state->scenario_lua_state);
+    for (uint32_t flag_index = 0; flag_index < BOT_CONFIG_FLAG_COUNT; flag_index++) {
+        uint32_t flag_value = 1U << flag_index;
+
+        char const_name[64];
+        char* const_name_ptr = const_name;
+        const_name_ptr += sprintf(const_name_ptr, "SHOULD_");
+        strcpy_to_upper(const_name_ptr, bot_config_flag_str(flag_value));
+
+        lua_pushinteger(state->scenario_lua_state, flag_value);
+        lua_setfield(state->scenario_lua_state, -2, const_name);
+    }
+    lua_setfield(state->scenario_lua_state, -2, "bot_config_flag");
 
     // Scenario file constants
     lua_newtable(state->scenario_lua_state);
@@ -353,16 +365,24 @@ void match_shell_script_generate_doc() {
     fprintf(file, "--- Sound constants\n");
     fprintf(file, "%s.sound = {}\n", MODULE_NAME);
     for (uint32_t sound = 0; sound < SOUND_COUNT; sound++) {
-        const char* sound_name = sound_get_name((SoundName)sound);
         char const_name[64];
-        sprintf(const_name, "%s", sound_name);
-        char* sound_name_ptr = const_name;
-        while (*sound_name_ptr != '\0') {
-            (*sound_name_ptr) = toupper(*sound_name_ptr);
-            sound_name_ptr++;
-        }
+        strcpy_to_upper(const_name, sound_get_name((SoundName)sound));
 
         fprintf(file, "%s.sound.%s = %u\n", MODULE_NAME, const_name, sound);
+    }
+    fprintf(file, "\n");
+
+    fprintf(file, "--- Bot config constants\n");
+    fprintf(file, "%s.bot_config_flag = {}\n", MODULE_NAME);
+    for (uint32_t flag_index = 0; flag_index < BOT_CONFIG_FLAG_COUNT; flag_index++) {
+        uint32_t flag_value = 1U << flag_index;
+
+        char const_name[64];
+        char* const_name_ptr = const_name;
+        const_name_ptr += sprintf(const_name_ptr, "SHOULD_");
+        strcpy_to_upper(const_name_ptr, bot_config_flag_str(flag_value));
+
+        fprintf(file, "%s.bot_config_flag.%s = %u\n", MODULE_NAME, const_name, flag_value);
     }
     fprintf(file, "\n");
 
@@ -462,13 +482,22 @@ const char* script_lua_type_str(int lua_type) {
     }
 }
 
-void script_error(lua_State* lua_state, const char* message) {
+void script_error(lua_State* lua_state, const char* message, ...) {
     lua_Debug debug;
     lua_getstack(lua_state, 1, &debug);
     lua_getinfo(lua_state, "Sl", &debug);
 
-    char error_str[512];
-    sprintf(error_str, "%s:%i %s", debug.source, debug.currentline, message);
+    const size_t ERROR_BUFFER_LENGTH = 1024;
+    char error_str[ERROR_BUFFER_LENGTH];
+    char* error_str_ptr = error_str;
+
+    error_str_ptr += sprintf(error_str_ptr, "%s:%i %s", debug.source, debug.currentline, message);
+
+    __builtin_va_list arg_ptr;
+    va_start(arg_ptr, message);
+    vsnprintf(error_str_ptr, ERROR_BUFFER_LENGTH, message, arg_ptr);
+    va_end(arg_ptr);
+
     lua_pushstring(lua_state, error_str);
     lua_error(lua_state);
 }
@@ -476,22 +505,17 @@ void script_error(lua_State* lua_state, const char* message) {
 void script_validate_type(lua_State* lua_state, int stack_index, const char* name, int expected_type) {
     int received_type = lua_type(lua_state, stack_index);
     if (received_type != expected_type) {
-        char error_message[256];
-        sprintf(error_message, 
-            "Invalid type for %s. Received %s. Expected %s.",
+        script_error(lua_state, "Invalid type for %s. Received %s. Expected %s.",
             name,
             script_lua_type_str(received_type),
             script_lua_type_str(expected_type));
-        script_error(lua_state, error_message);
     }
 }
 
 void script_validate_arguments(lua_State* lua_state, const int* arg_types, int arg_count) {
     int arg_number = lua_gettop(lua_state);
     if (arg_number != arg_count) {
-        char error_message[256];
-        sprintf(error_message, "Invalid arg count. Received %u. Expected %u.", arg_number, arg_count);
-        script_error(lua_state, error_message);
+        script_error(lua_state, "Invalid arg count. Received %u. Expected %u.", arg_number, arg_count);
     }
 
     for (int arg_index = 1; arg_index <= arg_count; arg_index++) {
@@ -503,18 +527,14 @@ void script_validate_arguments(lua_State* lua_state, const int* arg_types, int a
 
 void script_validate_entity_type(lua_State* lua_state, int entity_type) {
     if (entity_type < 0 || entity_type >= ENTITY_TYPE_COUNT) {
-        char error_str[128];
-        sprintf(error_str, "Entity type %i not recognized.", entity_type);
-        script_error(lua_state, error_str);
+        script_error(lua_state, "Entity type %i not recognized.", entity_type);
     }
 }
 
 uint32_t script_validate_entity_id(lua_State* lua_state, const MatchShellState* state, EntityId entity_id) {
     uint32_t entity_index = state->match_state.entities.get_index_of(entity_id);
     if (entity_index == INDEX_INVALID) {
-        char error_message[128];
-        sprintf(error_message, "Entity ID %u does not exist.", entity_id);
-        script_error(lua_state, error_message);
+        script_error(lua_state, "Entity ID %u does not exist.", entity_id);
     }
 
     return entity_index;
@@ -646,9 +666,7 @@ static int script_chat(lua_State* lua_state) {
 
     FontName font = script_chat_get_font_from_chat_color(chat_color);
     if (font == FONT_COUNT) {
-        char error_message[128];
-        sprintf(error_message, "Unregonized chat color %i", chat_color);
-        script_error(lua_state, error_message);
+        script_error(lua_state, "Unregonized chat color %i", chat_color);
     }
 
     match_shell_add_chat_message(state, font, chat_prefix, chat_message, CHAT_MESSAGE_DURATION);
@@ -680,9 +698,7 @@ static int script_play_sound(lua_State* lua_state) {
     int sound = (int)lua_tonumber(lua_state, 1);
 
     if (sound < 0 || sound >= SOUND_COUNT) {
-        char error_message[128];
-        sprintf(error_message, "Invalid sound %i", sound);
-        script_error(lua_state, error_message);
+        script_error(lua_state, "Invalid sound %i", sound);
     }
 
     sound_play((SoundName)sound);
@@ -770,9 +786,7 @@ static int script_complete_objective(lua_State* lua_state) {
     MatchShellState* state = script_get_match_shell_state(lua_state);
     uint32_t objective_index = lua_tonumber(lua_state, 1);
     if (objective_index >= state->scenario_objectives.size()) {
-        char error_message[128];
-        sprintf(error_message, "Objective index %u out of bounds.", objective_index);
-        script_error(lua_state, error_message);
+        script_error(lua_state, "Objective index %u out of bounds.", objective_index);
     }
 
     state->scenario_objectives[objective_index].is_complete = true;
@@ -790,9 +804,7 @@ static int script_is_objective_complete(lua_State* lua_state) {
     MatchShellState* state = script_get_match_shell_state(lua_state);
     uint32_t objective_index = lua_tonumber(lua_state, 1);
     if (objective_index >= state->scenario_objectives.size()) {
-        char error_message[128];
-        sprintf(error_message, "Objective index %u out of bounds.", objective_index);
-        script_error(lua_state, error_message);
+        script_error(lua_state, "Objective index %u out of bounds.", objective_index);
     }
 
     lua_pushboolean(lua_state, state->scenario_objectives[objective_index].is_complete);
@@ -964,7 +976,7 @@ static int script_player_has_entity_near_cell(lua_State* lua_state) {
 }
 
 // Reveals fog at the specified cell.
-// @param params { player_id: number, cell: ivec2, cell_size: number, sight: number, duration: number }
+// @param params { cell: ivec2, cell_size: number, sight: number, duration: number }
 static int script_fog_reveal(lua_State* lua_state) {
     const int arg_types[] = { LUA_TTABLE };
     script_validate_arguments(lua_state, arg_types, 1);
@@ -1090,7 +1102,7 @@ static int script_get_camera_mode(lua_State* lua_state) {
 // @param params { player_id: number, target_cell: ivec2, spawn_cell: ivec2, entities: table }
 // @return number 
 static int script_spawn_enemy_squad(lua_State* lua_state) {
-    int arg_types[] = { LUA_TTABLE };
+    const int arg_types[] = { LUA_TTABLE };
     script_validate_arguments(lua_state, arg_types, 1);
 
     // Player
@@ -1163,14 +1175,12 @@ static int script_spawn_enemy_squad(lua_State* lua_state) {
 // @param squad_id number
 // @return boolean 
 static int script_does_squad_exist(lua_State* lua_state) {
-    int arg_types[] = { LUA_TNUMBER, LUA_TNUMBER };
+    const int arg_types[] = { LUA_TNUMBER, LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 2);
 
     uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
     if (player_id == 0 || player_id >= MAX_PLAYERS) {
-        char error_message[128];
-        sprintf(error_message, "player_id %u is out of bounds", player_id);
-        script_error(lua_state, error_message);
+        script_error(lua_state, "player_id %u is out of bounds", player_id);
     }
 
     int squad_id = (int)lua_tonumber(lua_state, 2);
@@ -1197,14 +1207,12 @@ static int script_does_squad_exist(lua_State* lua_state) {
 // @param player_id number
 // @return boolean 
 static int script_is_player_defeated(lua_State* lua_state) {
-    int arg_types[] = { LUA_TNUMBER };
+    const int arg_types[] = { LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 1);
 
     uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
     if (player_id == 0 || player_id >= MAX_PLAYERS) {
-        char error_message[128];
-        sprintf(error_message, "player_id %u is out of bounds", player_id);
-        script_error(lua_state, error_message);
+        script_error(lua_state, "player_id %u is out of bounds", player_id);
     }
 
     const MatchShellState* state = script_get_match_shell_state(lua_state);
@@ -1216,7 +1224,7 @@ static int script_is_player_defeated(lua_State* lua_state) {
 // Queues a build input
 // @param params { building_type: number, building_cell: ivec2, builder_id: number }
 static int script_match_input_build(lua_State* lua_state) {
-    int arg_types[] = { LUA_TTABLE };
+    const int arg_types[] = { LUA_TTABLE };
     script_validate_arguments(lua_state, arg_types, 1);
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
@@ -1247,6 +1255,39 @@ static int script_match_input_build(lua_State* lua_state) {
 
     uint8_t player_id = state->match_state.entities.get_by_id(builder_id).player_id;
     state->inputs[player_id].push({ input });
+
+    return 0;
+}
+
+// Sets a bot config flag to the specified value
+// @param player_id number
+// @param flag number
+// @param value boolean
+static int script_set_bot_flag(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER, LUA_TNUMBER, LUA_TBOOLEAN };
+    script_validate_arguments(lua_state, arg_types, 3);
+
+    uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
+    if (player_id == 0 || player_id >= MAX_PLAYERS) {
+        script_error(lua_state, "player_id %u is out of bounds", player_id);
+    }
+
+    uint32_t flag = (uint32_t)lua_tonumber(lua_state, 2);
+    uint32_t flag_index;
+    for (flag_index = 0; flag_index < BOT_CONFIG_FLAG_COUNT; flag_index++) {
+        uint32_t flag_value = 1U << flag_index;
+        if (flag == flag_value) {
+            break;
+        }
+    }
+    if (flag_index == BOT_CONFIG_FLAG_COUNT) {
+        script_error(lua_state, "%u is not a valid bot config flag.", flag);
+    }
+
+    bool value = lua_toboolean(lua_state, 3);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    bitflag_set(&state->bots[player_id].config.flags, flag, value);
 
     return 0;
 }

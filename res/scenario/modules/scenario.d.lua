@@ -80,6 +80,16 @@ scenario.sound.RICOCHET = 31
 scenario.sound.OBJECTIVE_COMPLETE = 32
 scenario.sound.MATCH_START = 33
 
+--- Bot config constants
+scenario.bot_config_flag = {}
+scenario.bot_config_flag.SHOULD_ATTACK_FIRST = 1
+scenario.bot_config_flag.SHOULD_ATTACK = 2
+scenario.bot_config_flag.SHOULD_HARASS = 4
+scenario.bot_config_flag.SHOULD_RETREAT = 8
+scenario.bot_config_flag.SHOULD_SCOUT = 16
+scenario.bot_config_flag.SHOULD_SURRENDER = 32
+scenario.bot_config_flag.SHOULD_PAUSE = 64
+
 --- Send a debug log. If debug logging is disabled, this function does nothing.
 --- @param ... any Values to print
 function scenario.log(...) end
@@ -164,7 +174,7 @@ function scenario.get_player_full_bunker_count(player_id) end
 function scenario.player_has_entity_near_cell(player_id, cell, distance) end
 
 --- Reveals fog at the specified cell.
---- @param params { player_id: number, cell: ivec2, cell_size: number, sight: number, duration: number }
+--- @param params { cell: ivec2, cell_size: number, sight: number, duration: number }
 function scenario.fog_reveal(params) end
 
 --- Returns the cell the camera is currently centered on
@@ -206,4 +216,10 @@ function scenario.is_player_defeated(player_id) end
 --- Queues a build input
 --- @param params { building_type: number, building_cell: ivec2, builder_id: number }
 function scenario.match_input_build(params) end
+
+--- Sets a bot config flag to the specified value
+--- @param player_id number
+--- @param flag number
+--- @param value boolean
+function scenario.set_bot_flag(player_id, flag, value) end
 

@@ -119,6 +119,10 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
     GOLD_ASSERT_MESSAGE(state.players[bot.player_id].active, "bot_get_turn_input should not be called after bot has surrendered.");
 
+    if (bitflag_check(bot.config.flags, BOT_CONFIG_SHOULD_PAUSE)) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
     // Gather info
 
     bot_scout_gather_info(state, bot);
