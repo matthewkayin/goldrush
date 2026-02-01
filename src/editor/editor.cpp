@@ -8,6 +8,7 @@
 #include "editor/menu_players.h"
 #include "editor/menu_edit_squad.h"
 #include "editor/menu_constant.h"
+#include "editor/menu_map_size.h"
 #include "editor/menu.h"
 #include "editor/action.h"
 #include "core/logger.h"
@@ -51,7 +52,7 @@ static const Rect CANVAS_RECT = (Rect) {
 
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save", "Save As" },
-    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players" },
+    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players", "Map Size" },
     { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads", "Player Spawn", "Constants" },
 };
 
@@ -105,7 +106,8 @@ enum EditorMenuType {
     EDITOR_MENU_TYPE_FILE,
     EDITOR_MENU_TYPE_PLAYERS,
     EDITOR_MENU_TYPE_EDIT_SQUAD,
-    EDITOR_MENU_TYPE_CONSTANT
+    EDITOR_MENU_TYPE_CONSTANT,
+    EDITOR_MENU_TYPE_MAP_SIZE
 };
 
 struct EditorMenu {
@@ -115,7 +117,8 @@ struct EditorMenu {
         EditorMenuNew,
         EditorMenuPlayers,
         EditorMenuEditSquad,
-        EditorMenuConstant
+        EditorMenuConstant,
+        EditorMenuMapSize
     > menu;
 };
 
@@ -704,6 +707,51 @@ void editor_update() {
 
                 break;
             }
+            case EDITOR_MENU_TYPE_MAP_SIZE: {
+                EditorMenuMapSize& menu = std::get<EditorMenuMapSize>(state.menu.menu);
+                editor_menu_map_size_update(menu, state.ui, state.menu.mode);
+
+                if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
+                    MapSize map_size = (MapSize)menu.map_size;
+                    Scenario* new_scenario = scenario_init_blank(state.scenario->map.type, map_size);
+
+                    // Copy map
+                    int smallest_map_width = std::min(state.scenario->map.width, new_scenario->map.width);
+                    int smallest_map_height = std::min(state.scenario->map.height, new_scenario->map.height);
+                    for (int y = 0; y < smallest_map_height; y++) {
+                        for (int x = 0; x < smallest_map_width; x++) {
+                            new_scenario->noise->map[x + (y * new_scenario->map.width)] = state.scenario->noise->map[x + (y * state.scenario->map.width)];
+                            new_scenario->noise->forest[x + (y * new_scenario->map.width)] = state.scenario->noise->forest[x + (y * state.scenario->map.width)];
+                        }
+                    }
+                    scenario_bake_map(new_scenario);
+
+                    // Copy player data
+                    new_scenario->player_spawn = ivec2(
+                        std::clamp(state.scenario->player_spawn.x, 0, new_scenario->map.width - 1),
+                        std::clamp(state.scenario->player_spawn.y, 0, new_scenario->map.height - 1)
+                    );
+                    memcpy(new_scenario->player_allowed_entities, state.scenario->player_allowed_entities, sizeof(new_scenario->player_allowed_entities));
+                    new_scenario->player_allowed_upgrades = state.scenario->player_allowed_upgrades;
+                    memcpy(new_scenario->bot_config, state.scenario->bot_config, sizeof(new_scenario->bot_config));
+
+                    // Copy entities
+                    for (uint32_t entity_index = 0; entity_index < state.scenario->entity_count; entity_index++) {
+                        const ScenarioEntity& entity = state.scenario->entities[entity_index];
+                        if (!map_is_cell_rect_in_bounds(new_scenario->map, entity.cell, entity_get_data(entity.type).cell_size)) {
+                            continue;
+                        }
+
+                        new_scenario->entities[new_scenario->entity_count] = entity;
+                        new_scenario->entity_count++;
+                    }
+
+                    editor_free_current_document();
+                    state.scenario = new_scenario;
+                }
+
+                break;
+            }
             case EDITOR_MENU_TYPE_FILE:
                 break;
             case EDITOR_MENU_TYPE_NONE:
@@ -896,6 +944,26 @@ void editor_update() {
             state.tool_edit_entity_offset = editor_get_hovered_cell() - state.scenario->entities[state.tool_value].cell;
             state.is_painting = true;
         }
+    }
+
+    // Camera drag during selection
+    if (state.is_painting && state.tool == EDITOR_TOOL_SELECT) {
+        const int CAMERA_DRAG_MARGIN = 16;
+
+        ivec2 mouse_in_canvas_position = input_get_mouse_position() - ivec2(CANVAS_RECT.x, CANVAS_RECT.y);
+        ivec2 drag_direction = ivec2(0, 0);
+        if (mouse_in_canvas_position.x < CAMERA_DRAG_MARGIN) {
+            drag_direction.x = -1;
+        } else if (mouse_in_canvas_position.x >= CANVAS_RECT.w - CAMERA_DRAG_MARGIN) {
+            drag_direction.x = 1;
+        }
+        if (mouse_in_canvas_position.y < CAMERA_DRAG_MARGIN) {
+            drag_direction.y = -1;
+        } else if (mouse_in_canvas_position.y >= CANVAS_RECT.h - CAMERA_DRAG_MARGIN) {
+            drag_direction.y = 1;
+        }
+        state.camera_offset += drag_direction * 8;
+        editor_clamp_camera();
     }
 
     // Paint / Selection move
@@ -1135,6 +1203,12 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
                 .type = EDITOR_MENU_TYPE_PLAYERS,
                 .mode = EDITOR_MENU_MODE_OPEN,
                 .menu = editor_menu_players_open(state.scenario)
+            };
+        } else if (action == "Map Size") {
+            state.menu = (EditorMenu) {
+                .type = EDITOR_MENU_TYPE_MAP_SIZE,
+                .mode = EDITOR_MENU_MODE_OPEN,
+                .menu = editor_menu_map_size_open(state.scenario->map.width)
             };
         }
     } else if (column == "Tool") {
@@ -2339,6 +2413,13 @@ void editor_render() {
                 .h = ((SCREEN_HEIGHT - 86) / TILE_SIZE)
             };
             render_minimap_draw_rect(MINIMAP_LAYER_FOG, spawn_rect, MINIMAP_PIXEL_PLAYER0);
+        }
+        // Minimap selection rect
+        if ((state.is_painting && state.tool == EDITOR_TOOL_SELECT) || state.tool_select_selection.x != -1) {
+            const Rect rect = state.is_painting && state.tool == EDITOR_TOOL_SELECT 
+                ? editor_tool_select_get_select_rect()
+                : state.tool_select_selection;
+            render_minimap_draw_rect(MINIMAP_LAYER_FOG, rect, MINIMAP_PIXEL_WHITE);
         }
         // Minimap camera rect
         Rect camera_rect = (Rect) {
