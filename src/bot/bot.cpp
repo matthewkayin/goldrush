@@ -172,14 +172,16 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
     // Misc
 
     // Cancel in-progress buildings
-    EntityId threatened_in_progress_building_id = bot_find_threatened_in_progress_building(state, bot);
-    if (threatened_in_progress_building_id != ID_NULL) {
-        MatchInput input;
-        input.type = MATCH_INPUT_BUILD_CANCEL;
-        input.build_cancel.building_id = threatened_in_progress_building_id;
+    if (bitflag_check(bot.config.flags, BOT_CONFIG_SHOULD_CANCEL_BUILDINGS)) {
+        EntityId threatened_in_progress_building_id = bot_find_threatened_in_progress_building(state, bot);
+        if (threatened_in_progress_building_id != ID_NULL) {
+            MatchInput input;
+            input.type = MATCH_INPUT_BUILD_CANCEL;
+            input.build_cancel.building_id = threatened_in_progress_building_id;
 
-        log_debug("BOT %u get_turn_input, cancel threatened building %u", bot.player_id, threatened_in_progress_building_id);
-        return input;
+            log_debug("BOT %u get_turn_input, cancel threatened building %u", bot.player_id, threatened_in_progress_building_id);
+            return input;
+        }
     }
 
     // Repair burning buildings

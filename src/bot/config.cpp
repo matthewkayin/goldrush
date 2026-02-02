@@ -34,7 +34,8 @@ BotConfig bot_config_init_from_difficulty(Difficulty difficulty) {
             config.flags = 
                 BOT_CONFIG_SHOULD_ATTACK |
                 BOT_CONFIG_SHOULD_SCOUT |
-                BOT_CONFIG_SHOULD_SURRENDER;
+                BOT_CONFIG_SHOULD_SURRENDER |
+                BOT_CONFIG_SHOULD_CANCEL_BUILDINGS;
             config.macro_cycle_cooldown = 1U * 60U * UPDATES_PER_SECOND;
             config.target_base_count = 1U;
             config.allowed_upgrades = 0;
@@ -47,7 +48,8 @@ BotConfig bot_config_init_from_difficulty(Difficulty difficulty) {
                 BOT_CONFIG_SHOULD_ATTACK_FIRST |
                 BOT_CONFIG_SHOULD_RETREAT | 
                 BOT_CONFIG_SHOULD_SCOUT |
-                BOT_CONFIG_SHOULD_SURRENDER;
+                BOT_CONFIG_SHOULD_SURRENDER | 
+                BOT_CONFIG_SHOULD_CANCEL_BUILDINGS;
             config.macro_cycle_cooldown = 1U * 30U * UPDATES_PER_SECOND;
             config.target_base_count = 2U;
             break;
@@ -59,7 +61,8 @@ BotConfig bot_config_init_from_difficulty(Difficulty difficulty) {
                 BOT_CONFIG_SHOULD_HARASS |
                 BOT_CONFIG_SHOULD_RETREAT |
                 BOT_CONFIG_SHOULD_SCOUT | 
-                BOT_CONFIG_SHOULD_SURRENDER;
+                BOT_CONFIG_SHOULD_SURRENDER |
+                BOT_CONFIG_SHOULD_CANCEL_BUILDINGS;
             config.macro_cycle_cooldown = 0;
             config.target_base_count = BOT_TARGET_BASE_COUNT_MATCH_ENEMY;
             break;
@@ -113,6 +116,8 @@ const char* bot_config_flag_str(uint32_t flag) {
             return "Surrender";
         case BOT_CONFIG_SHOULD_PAUSE:
             return "Pause";
+        case BOT_CONFIG_SHOULD_CANCEL_BUILDINGS:
+            return "Cancel Buildings";
     }
 
     GOLD_ASSERT(false);

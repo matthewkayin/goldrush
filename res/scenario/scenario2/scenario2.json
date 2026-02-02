@@ -8,7 +8,7 @@
 	"players": [
 		{
 			"name": "Player",
-			"starting_gold": 200.000000,
+			"starting_gold": 500.000000,
 			"allowed_upgrades": [],
 			"allowed_entities": [
 				"Miner",
@@ -695,6 +695,22 @@
 			"cell": {
 				"x": 118.000000,
 				"y": 116.000000
+			}
+		},
+		{
+			"name": "BUNKER_CELL1",
+			"type": "Cell",
+			"cell": {
+				"x": 46.000000,
+				"y": 87.000000
+			}
+		},
+		{
+			"name": "BUNKER_CELL2",
+			"type": "Cell",
+			"cell": {
+				"x": 76.000000,
+				"y": 63.000000
 			}
 		}
 	]
