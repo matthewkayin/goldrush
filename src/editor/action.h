@@ -68,6 +68,8 @@ struct EditorActionEditEntity {
 struct EditorActionRemoveEntity {
     uint32_t index;
     ScenarioEntity value;
+    uint32_t squad_index;
+    std::vector<uint32_t> constant_indices;
 };
 
 struct EditorActionEditSquad {

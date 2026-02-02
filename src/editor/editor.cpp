@@ -1776,11 +1776,30 @@ void editor_validate_tool_value() {
 }
 
 void editor_tool_edit_entity_delete_entity(uint32_t entity_index) {
+    uint32_t entity_squad_index = INDEX_INVALID;
+    for (uint32_t squad_index = 0; squad_index < state.scenario->squads.size(); squad_index++) {
+        for (uint32_t squad_entity_index = 0; squad_entity_index < state.scenario->squads[squad_index].entity_count; squad_entity_index++) {
+            if (state.scenario->squads[squad_index].entities[squad_entity_index] == entity_index) {
+                entity_squad_index = squad_index;
+                break;
+            }
+        }
+    }
+
+    std::vector<uint32_t> constant_indices;
+    for (uint32_t constant_index = 0; constant_index < state.scenario->constants.size(); constant_index++) {
+        if (state.scenario->constants[constant_index].type == SCENARIO_CONSTANT_TYPE_ENTITY && state.scenario->constants[constant_index].entity_index == entity_index) {
+            constant_indices.push_back(constant_index);
+        }
+    }
+
     editor_do_action((EditorAction) {
         .type = EDITOR_ACTION_REMOVE_ENTITY,
         .data = (EditorActionRemoveEntity) {
             .index = entity_index,
-            .value = state.scenario->entities[entity_index]
+            .value = state.scenario->entities[entity_index],
+            .squad_index = entity_squad_index,
+            .constant_indices = constant_indices
         }
     });
     state.tool_value = INDEX_INVALID;

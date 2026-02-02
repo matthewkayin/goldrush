@@ -91,12 +91,70 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
             const EditorActionRemoveEntity& action_data = std::get<EditorActionRemoveEntity>(action.data);
 
             if (mode == EDITOR_ACTION_MODE_DO) {
-                scenario->entities[action_data.index] = scenario->entities[scenario->entity_count - 1];
+                if (action_data.squad_index != INDEX_INVALID) {
+                    ScenarioSquad& squad = scenario->squads[action_data.squad_index];
+
+                    uint32_t squad_entity_index;
+                    for (squad_entity_index = 0; squad_entity_index < squad.entity_count; squad_entity_index++) {
+                        if (squad.entities[squad_entity_index] == action_data.index) {
+                            break;
+                        }
+                    }
+                    GOLD_ASSERT(squad_entity_index != squad.entity_count);
+
+                    squad.entities[squad_entity_index] = squad.entities[squad.entity_count - 1];
+                    squad.entity_count--;
+                }
+
+                for (uint32_t constant_index : action_data.constant_indices) {
+                    scenario->constants[constant_index].entity_index = INDEX_INVALID;
+                }
+
+                uint32_t last_entity_index = scenario->entity_count - 1;
+                scenario->entities[action_data.index] = scenario->entities[last_entity_index];
                 scenario->entity_count--;
+
+                for (ScenarioSquad& squad : scenario->squads) {
+                    for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entity_count; squad_entity_index++) {
+                        if (squad.entities[squad_entity_index] == scenario->entity_count) {
+                            squad.entities[squad_entity_index] = action_data.index;
+                        }
+                    }
+                }
+
+                for (ScenarioConstant& constant : scenario->constants) {
+                    if (constant.type == SCENARIO_CONSTANT_TYPE_ENTITY && constant.entity_index == scenario->entity_count) {
+                        constant.entity_index = action_data.index;
+                    }
+                }
             } else if (mode == EDITOR_ACTION_MODE_UNDO) {
+                for (ScenarioConstant& constant : scenario->constants) {
+                    if (constant.type == SCENARIO_CONSTANT_TYPE_ENTITY && constant.entity_index == action_data.index) {
+                        constant.entity_index = scenario->entity_count;
+                    }
+                }
+
+                for (ScenarioSquad& squad : scenario->squads) {
+                    for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entity_count; squad_entity_index++) {
+                        if (squad.entities[squad_entity_index] == action_data.index) {
+                            squad.entities[squad_entity_index] = scenario->entity_count;
+                        }
+                    }
+                }
+
                 scenario->entities[scenario->entity_count] = scenario->entities[action_data.index];
                 scenario->entities[action_data.index] = action_data.value;
                 scenario->entity_count++;
+
+                for (uint32_t constant_index : action_data.constant_indices) {
+                    scenario->constants[constant_index].entity_index = action_data.index;
+                }
+
+                if (action_data.squad_index != INDEX_INVALID) {
+                    ScenarioSquad& squad = scenario->squads[action_data.squad_index];
+                    squad.entities[squad.entity_count] = action_data.index;
+                    squad.entity_count++;
+                }
             }
 
             Cell cell_value = mode == EDITOR_ACTION_MODE_DO 
