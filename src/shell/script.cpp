@@ -52,6 +52,7 @@ static int script_is_player_defeated(lua_State* lua_state);
 static int script_match_input_build(lua_State* lua_state);
 static int script_set_bot_flag(lua_State* lua_state);
 static int script_set_global_objective_counter(lua_State* lua_state);
+static int script_get_player_gold_mined_total(lua_State* lua_state);
 
 static const char* MODULE_NAME = "scenario";
 
@@ -85,6 +86,7 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "match_input_build", script_match_input_build },
     { "set_bot_flag", script_set_bot_flag },
     { "set_global_objective_counter", script_set_global_objective_counter },
+    { "get_player_gold_mined_total", script_get_player_gold_mined_total },
     { NULL, NULL }
 };
 
@@ -651,6 +653,13 @@ static int script_set_match_over_victory(lua_State* lua_state) {
     script_validate_arguments(lua_state, NULL, 0);
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    // This validation is to prevent the player from losing and then winning
+    if (state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY || state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT) {
+        log_warn("script set_match_over_victory(): the match is already over.");
+        return 0;
+    }
+
     state->mode = MATCH_SHELL_MODE_MATCH_OVER_VICTORY;
 
     return 0;
@@ -661,6 +670,13 @@ static int script_set_match_over_defeat(lua_State* lua_state) {
     script_validate_arguments(lua_state, NULL, 0);
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    // This validation is to prevent the player from winning and then losing
+    if (state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY || state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT) {
+        log_warn("script set_match_over_defeat(): the match is already over.");
+        return 0;
+    }
+
     state->mode = MATCH_SHELL_MODE_MATCH_OVER_DEFEAT;
 
     return 0;
@@ -1348,4 +1364,26 @@ static int script_set_global_objective_counter(lua_State* lua_state) {
     state->scenario_global_objective_counter = counter;
 
     return 0;
+}
+
+// Returns the total number of gold mined by the specified player this match
+// @param player_id number
+// @return number
+static int script_get_player_gold_mined_total(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
+    if (player_id >= MAX_PLAYERS) {
+        script_error(lua_state, "player_id %u is out of bounds.", player_id);
+    }
+
+    const MatchShellState* state = script_get_match_shell_state(lua_state);
+    if (!state->match_state.players[player_id].active) {
+        script_error(lua_state, "player %u is inactive.", player_id);
+    }
+
+    lua_pushnumber(lua_state, state->match_state.players[player_id].gold_mined_total);
+
+    return 1;
 }

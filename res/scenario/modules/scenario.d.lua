@@ -225,3 +225,8 @@ function scenario.set_bot_flag(player_id, flag, value) end
 --- @param value number
 function scenario.set_global_objective_counter(value) end
 
+--- Returns the total number of gold mined by the specified player this match
+--- @param player_id number
+--- @return number
+function scenario.get_player_gold_mined_total(player_id) end
+

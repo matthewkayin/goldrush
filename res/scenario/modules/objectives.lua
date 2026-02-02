@@ -19,6 +19,14 @@ function objectives.announce_objectives_complete()
     scenario.clear_objectives()
 end
 
+function objectives.announce_objectives_failed()
+    objectives.current_objective = nil
+    scenario.play_sound(scenario.UI_CLICK)
+    scenario.chat(scenario.CHAT_COLOR_GOLD, "Objective Failed", "")
+    actions.wait(3.0)
+    scenario.clear_objectives()
+end
+
 function objectives.add_objective(params)
     local index = scenario.add_objective(params.objective)
     table.insert(objectives.objectives, {
