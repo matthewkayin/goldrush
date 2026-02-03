@@ -24,7 +24,8 @@ enum MatchInputType {
     MATCH_INPUT_UNLOAD,
     MATCH_INPUT_CAMO,
     MATCH_INPUT_DECAMO,
-    MATCH_INPUT_PATROL
+    MATCH_INPUT_PATROL,
+    MATCH_INPUT_TYPE_COUNT
 };
 
 struct MatchInputMove {
@@ -110,4 +111,5 @@ struct MatchInput {
 
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const MatchInput& input);
 MatchInput match_input_deserialize(const uint8_t* in_buffer, size_t& in_buffer_head);
+const char* match_input_type_str(MatchInputType type);
 void match_input_print(char* out_ptr, const MatchInput& input);

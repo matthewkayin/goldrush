@@ -659,6 +659,10 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
             }
             break;
         }
+        case MATCH_INPUT_TYPE_COUNT: {
+            GOLD_ASSERT(false);
+            break;
+        }
     }
 }
 

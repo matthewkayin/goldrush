@@ -1,5 +1,6 @@
 local actions = require("actions")
 local objectives = require("objectives")
+local squad_util = require("squad_util")
 
 local OBJECTIVE_MINE_GOLD = "Mine 10,000 Gold before your Opponent"
 
@@ -28,7 +29,7 @@ function scenario_init()
     set_bot_should_produce(false)
 
     actions.run(function ()
-        actions.wait(5.0)
+        actions.wait(1.0)
         local previous_camera_cell = scenario.get_camera_centered_cell()
 
         -- Camera pan 1
@@ -43,10 +44,12 @@ function scenario_init()
         scenario.play_sound(scenario.sound.UI_CLICK)
         scenario.chat(scenario.CHAT_COLOR_WHITE, "", "Those greedy prospectors are taking all the gold!")
         actions.wait(1.0)
-        scenario.match_input_build({
+        scenario.queue_match_input({
+            player_id = ENEMY_PLAYER_ID,
+            type = scenario.match_input_type.BUILD,
             building_type = scenario.entity_type.HALL,
             building_cell = scenario.constants.HALL_CELL1,
-            builder_id = scenario.constants.HALL_BUILDER1
+            entity_id = scenario.constants.HALL_BUILDER1
         })
         actions.wait(3.0)
 
@@ -59,10 +62,12 @@ function scenario_init()
         })
         actions.camera_pan(scenario.constants.HALL_CELL2, 1.5)
         scenario.hold_camera()
-        scenario.match_input_build({
+        scenario.queue_match_input({
+            player_id = ENEMY_PLAYER_ID,
+            type = scenario.match_input_type.BUILD,
             building_type = scenario.entity_type.HALL,
             building_cell = scenario.constants.HALL_CELL2,
-            builder_id = scenario.constants.HALL_BUILDER2
+            entity_id = scenario.constants.HALL_BUILDER2
         })
         actions.wait(3.0)
 
@@ -120,20 +125,20 @@ function scenario_update()
         local player_is_attacking_base1 = scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.HALL_CELL1, HARASS_TRIGGER_DISTANCE)
         local player_is_attacking_base2 = scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.HALL_CELL2, HARASS_TRIGGER_DISTANCE)
         if player_is_attacking_base1 or player_is_attacking_base2 then
-            local squad_entities = {}
-            table.insert(squad_entities, scenario.entity_type.BANDIT)
-            table.insert(squad_entities, scenario.entity_type.BANDIT)
-            table.insert(squad_entities, scenario.entity_type.BANDIT)
-            table.insert(squad_entities, scenario.entity_type.BANDIT)
-            table.insert(squad_entities, scenario.entity_type.COWBOY)
-            table.insert(squad_entities, scenario.entity_type.COWBOY)
-
-            scenario.bot_spawn_squad({
+            squad_util.spawn_harass_squad({
                 player_id = ENEMY_PLAYER_ID,
-                target_cell = scenario.constants.HARASS_TARGET_CELL,
                 spawn_cell = scenario.constants.HARASS_SPAWN_CELL,
-                entities = squad_entities
+                target_cell = scenario.constants.HARASS_TARGET_CELL,
+                entity_types = {
+                    scenario.entity_type.BANDIT,
+                    scenario.entity_type.BANDIT,
+                    scenario.entity_type.BANDIT,
+                    scenario.entity_type.BANDIT,
+                    scenario.entity_type.COWBOY,
+                    scenario.entity_type.COWBOY
+                }
             })
+
             has_sent_reactive_harass = true
         end
 
@@ -199,15 +204,16 @@ function builder_state_update(builder_state)
         end
 
         builder_state.mode = BUILDER_MODE_WAIT_GOLD_BUNKER
-        -- TODO: use bot find building location here?
         actions.run(function ()
             while scenario.player_get_gold(ENEMY_PLAYER_ID) < scenario.entity_get_gold_cost(scenario.entity_type.BUNKER) do
                 coroutine.yield()
             end
-            scenario.match_input_build({
+            scenario.queue_match_input({
+                player_id = ENEMY_PLAYER_ID,
+                type = scenario.match_input_type.BUILD,
                 building_type = scenario.entity_type.BUNKER,
                 building_cell = builder_state.bunker_cell,
-                builder_id = builder_state.builder_id
+                entity_id = builder_state.builder_id
             })
             builder_state.mode = BUILDER_MODE_ORDER_BUNKER
         end)
@@ -231,14 +237,20 @@ function builder_state_update(builder_state)
         end
 
         -- TODO: garrison defense squad into bunker
-        local squad_entities = {}
-        table.insert(squad_entities, scenario.entity_type.COWBOY)
-        table.insert(squad_entities, scenario.entity_type.COWBOY)
-        table.insert(squad_entities, scenario.entity_type.COWBOY)
-        table.insert(squad_entities, scenario.entity_type.COWBOY)
-        local bunker_squad_id = scenario.bot_spawn_squad({
+        local squad_entity_ids = {}
+        table.insert(squad_entity_ids, builder_state.bunker_id)
+        for index=1,4 do
+            local entity_cell = scenario.entity_find_spawn_cell(scenario.entity_type.COWBOY, bunker.cell)
+            if not entity_cell then
+                break
+            end
+            local entity_id = scenario.entity_create(scenario.entity_type.COWBOY, entity_cell, ENEMY_PLAYER_ID)
+            table.insert(squad_entity_ids, entity_id)
+        end
+        scenario.bot_add_squad({
             player_id = ENEMY_PLAYER_ID,
-
+            type = scenario.bot_squad_type.DEFEND,
+            entities = squad_entity_ids
         })
 
         builder_state_release(builder_state)
