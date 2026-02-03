@@ -8,11 +8,22 @@ local ENEMY_PLAYER_ID = 1
 local TARGET_GOLD_COUNT = 10000
 local HARASS_TRIGGER_DISTANCE = 16
 
+local BUILDER_MODE_ORDER_HALL = 0
+local BUILDER_MODE_BUILDING_HALL = 1
+local BUILDER_MODE_ORDER_BUNKER = 2
+local BUILDER_MODE_BUILDING_BUNKER = 3
+local BUILDER_MODE_RELEASED = 4
+
 local has_given_bunker_hint = false
 local has_sent_reactive_harass = false
+local builder_state1 = {}
+local builder_state2 = {}
 
 function scenario_init()
-    scenario.set_bot_flag(ENEMY_PLAYER_ID, scenario.bot_config_flag.SHOULD_PAUSE, true)
+    builder_state1 = builder_state_init(scenario.constants.HALL_BUILDER1, scenario.constants.BUNKER_CELL1)
+    builder_state2 = builder_state_init(scenario.constants.HALL_BUILDER2, scenario.constants.BUNKER_CELL2)
+    scenario.bot_set_config_flag(ENEMY_PLAYER_ID, scenario.bot_config_flag.SHOULD_PAUSE, true)
+
     actions.run(function ()
         actions.wait(5.0)
         local previous_camera_cell = scenario.get_camera_centered_cell()
@@ -70,8 +81,7 @@ function scenario_init()
         scenario.set_global_objective_counter(scenario.global_objective_counter_type.GOLD)
 
         actions.wait(3.0)
-
-        scenario.set_bot_flag(ENEMY_PLAYER_ID, scenario.bot_config_flag.SHOULD_PAUSE, false)
+        scenario.bot_set_config_flag(ENEMY_PLAYER_ID, scenario.bot_config_flag.SHOULD_PAUSE, false)
 
         actions.wait(5.0)
         scenario.hint("You can now build bunkers to defend your base.")
@@ -101,11 +111,11 @@ function scenario_update()
         end)
     end
 
+    -- Reactive harass
     if not has_sent_reactive_harass then
         local player_is_attacking_base1 = scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.HALL_CELL1, HARASS_TRIGGER_DISTANCE)
         local player_is_attacking_base2 = scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.HALL_CELL2, HARASS_TRIGGER_DISTANCE)
         if player_is_attacking_base1 or player_is_attacking_base2 then
-
             local squad_entities = {}
             table.insert(squad_entities, scenario.entity_type.BANDIT)
             table.insert(squad_entities, scenario.entity_type.BANDIT)
@@ -122,7 +132,90 @@ function scenario_update()
             })
             has_sent_reactive_harass = true
         end
+
+        if player_is_attacking_base1 then
+            builder_state_release(builder_state1)
+        end
+        if player_is_attacking_base2 then
+            builder_state_release(builder_state2)
+        end
     end
 
+    builder_state_update(builder_state1)
+    builder_state_update(builder_state2)
+
     actions.update()
+end
+
+function builder_state_init(builder_id, bunker_cell)
+    scenario.bot_reserve_entity(ENEMY_PLAYER_ID, builder_id)
+    return {
+        builder_id = builder_id,
+        bunker_cell = bunker_cell,
+        mode = BUILDER_MODE_ORDER_HALL
+    }
+end
+
+function builder_state_release(builder_state)
+    scenario.bot_release_entity(ENEMY_PLAYER_ID, builder_state.builder_id)
+    builder_state.mode = BUILDER_MODE_RELEASED
+end
+
+function builder_state_update(builder_state)
+    if builder_state.mode == BUILDER_MODE_RELEASED then
+        return
+    end
+
+    local builder = scenario.get_entity_info(builder_state.builder_id)
+    if not builder or builder.health == 0 then
+        builder_state_release(builder_state)
+        scenario.log("BUILDER_STATE / Builder does not exist, builder_id:", builder_state.builder_id)
+        return
+    end
+
+    if builder_state.mode == BUILDER_MODE_ORDER_HALL and builder.mode == scenario.entity_mode.UNIT_BUILD then
+        builder_state.mode = BUILDER_MODE_BUILDING_HALL
+        builder_state.hall_id = builder.target.id
+        scenario.log("BUILDER_STATE / set mode to BUILDING_HALL, hall_id:", builder_state.hall_id)
+        return
+    end
+
+    if builder_state.mode == BUILDER_MODE_BUILDING_HALL and builder.mode ~= scenario.entity_mode.UNIT_BUILD then
+        local hall = scenario.get_entity_info(builder_state.hall_id)
+        if not hall or hall.health == 0 then
+            builder_state_release(builder_state)
+            scenario.log("BUILDER_STATE / hall does not exist:", builder_state.hall_id)
+            return
+        end
+
+        builder_state.mode = BUILDER_MODE_ORDER_BUNKER
+        -- TODO: use bot find building location here?
+        scenario.match_input_build({
+            building_type = scenario.entity_type.BUNKER,
+            building_cell = builder_state.bunker_cell,
+            builder_id = builder_state.builder_id
+        })
+        scenario.log("BUILDER_STATE / ordered build bunker:", builder_state.builder_id)
+        return
+    end
+
+    if builder_state.mode == BUILDER_MODE_ORDER_BUNKER and builder.mode == scenario.entity_mode.UNIT_BUILD then
+        builder_state.mode = BUILDER_MODE_BUILDING_BUNKER
+        builder_state.bunker_id = builder.target.id
+        scenario.log("BUILDER_STATE / building bunker:", builder_state.bunker_id)
+        return
+    end
+
+    if builder_state.mode == BUILDER_MODE_BUILDING_BUNKER and builder.mode ~= scenario.entity_mode.UNIT_BUILD then
+        local bunker = scenario.get_entity_info(builder_state.bunker_id)
+        if not bunker or bunker.health == 0 then
+            builder_state_release(builder_state)
+            scenario.log("BUILDER_STATE / bunker does not exist:", builder_state.bunker_id)
+            return
+        end
+
+        -- TODO: garrison defense squad into bunker
+        builder_state_release(builder_state)
+        scenario.log("BUILDER_STATE / bunker finished:", builder_state.bunker_id)
+    end
 end

@@ -85,7 +85,8 @@ enum EntityMode {
     MODE_MINE_ARM,
     MODE_MINE_PRIME,
     MODE_GOLDMINE,
-    MODE_GOLDMINE_COLLAPSED
+    MODE_GOLDMINE_COLLAPSED,
+    MODE_COUNT
 };
 
 enum TargetType {
@@ -99,7 +100,8 @@ enum TargetType {
     TARGET_MOLOTOV,
     TARGET_BUILD,
     TARGET_BUILD_ASSIST,
-    TARGET_PATROL
+    TARGET_PATROL,
+    TARGET_TYPE_COUNT
 };
 
 struct TargetBuild {

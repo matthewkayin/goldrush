@@ -4240,7 +4240,7 @@ void match_shell_render(const MatchShellState* state) {
         if (state->scenario_global_objective_counter.type == GLOBAL_OBJECTIVE_COUNTER_GOLD) {
             objectives_text_pos.x = 1;
             render_text(FONT_HACK_SHADOW, "Gold Mined:", objectives_text_pos + ivec2(1, 1));
-            render_text(FONT_HACK_GOLD_SATURATED, "Gold Mined:", objectives_text_pos + ivec2(1, 1));
+            render_text(FONT_HACK_GOLD_SATURATED, "Gold Mined:", objectives_text_pos);
             objectives_text_pos += ivec2(4, 20);
 
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -4803,6 +4803,9 @@ ivec2 match_shell_get_queued_target_position(const MatchShellState* state, const
         case TARGET_BUILD:
         case TARGET_BUILD_ASSIST:
         case TARGET_PATROL:
+            return ivec2(-1, -1);
+        case TARGET_TYPE_COUNT:
+            GOLD_ASSERT(false);
             return ivec2(-1, -1);
     }
 }

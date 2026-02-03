@@ -49,7 +49,7 @@ function scenario_update()
     end
 
     -- Handle bandit attack defeated
-    if bandit_attack_squad_id ~= nil and not scenario.does_squad_exist(ENEMY_BANDITS_PLAYER_ID, bandit_attack_squad_id) then
+    if bandit_attack_squad_id ~= nil and not scenario.bot_squad_exists(ENEMY_BANDITS_PLAYER_ID, bandit_attack_squad_id) then
         bandit_attack_squad_id = nil
         actions.run(function ()
             actions.wait(3.0)
@@ -140,7 +140,7 @@ function on_objectives_complete()
             table.insert(squad_entities, scenario.entity_type.BANDIT)
             table.insert(squad_entities, scenario.entity_type.BANDIT)
             table.insert(squad_entities, scenario.entity_type.BANDIT)
-            bandit_attack_squad_id = scenario.spawn_enemy_squad({
+            bandit_attack_squad_id = scenario.bot_spawn_squad({
                 player_id = ENEMY_BANDITS_PLAYER_ID,
                 spawn_cell = scenario.constants.BANDIT_ATTACK_SPAWN_CELL,
                 target_cell = scenario.constants.BANDIT_ATTACK_TARGET_CELL,

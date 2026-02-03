@@ -64,12 +64,14 @@ static int script_player_has_entity_near_cell(lua_State* lua_state);
 static int script_get_entity_info(lua_State* lua_state);
 
 // Bot
-static int script_spawn_enemy_squad(lua_State* lua_state);
-static int script_does_squad_exist(lua_State* lua_state);
-static int script_match_input_build(lua_State* lua_state);
-static int script_set_bot_flag(lua_State* lua_state);
+static int script_bot_spawn_squad(lua_State* lua_state);
+static int script_bot_squad_exists(lua_State* lua_state);
+static int script_bot_set_config_flag(lua_State* lua_state);
 static int script_bot_reserve_entity(lua_State* lua_state);
 static int script_bot_release_entity(lua_State* lua_state);
+
+// Match input
+static int script_match_input_build(lua_State* lua_state);
 
 static const char* MODULE_NAME = "scenario";
 
@@ -114,12 +116,14 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "get_entity_info", script_get_entity_info },
 
     // Bot
-    { "spawn_enemy_squad", script_spawn_enemy_squad },
-    { "does_squad_exist", script_does_squad_exist },
-    { "match_input_build", script_match_input_build },
-    { "set_bot_flag", script_set_bot_flag },
+    { "bot_spawn_squad", script_bot_spawn_squad },
+    { "bot_squad_exists", script_bot_squad_exists },
+    { "bot_set_config_flag", script_bot_set_config_flag },
     { "bot_reserve_entity", script_bot_reserve_entity },
     { "bot_release_entity", script_bot_release_entity },
+
+    // Match input
+    { "match_input_build", script_match_input_build },
 
     { NULL, NULL }
 };
@@ -138,6 +142,8 @@ static const ScriptConstant GOLD_CONSTANTS[] = {
 
 void match_shell_script_register_scenario_constants(lua_State* lua_state);
 const char* match_shell_script_get_entity_type_str(EntityType type);
+const char* match_shell_script_get_entity_mode_str(EntityMode mode);
+const char* match_shell_script_get_target_type_str(TargetType type);
 const char* match_shell_script_get_global_objective_counter_type_str(GlobalObjectiveCounterType type);
 void match_shell_script_handle_error(MatchShellState* state);
 
@@ -260,15 +266,31 @@ void match_shell_script_register_scenario_constants(lua_State* lua_state) {
     lua_setfield(lua_state, -2, "PLAYER_ID");
 
     // Entity constants
-    lua_newtable(lua_state);
+    lua_createtable(lua_state, 0, ENTITY_TYPE_COUNT);
     for (int entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
         lua_pushinteger(lua_state, entity_type);
         lua_setfield(lua_state, -2, match_shell_script_get_entity_type_str((EntityType)entity_type));
     }
     lua_setfield(lua_state, -2, "entity_type");
 
+    // Entity mode
+    lua_createtable(lua_state, 0, MODE_COUNT);
+    for (int entity_mode = 0; entity_mode < MODE_COUNT; entity_mode++) {
+        lua_pushinteger(lua_state, entity_mode);
+        lua_setfield(lua_state, -2, match_shell_script_get_entity_mode_str((EntityMode)entity_mode));
+    }
+    lua_setfield(lua_state, -2, "entity_mode");
+
+    // Target type
+    lua_createtable(lua_state, 0, TARGET_TYPE_COUNT);
+    for (int target_type = 0; target_type < TARGET_TYPE_COUNT; target_type++) {
+        lua_pushinteger(lua_state, target_type);
+        lua_setfield(lua_state, -2, match_shell_script_get_target_type_str((TargetType)target_type));
+    }
+    lua_setfield(lua_state, -2, "target_type");
+
     // Sound constants
-    lua_newtable(lua_state);
+    lua_createtable(lua_state, 0, SOUND_COUNT);
     for (int sound_name = 0; sound_name < SOUND_COUNT; sound_name++) {
         char const_name[64];
         strcpy_to_upper(const_name, sound_get_name((SoundName)sound_name));
@@ -294,7 +316,7 @@ void match_shell_script_register_scenario_constants(lua_State* lua_state) {
     lua_setfield(lua_state, -2, "bot_config_flag");
 
     // Objective counter type constants
-    lua_newtable(lua_state);
+    lua_createtable(lua_state, 0, GLOBAL_OBJECTIVE_COUNTER_TYPE_COUNT);
     for (uint32_t counter_type = 0; counter_type < GLOBAL_OBJECTIVE_COUNTER_TYPE_COUNT; counter_type++) {
         lua_pushnumber(lua_state, counter_type);
         lua_setfield(lua_state, -2, match_shell_script_get_global_objective_counter_type_str((GlobalObjectiveCounterType)counter_type));
@@ -382,6 +404,90 @@ const char* match_shell_script_get_entity_type_str(EntityType type) {
         case ENTITY_LANDMINE:
             return "LANDMINE";
         case ENTITY_TYPE_COUNT:
+            GOLD_ASSERT(false);
+            return "";
+    }
+}
+
+const char* match_shell_script_get_entity_mode_str(EntityMode mode) {
+    switch (mode) {
+        case MODE_UNIT_IDLE:
+            return "UNIT_IDLE";
+        case MODE_UNIT_BLOCKED:
+            return "UNIT_BLOCKED";
+        case MODE_UNIT_MOVE:
+            return "UNIT_MOVE";
+        case MODE_UNIT_MOVE_FINISHED:
+            return "UNIT_MOVE_FINISHED";
+        case MODE_UNIT_BUILD:
+            return "UNIT_BUILD";
+        case MODE_UNIT_BUILD_ASSIST:
+            return "UNIT_BUILD_ASSIST";
+        case MODE_UNIT_REPAIR:
+            return "UNIT_REPAIR";
+        case MODE_UNIT_ATTACK_WINDUP:
+            return "UNIT_ATTACK_WINDUP";
+        case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP:
+            return "UNIT_SOLDIER_RANGED_ATTACK_WINDUP";
+        case MODE_UNIT_SOLDIER_CHARGE:
+            return "UNIT_SOLDIER_CHARGE";
+        case MODE_UNIT_IN_MINE:
+            return "UNIT_IN_MINE";
+        case MODE_UNIT_PYRO_THROW:
+            return "UNIT_PYRO_THROW";
+        case MODE_UNIT_DEATH:
+            return "UNIT_DEATH";
+        case MODE_UNIT_DEATH_FADE:
+            return "UNIT_DEATH_FADE";
+        case MODE_UNIT_BALLOON_DEATH_START:
+            return "UNIT_BALLOON_DEATH_START";
+        case MODE_UNIT_BALLOON_DEATH:
+            return "UNIT_BALLOON_DEATH";
+        case MODE_BUILDING_IN_PROGRESS:
+            return "BUILDING_IN_PROGRESS";
+        case MODE_BUILDING_FINISHED:
+            return "BUILDING_FINISHED";
+        case MODE_BUILDING_DESTROYED:
+            return "BUILDING_DESTROYED";
+        case MODE_MINE_ARM:
+            return "MINE_ARM";
+        case MODE_MINE_PRIME:
+            return "MINE_PRIME";
+        case MODE_GOLDMINE:
+            return "GOLDMINE";
+        case MODE_GOLDMINE_COLLAPSED:
+            return "GOLDMINE_COLLAPSED";
+        case MODE_COUNT:
+            GOLD_ASSERT(false);
+            return "";
+    }
+}
+
+const char* match_shell_script_get_target_type_str(TargetType type) {
+    switch (type) {
+        case TARGET_NONE:
+            return "NONE";
+        case TARGET_CELL:
+            return "CELL";
+        case TARGET_ENTITY:
+            return "ENTITY";
+        case TARGET_ATTACK_CELL:
+            return "ATTACK_CELL";
+        case TARGET_ATTACK_ENTITY:
+            return "ATTACK_ENTITY";
+        case TARGET_REPAIR:
+            return "REPAIR";
+        case TARGET_UNLOAD:
+            return "UNLOAD";
+        case TARGET_MOLOTOV:
+            return "MOLOTOV";
+        case TARGET_BUILD:
+            return "BUILD";
+        case TARGET_BUILD_ASSIST:
+            return "BUILD_ASSIST";
+        case TARGET_PATROL:
+            return "PATROL";
+        case TARGET_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
     }
@@ -673,7 +779,7 @@ int script_sprintf(char* str_ptr, lua_State* lua_state, int stack_index) {
             while (lua_next(lua_state, stack_index) != 0) {
                 const char* key = lua_tostring(lua_state, -2);
                 offset += sprintf(str_ptr + offset, "%s = ", key);
-                offset += script_sprintf(str_ptr + offset, lua_state, -1);
+                offset += script_sprintf(str_ptr + offset, lua_state, lua_gettop(lua_state));
                 offset += sprintf(str_ptr + offset, ", ");
                 lua_pop(lua_state, 1);
             }
@@ -1310,7 +1416,6 @@ static int script_get_entity_info(lua_State* lua_state) {
     lua_setfield(lua_state, -2, "player_id");
 
     // Cell
-    lua_newtable(lua_state);
     script_lua_push_ivec2(lua_state, entity.cell);
     lua_setfield(lua_state, -2, "cell");
 
@@ -1325,10 +1430,13 @@ static int script_get_entity_info(lua_State* lua_state) {
         lua_setfield(lua_state, -2, "id");
 
         // Cell
-        lua_newtable(lua_state);
         script_lua_push_ivec2(lua_state, entity.cell);
         lua_setfield(lua_state, -2, "cell");
     lua_setfield(lua_state, -2, "target");
+
+    // Health
+    lua_pushnumber(lua_state, entity.health);
+    lua_setfield(lua_state, -2, "health");
 
     return 1;
 }
@@ -1339,7 +1447,7 @@ static int script_get_entity_info(lua_State* lua_state) {
 // Returns the squad ID of the created squad, or SQUAD_ID_NULL if no squad was created.
 // @param params { player_id: number, target_cell: ivec2, spawn_cell: ivec2, entities: table }
 // @return number 
-static int script_spawn_enemy_squad(lua_State* lua_state) {
+static int script_bot_spawn_squad(lua_State* lua_state) {
     const int arg_types[] = { LUA_TTABLE };
     script_validate_arguments(lua_state, arg_types, 1);
 
@@ -1412,7 +1520,7 @@ static int script_spawn_enemy_squad(lua_State* lua_state) {
 // @param player_id number
 // @param squad_id number
 // @return boolean 
-static int script_does_squad_exist(lua_State* lua_state) {
+static int script_bot_squad_exists(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER, LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 2);
 
@@ -1441,13 +1549,13 @@ static int script_does_squad_exist(lua_State* lua_state) {
 
 /*
  * TODO: 
- * - change bot functions to be prefixed with bot_
- * - update scenario1 and 2 script to reflect this
+ * x change bot functions to be prefixed with bot_
+ * x update scenario1 and 2 script to reflect this
  * - make it so that we can set target cell and so that we can add entities to a squad
  * - alternatively: just reserve the 4 squad entities? and then make a squad out of them
  * - make a scenario constant type squad ID, this should be a table containing the bot ID and the squad ID both
  * - make 2 defense squads in enemy main of 4 cowboys each
- * - reserve the two builders at match start, tell them to build
+ * x reserve the two builders at match start, tell them to build
  * - when the builders are done building, tell them to build a bunker
  * - when the bunker is done building, add it to the respective defense squad and tell cowboys to garrison
  * - create a match_input_move function to do this
@@ -1464,49 +1572,11 @@ static int script_bot_set_squad_target_cell(lua_State* lua_state) {
 
 }
 
-// Queues a build input
-// @param params { building_type: number, building_cell: ivec2, builder_id: number }
-static int script_match_input_build(lua_State* lua_state) {
-    const int arg_types[] = { LUA_TTABLE };
-    script_validate_arguments(lua_state, arg_types, 1);
-
-    MatchShellState* state = script_get_match_shell_state(lua_state);
-
-    // Building type
-    lua_getfield(lua_state, 1, "building_type");
-    int building_type = (int)lua_tonumber(lua_state, -1);
-    script_validate_entity_type(lua_state, building_type);
-    lua_pop(lua_state, 1);
-
-    // Cell
-    lua_getfield(lua_state, 1, "building_cell");
-    ivec2 cell = script_lua_to_ivec2(lua_state, -1, "building_cell");
-    lua_pop(lua_state, 1);
-
-    // Builder ID
-    lua_getfield(lua_state, 1, "builder_id");
-    EntityId builder_id = (EntityId)lua_tonumber(lua_state, -1);
-    script_validate_entity_id(lua_state, state, builder_id);
-
-    MatchInput input;
-    input.type = MATCH_INPUT_BUILD;
-    input.build.shift_command = 0;
-    input.build.building_type = (EntityType)building_type;
-    input.build.target_cell = cell;
-    input.build.entity_count = 1;
-    input.build.entity_ids[0] = builder_id;
-
-    uint8_t player_id = state->match_state.entities.get_by_id(builder_id).player_id;
-    state->inputs[player_id].push({ input });
-
-    return 0;
-}
-
 // Sets a bot config flag to the specified value
 // @param player_id number
 // @param flag number
 // @param value boolean
-static int script_set_bot_flag(lua_State* lua_state) {
+static int script_bot_set_config_flag(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER, LUA_TNUMBER, LUA_TBOOLEAN };
     script_validate_arguments(lua_state, arg_types, 3);
 
@@ -1570,6 +1640,46 @@ static int script_bot_release_entity(lua_State* lua_state) {
     script_validate_entity_id(lua_state, state, entity_id);
 
     bot_release_entity(state->bots[player_id], entity_id);
+
+    return 0;
+}
+
+// MATCH INPUT
+
+// Queues a build input
+// @param params { building_type: number, building_cell: ivec2, builder_id: number }
+static int script_match_input_build(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TTABLE };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    // Building type
+    lua_getfield(lua_state, 1, "building_type");
+    int building_type = (int)lua_tonumber(lua_state, -1);
+    script_validate_entity_type(lua_state, building_type);
+    lua_pop(lua_state, 1);
+
+    // Cell
+    lua_getfield(lua_state, 1, "building_cell");
+    ivec2 cell = script_lua_to_ivec2(lua_state, -1, "building_cell");
+    lua_pop(lua_state, 1);
+
+    // Builder ID
+    lua_getfield(lua_state, 1, "builder_id");
+    EntityId builder_id = (EntityId)lua_tonumber(lua_state, -1);
+    script_validate_entity_id(lua_state, state, builder_id);
+
+    MatchInput input;
+    input.type = MATCH_INPUT_BUILD;
+    input.build.shift_command = 0;
+    input.build.building_type = (EntityType)building_type;
+    input.build.target_cell = cell;
+    input.build.entity_count = 1;
+    input.build.entity_ids[0] = builder_id;
+
+    uint8_t player_id = state->match_state.entities.get_by_id(builder_id).player_id;
+    state->inputs[player_id].push({ input });
 
     return 0;
 }

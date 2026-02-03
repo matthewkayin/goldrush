@@ -1717,6 +1717,9 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                         update_finished = true;
                         break;
                     }
+                    case TARGET_TYPE_COUNT:
+                        GOLD_ASSERT(false);
+                        break;
                 }
 
                 update_finished = update_finished || !(entity.mode == MODE_UNIT_MOVE && movement_left.raw_value > 0);
@@ -2676,6 +2679,9 @@ bool entity_has_reached_target(const MatchState& state, const Entity& entity) {
         }
         case TARGET_PATROL:
             return false;
+        case TARGET_TYPE_COUNT:
+            GOLD_ASSERT(false);
+            return false;
     }
 }
 
@@ -2781,6 +2787,9 @@ ivec2 entity_get_target_cell_helper(const MatchState& state, const Entity& entit
             }
             return map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_cell_size, target.cell, target_cell_size, entity_is_mining(state, entity) ? MAP_OPTION_IGNORE_MINERS : 0, ignore_cell);
         }
+        case TARGET_TYPE_COUNT:
+            GOLD_ASSERT(false);
+            return ivec2(-1, -1);
     }
 }
 
