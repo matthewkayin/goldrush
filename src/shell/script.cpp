@@ -32,7 +32,11 @@ static int script_get_time(lua_State* lua_state);
 // Match over
 static int script_set_match_over_victory(lua_State* lua_state);
 static int script_set_match_over_defeat(lua_State* lua_state);
-static int script_is_player_defeated(lua_State* lua_state);
+
+// Player
+static int script_player_is_defeated(lua_State* lua_state);
+static int script_player_get_gold(lua_State* lua_state);
+static int script_player_get_gold_mined_total(lua_State* lua_state);
 
 // Chat
 static int script_chat(lua_State* lua_state);
@@ -53,15 +57,15 @@ static int script_is_objective_complete(lua_State* lua_state);
 static int script_are_objectives_complete(lua_State* lua_state);
 static int script_clear_objectives(lua_State* lua_state);
 static int script_set_global_objective_counter(lua_State* lua_state);
-static int script_get_player_gold_mined_total(lua_State* lua_state);
 
 // Entities
 static int script_entity_is_visible_to_player(lua_State* lua_state);
 static int script_highlight_entity(lua_State* lua_state);
-static int script_get_player_entity_count(lua_State* lua_state);
-static int script_get_player_full_bunker_count(lua_State* lua_state);
+static int script_player_get_entity_count(lua_State* lua_state);
+static int script_player_get_full_bunker_count(lua_State* lua_state);
 static int script_player_has_entity_near_cell(lua_State* lua_state);
-static int script_get_entity_info(lua_State* lua_state);
+static int script_entity_get_info(lua_State* lua_state);
+static int script_entity_get_gold_cost(lua_State* lua_state);
 
 // Bot
 static int script_bot_spawn_squad(lua_State* lua_state);
@@ -84,7 +88,14 @@ static const luaL_reg GOLD_FUNCS[] = {
     // Match over
     { "set_match_over_victory", script_set_match_over_victory },
     { "set_match_over_defeat", script_set_match_over_defeat },
-    { "is_player_defeated", script_is_player_defeated },
+
+    // Player
+    { "player_is_defeated", script_player_is_defeated },
+    { "player_get_gold", script_player_get_gold },
+    { "player_get_gold_mined_total", script_player_get_gold_mined_total },
+    { "player_get_entity_count", script_player_get_entity_count },
+    { "player_get_full_bunker_count", script_player_get_full_bunker_count },
+    { "player_has_entity_near_cell", script_player_has_entity_near_cell },
 
     // Chat
     { "chat", script_chat },
@@ -105,15 +116,12 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "are_objectives_complete", script_are_objectives_complete },
     { "clear_objectives", script_clear_objectives },
     { "set_global_objective_counter", script_set_global_objective_counter },
-    { "get_player_gold_mined_total", script_get_player_gold_mined_total },
 
     // Entities
     { "entity_is_visible_to_player", script_entity_is_visible_to_player },
     { "highlight_entity", script_highlight_entity },
-    { "get_player_entity_count", script_get_player_entity_count },
-    { "get_player_full_bunker_count", script_get_player_full_bunker_count },
-    { "player_has_entity_near_cell", script_player_has_entity_near_cell },
-    { "get_entity_info", script_get_entity_info },
+    { "entity_get_info", script_entity_get_info },
+    { "entity_get_gold_cost", script_entity_get_gold_cost },
 
     // Bot
     { "bot_spawn_squad", script_bot_spawn_squad },
@@ -862,7 +870,6 @@ static int script_set_match_over_victory(lua_State* lua_state) {
     return 0;
 }
 
-
 // End the match in defeat.
 static int script_set_match_over_defeat(lua_State* lua_state) {
     script_validate_arguments(lua_state, NULL, 0);
@@ -880,10 +887,12 @@ static int script_set_match_over_defeat(lua_State* lua_state) {
     return 0;
 }
 
+// PLAYERS
+
 // Checks if the player has been defeated.
 // @param player_id number
 // @return boolean 
-static int script_is_player_defeated(lua_State* lua_state) {
+static int script_player_is_defeated(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 1);
 
@@ -893,6 +902,40 @@ static int script_is_player_defeated(lua_State* lua_state) {
     script_validate_player_id(lua_state, state, player_id);
 
     lua_pushboolean(lua_state, !state->match_state.players[player_id].active);
+
+    return 1;
+}
+
+// Returns the specified player's gold count
+// @param player_id number
+// @return number
+static int script_player_get_gold(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    const MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
+    script_validate_player_id(lua_state, state, player_id);
+
+    lua_pushnumber(lua_state, state->match_state.players[player_id].gold);
+
+    return 1;
+}
+
+// Returns the total number of gold mined by the specified player this match
+// @param player_id number
+// @return number
+static int script_player_get_gold_mined_total(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    const MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
+    script_validate_player_id(lua_state, state, player_id);
+
+    lua_pushnumber(lua_state, state->match_state.players[player_id].gold_mined_total);
 
     return 1;
 }
@@ -1234,23 +1277,6 @@ static int script_set_global_objective_counter(lua_State* lua_state) {
     return 0;
 }
 
-// Returns the total number of gold mined by the specified player this match
-// @param player_id number
-// @return number
-static int script_get_player_gold_mined_total(lua_State* lua_state) {
-    const int arg_types[] = { LUA_TNUMBER };
-    script_validate_arguments(lua_state, arg_types, 1);
-
-    const MatchShellState* state = script_get_match_shell_state(lua_state);
-
-    uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
-    script_validate_player_id(lua_state, state, player_id);
-
-    lua_pushnumber(lua_state, state->match_state.players[player_id].gold_mined_total);
-
-    return 1;
-}
-
 // ENTITIES
 
 // Returns true if the specified entity is visible to the player.
@@ -1303,7 +1329,7 @@ static int script_highlight_entity(lua_State* lua_state) {
 // @param player_id number
 // @param entity_type number
 // @return number
-static int script_get_player_entity_count(lua_State* lua_state) {
+static int script_player_get_entity_count(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER, LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 2);
 
@@ -1322,7 +1348,7 @@ static int script_get_player_entity_count(lua_State* lua_state) {
 // Returns the number of bunkers controlled by the player that have 4 cowboys in them.
 // @param player_id number
 // @return number
-static int script_get_player_full_bunker_count(lua_State* lua_state) {
+static int script_player_get_full_bunker_count(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 1);
 
@@ -1386,7 +1412,7 @@ static int script_player_has_entity_near_cell(lua_State* lua_state) {
 // Returns a table of information about the specified entity, or nil if the entity does not exist
 // @param entity_id number
 // @return table
-static int script_get_entity_info(lua_State* lua_state) {
+static int script_entity_get_info(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 1);
 
@@ -1437,6 +1463,21 @@ static int script_get_entity_info(lua_State* lua_state) {
     // Health
     lua_pushnumber(lua_state, entity.health);
     lua_setfield(lua_state, -2, "health");
+
+    return 1;
+}
+
+// Returns the gold cost of the specified entity type
+// @param entity_type number
+// @return number
+static int script_entity_get_gold_cost(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    int entity_type = (uint32_t)lua_tonumber(lua_state, 1);
+    script_validate_entity_type(lua_state, entity_type);
+
+    lua_pushnumber(lua_state, entity_get_data((EntityType)entity_type).gold_cost);
 
     return 1;
 }

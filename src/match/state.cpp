@@ -420,6 +420,7 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
                 lead_builder.energy -= building_data.gold_cost;
             } else {
                 state.players[lead_builder.player_id].gold -= building_data.gold_cost;
+                log_debug("PLAYER %u build gold %u", lead_builder.player_id, state.players[lead_builder.player_id].gold);
             }
 
             // Assign the lead builder's target
@@ -545,6 +546,7 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
             }
 
             state.players[building.player_id].gold -= building_queue_item_cost(item);
+            log_debug("PLAYER %u building queue item gold %u", building.player_id, state.players[building.player_id].gold);
             entity_building_enqueue(state, building, item);
             break;
         }

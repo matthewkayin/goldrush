@@ -16,8 +16,8 @@ scenario.CHAT_COLOR_BLUE = 1
 scenario.CAMERA_MODE_HELD = 3
 scenario.PLAYER_ID = 0
 scenario.bot_config_flag = {}
-scenario.bot_config_flag.SHOULD_PAUSE = 64
 scenario.bot_config_flag.SHOULD_ATTACK = 2
+scenario.bot_config_flag.SHOULD_PRODUCE = 64
 scenario.bot_config_flag.SHOULD_ATTACK_FIRST = 1
 scenario.bot_config_flag.SHOULD_SCOUT = 16
 scenario.bot_config_flag.SHOULD_SURRENDER = 32
@@ -148,7 +148,35 @@ function scenario.set_match_over_defeat() end
 --- Checks if the player has been defeated.
 --- @param player_id number
 --- @return boolean 
-function scenario.is_player_defeated(player_id) end
+function scenario.player_is_defeated(player_id) end
+
+--- Returns the specified player's gold count
+--- @param player_id number
+--- @return number
+function scenario.player_get_gold(player_id) end
+
+--- Returns the total number of gold mined by the specified player this match
+--- @param player_id number
+--- @return number
+function scenario.player_get_gold_mined_total(player_id) end
+
+--- Returns the number of entities controlled by the player of a given type.
+--- @param player_id number
+--- @param entity_type number
+--- @return number
+function scenario.player_get_entity_count(player_id, entity_type) end
+
+--- Returns the number of bunkers controlled by the player that have 4 cowboys in them.
+--- @param player_id number
+--- @return number
+function scenario.player_get_full_bunker_count(player_id) end
+
+--- Returns true if the specified player has an entity near the cell within the given distance
+--- @param player_id number
+--- @param cell ivec2
+--- @param distance number
+--- @return boolean
+function scenario.player_has_entity_near_cell(player_id, cell, distance) end
 
 --- Sends a chat message.
 --- @param color number
@@ -215,11 +243,6 @@ function scenario.clear_objectives() end
 --- @param value number
 function scenario.set_global_objective_counter(value) end
 
---- Returns the total number of gold mined by the specified player this match
---- @param player_id number
---- @return number
-function scenario.get_player_gold_mined_total(player_id) end
-
 --- Returns true if the specified entity is visible to the player.
 --- @param entity_id number
 --- @return boolean
@@ -229,28 +252,15 @@ function scenario.entity_is_visible_to_player(entity_id) end
 --- @param entity_id number
 function scenario.highlight_entity(entity_id) end
 
---- Returns the number of entities controlled by the player of a given type.
---- @param player_id number
---- @param entity_type number
---- @return number
-function scenario.get_player_entity_count(player_id, entity_type) end
-
---- Returns the number of bunkers controlled by the player that have 4 cowboys in them.
---- @param player_id number
---- @return number
-function scenario.get_player_full_bunker_count(player_id) end
-
---- Returns true if the specified player has an entity near the cell within the given distance
---- @param player_id number
---- @param cell ivec2
---- @param distance number
---- @return boolean
-function scenario.player_has_entity_near_cell(player_id, cell, distance) end
-
 --- Returns a table of information about the specified entity, or nil if the entity does not exist
 --- @param entity_id number
 --- @return table
-function scenario.get_entity_info(entity_id) end
+function scenario.entity_get_info(entity_id) end
+
+--- Returns the gold cost of the specified entity type
+--- @param entity_type number
+--- @return number
+function scenario.entity_get_gold_cost(entity_type) end
 
 --- Spawns an enemy squad. The entities table should be an array of entity types.
 --- Returns the squad ID of the created squad, or SQUAD_ID_NULL if no squad was created.

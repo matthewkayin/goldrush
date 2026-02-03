@@ -31,8 +31,8 @@ function scenario_update()
     objectives.update()
 
     if objectives.current_objective ~= OBJECTIVE_DEFEAT_BANDITS and
-            scenario.is_player_defeated(ENEMY_BANDITS_PLAYER_ID)
-            and not has_handled_bandits_defeated then
+            scenario.player_is_defeated(ENEMY_BANDITS_PLAYER_ID) and
+            not has_handled_bandits_defeated then
         has_handled_bandits_defeated = true
         actions.run(function ()
             scenario.clear_objectives()
@@ -61,7 +61,7 @@ function scenario_update()
                     description = OBJECTIVE_DEFEAT_BANDITS
                 },
                 complete_fn = function ()
-                    return scenario.is_player_defeated(ENEMY_BANDITS_PLAYER_ID)
+                    return scenario.player_is_defeated(ENEMY_BANDITS_PLAYER_ID)
                 end
             })
         end)
@@ -69,7 +69,7 @@ function scenario_update()
 
     -- Two saloons hint
     if objectives.current_objective == OBJECTIVE_ESTABLISH_BASE and 
-            scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.COWBOY) >= 1 and
+            scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.COWBOY) >= 1 and
             not has_given_two_saloon_hint then
         actions.run(function ()
             actions.wait(1.0)
@@ -92,7 +92,7 @@ function on_objectives_complete()
                     description = "Build a Town Hall"
                 },
                 complete_fn = function ()
-                    return scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.HALL) >= 1
+                    return scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.HALL) >= 1
                 end
             })
             actions.wait(5.0)
@@ -109,7 +109,7 @@ function on_objectives_complete()
                     counter_target = 8
                 },
                 complete_fn = function ()
-                    return scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.MINER) >= 8
+                    return scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.MINER) >= 8
                 end
             })
             objectives.add_objective({
@@ -117,7 +117,7 @@ function on_objectives_complete()
                     description = "Build a Saloon"
                 },
                 complete_fn = function ()
-                    return scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.SALOON) >= 1
+                    return scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.SALOON) >= 1
                 end
             })
             objectives.add_objective({
@@ -127,7 +127,7 @@ function on_objectives_complete()
                     counter_target = 6
                 },
                 complete_fn = function ()
-                    return scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.COWBOY) >= 6
+                    return scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.COWBOY) >= 6
                 end
             })
         end)
