@@ -128,7 +128,7 @@ function scenario_update()
             table.insert(squad_entities, scenario.entity_type.COWBOY)
             table.insert(squad_entities, scenario.entity_type.COWBOY)
 
-            scenario.spawn_enemy_squad({
+            scenario.bot_spawn_squad({
                 player_id = ENEMY_PLAYER_ID,
                 target_cell = scenario.constants.HARASS_TARGET_CELL,
                 spawn_cell = scenario.constants.HARASS_SPAWN_CELL,
@@ -231,6 +231,16 @@ function builder_state_update(builder_state)
         end
 
         -- TODO: garrison defense squad into bunker
+        local squad_entities = {}
+        table.insert(squad_entities, scenario.entity_type.COWBOY)
+        table.insert(squad_entities, scenario.entity_type.COWBOY)
+        table.insert(squad_entities, scenario.entity_type.COWBOY)
+        table.insert(squad_entities, scenario.entity_type.COWBOY)
+        local bunker_squad_id = scenario.bot_spawn_squad({
+            player_id = ENEMY_PLAYER_ID,
+
+        })
+
         builder_state_release(builder_state)
         scenario.log("BUILDER_STATE / bunker finished:", builder_state.bunker_id)
     end

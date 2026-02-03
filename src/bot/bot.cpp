@@ -136,7 +136,6 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
     // Production
 
     if (bitflag_check(bot.config.flags, BOT_CONFIG_SHOULD_PRODUCE)) {
-        log_debug("BOT %u produce", bot.player_id);
         MatchInput production_input = bot_get_production_input(state, bot, match_timer);
         if (production_input.type != MATCH_INPUT_NONE) {
             return production_input;

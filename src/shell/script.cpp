@@ -57,6 +57,8 @@ static int script_is_objective_complete(lua_State* lua_state);
 static int script_are_objectives_complete(lua_State* lua_state);
 static int script_clear_objectives(lua_State* lua_state);
 static int script_set_global_objective_counter(lua_State* lua_state);
+static int script_entity_find_spawn_cell(lua_State* lua_state);
+static int script_entity_create(lua_State* lua_state);
 
 // Entities
 static int script_entity_is_visible_to_player(lua_State* lua_state);
@@ -68,7 +70,7 @@ static int script_entity_get_info(lua_State* lua_state);
 static int script_entity_get_gold_cost(lua_State* lua_state);
 
 // Bot
-static int script_bot_spawn_squad(lua_State* lua_state);
+static int script_bot_add_squad(lua_State* lua_state);
 static int script_bot_squad_exists(lua_State* lua_state);
 static int script_bot_set_config_flag(lua_State* lua_state);
 static int script_bot_reserve_entity(lua_State* lua_state);
@@ -307,6 +309,17 @@ void match_shell_script_register_scenario_constants(lua_State* lua_state) {
         lua_setfield(lua_state, -2, const_name);
     }
     lua_setfield(lua_state, -2, "sound");
+
+    // Bot squad type constants
+    lua_createtable(lua_state, 0, BOT_SQUAD_TYPE_COUNT);
+    for (int squad_type = 0; squad_type < BOT_SQUAD_TYPE_COUNT; squad_type++) {
+        char const_name[64];
+        strcpy_to_upper(const_name, bot_squad_type_str((BotSquadType)squad_type));
+
+        lua_pushinteger(lua_state, squad_type);
+        lua_setfield(lua_state, -2, const_name);
+    }
+    lua_setfield(lua_state, -2, "bot_squad_type");
 
     // Bot config constants
     lua_newtable(lua_state);
@@ -1482,13 +1495,118 @@ static int script_entity_get_gold_cost(lua_State* lua_state) {
     return 1;
 }
 
+// Finds an empty cell for the specified entity to spawn in. The manhattan distance of the cell to the provided spawn_cell will be less than 16
+//
+// If no cell is found, returns nil, but this should be rare.
+// @param entity_type number
+// @param spawn_cell ivec2
+// @return ivec2|nil
+static int script_entity_find_spawn_cell(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER, LUA_TTABLE };
+    script_validate_arguments(lua_state, arg_types, 2);
+
+    // Entity type
+    int entity_type = lua_tonumber(lua_state, 1);
+    script_validate_entity_type(lua_state, entity_type);
+
+    // Spawn cell
+    ivec2 spawn_cell = script_lua_to_ivec2(lua_state, 2, "spawn_cell");
+
+    const EntityData& entity_data = entity_get_data((EntityType)entity_type);
+    const MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    std::vector<ivec2> frontier;
+    std::vector<bool> explored = std::vector<bool>(state->match_state.map.width * state->match_state.map.height, false);
+    ivec2 result = ivec2(-1, -1);
+
+    frontier.push_back(spawn_cell);
+
+    while (!frontier.empty()) {
+        uint32_t nearest_index = 0;
+        for (uint32_t index = 1; index < frontier.size(); index++) {
+            if (ivec2::manhattan_distance(frontier[index], spawn_cell) < 
+                    ivec2::manhattan_distance(frontier[nearest_index], spawn_cell)) {
+                nearest_index = index;
+            }
+        }
+        ivec2 next = frontier[nearest_index];
+        frontier[nearest_index] = frontier.back();
+        frontier.pop_back();
+
+        if (!map_is_cell_rect_occupied(state->match_state.map, entity_data.cell_layer, next, entity_data.cell_size)) {
+            result = next;
+            break;
+        }
+
+        explored[next.x + (next.y * state->match_state.map.width)] = true;
+
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            ivec2 child = next + DIRECTION_IVEC2[direction];
+            if (!map_is_cell_rect_in_bounds(state->match_state.map, child, entity_data.cell_size)) {
+                continue;
+            }
+            if (explored[child.x + (child.y * state->match_state.map.width)]) {
+                continue;
+            }
+            if (ivec2::manhattan_distance(child, spawn_cell) > 16) {
+                continue;
+            }
+
+            bool is_in_frontier = false;
+            for (ivec2 cell : frontier) {
+                if (cell == child) {
+                    is_in_frontier = true;
+                    break;
+                }
+            }
+            if (!is_in_frontier) {
+                frontier.push_back(child);
+            }
+        }
+    }
+
+    if (result.x == -1) {
+        log_warn("No entity spawn cell was found for entity type %u spawn_cell <%i, %i>", entity_type, spawn_cell.x, spawn_cell.y);
+        lua_pushnil(lua_state);
+    } else {
+        script_lua_push_ivec2(lua_state, result);
+    }
+
+    return 1;
+}
+
+// Creates a new entity. Returns the ID of the newly created entity
+// @param entity_type number
+// @param cell ivec2
+// @param player_id number
+// @return number
+static int script_entity_create(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER, LUA_TTABLE, LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 3);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    int entity_type = (int)lua_tonumber(lua_state, 1);
+    script_validate_entity_type(lua_state, entity_type);
+
+    ivec2 cell = script_lua_to_ivec2(lua_state, 2, "cell");
+
+    uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 3);
+    script_validate_player_id(lua_state, state, player_id, SCRIPT_VALIDATE_PLAYER_IS_ACTIVE);
+
+    EntityId entity_id = entity_create(state->match_state, (EntityType)entity_type, cell, player_id);
+    lua_pushnumber(lua_state, entity_id);
+
+    return 1;
+}
+
 // BOT
 
 // Spawns an enemy squad. The entities table should be an array of entity types.
 // Returns the squad ID of the created squad, or SQUAD_ID_NULL if no squad was created.
-// @param params { player_id: number, target_cell: ivec2, spawn_cell: ivec2, entities: table }
+// @param params { player_id: number, type: number, target_cell: ivec2, entities: table }
 // @return number 
-static int script_bot_spawn_squad(lua_State* lua_state) {
+static int script_bot_add_squad(lua_State* lua_state) {
     const int arg_types[] = { LUA_TTABLE };
     script_validate_arguments(lua_state, arg_types, 1);
 
@@ -1498,58 +1616,51 @@ static int script_bot_spawn_squad(lua_State* lua_state) {
     uint8_t player_id = (uint8_t)lua_tonumber(lua_state, -1);
     lua_pop(lua_state, 1);
 
+    // Type
+    lua_getfield(lua_state, 1, "type");
+    uint32_t squad_type = (uint32_t)lua_tonumber(lua_state, -1);
+    if (squad_type >= BOT_SQUAD_TYPE_COUNT) {
+        script_error(lua_state, "Squad type %u is invalid.", squad_type);
+    }
+    lua_pop(lua_state, 1);
+
     // Target cell
     lua_getfield(lua_state, 1, "target_cell");
     ivec2 target_cell = script_lua_to_ivec2(lua_state, -1, "target_cell");
-    lua_pop(lua_state, 1);
-
-    // Spawn cell
-    lua_getfield(lua_state, 1, "spawn_cell");
-    ivec2 spawn_cell = script_lua_to_ivec2(lua_state, -1, "spawn_cell");
     lua_pop(lua_state, 1);
 
     // Entities
     lua_getfield(lua_state, 1, "entities");
     script_validate_type(lua_state, -1, "entities", LUA_TTABLE);
 
-    std::vector<EntityType> entity_types;
+    std::vector<EntityId> entities;
     lua_pushnil(lua_state);
     while (lua_next(lua_state, -2)) {
-        script_validate_type(lua_state, -1, "entity_type", LUA_TNUMBER);
-        int value = lua_tonumber(lua_state, -1);
-        script_validate_entity_type(lua_state, value);
-        entity_types.push_back((EntityType)value);
+        script_validate_type(lua_state, -1, "entities.element", LUA_TNUMBER);
+        EntityId entity_id = (EntityId)lua_tonumber(lua_state, -1);
+        if (entity_id == ID_NULL) {
+            log_warn("bot_add_squad: provided entity_id is ID_NULL.");
+        }
+        entities.push_back(entity_id);
 
         lua_pop(lua_state, 1);
     }
-
     lua_pop(lua_state, 1); 
-
-    if (entity_types.empty()) {
-        script_error(lua_state, "No entities provided for spawn_enemy_squad()");
-    }
 
     // Create the squad
     MatchShellState* state = script_get_match_shell_state(lua_state);
 
-    std::vector<EntityId> squad_entity_list;
-    for (EntityType entity_type : entity_types) {
-        ivec2 entity_cell = match_shell_spawn_enemy_squad_find_spawn_cell(state, entity_type, spawn_cell, target_cell);
-        if (entity_cell.x == -1) {
-            log_warn("Couldn't find a place to spawn unit with type %u spawn cell <%i, %i>", entity_type, spawn_cell.x, spawn_cell.y);
-        }
-
-        EntityId entity_id = entity_create(state->match_state, entity_type, entity_cell, player_id);
-        squad_entity_list.push_back(entity_id);
+    int squad_id = BOT_SQUAD_ID_NULL;
+    if (!entities.empty()) {
+        squad_id = bot_add_squad(state->bots[player_id], {
+            .type = (BotSquadType)squad_type,
+            .target_cell = target_cell,
+            .entities = entities
+        });
     }
 
-    int squad_id = BOT_SQUAD_ID_NULL;
-    if (!squad_entity_list.empty()) {
-        squad_id = bot_add_squad(state->bots[player_id], {
-            .type = BOT_SQUAD_TYPE_ATTACK,
-            .target_cell = target_cell,
-            .entities = squad_entity_list
-        });
+    if (squad_id == BOT_SQUAD_ID_NULL) {
+        log_warn("script_bot_add_squad() did not create a squad.");
     }
 
     lua_pushnumber(lua_state, squad_id);
@@ -1600,8 +1711,8 @@ static int script_bot_squad_exists(lua_State* lua_state) {
  * - when the builders are done building, tell them to build a bunker
  * - when the bunker is done building, add it to the respective defense squad and tell cowboys to garrison
  * - create a match_input_move function to do this
- * - if the town hall is destroyed, release the builder and retreat to base (you might have to give an input for this bc bot might be already saturated)
- * - make sure to release the builder after bunker is built
+ * x if the town hall is destroyed, release the builder and retreat to base (you might have to give an input for this bc bot might be already saturated)
+ * x make sure to release the builder after bunker is built
  * - check gold mine levels
  * - remove the hidden goldmines?
  */
