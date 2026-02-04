@@ -566,6 +566,24 @@
 				"x": 41.000000,
 				"y": 89.000000
 			}
+		},
+		{
+			"type": "Gold Mine",
+			"player_id": 4.000000,
+			"gold_held": 7500.000000,
+			"cell": {
+				"x": 46.000000,
+				"y": 124.000000
+			}
+		},
+		{
+			"type": "Gold Mine",
+			"player_id": 4.000000,
+			"gold_held": 7500.000000,
+			"cell": {
+				"x": 120.000000,
+				"y": 36.000000
+			}
 		}
 	],
 	"squads": [
@@ -664,19 +682,11 @@
 			"entity_index": 15.000000
 		},
 		{
-			"name": "HARASS_SPAWN_CELL",
+			"name": "HARASS_SPAWN_CELL1",
 			"type": "Cell",
 			"cell": {
 				"x": 107.000000,
 				"y": 87.000000
-			}
-		},
-		{
-			"name": "HARASS_TARGET_CELL",
-			"type": "Cell",
-			"cell": {
-				"x": 118.000000,
-				"y": 116.000000
 			}
 		},
 		{
@@ -694,6 +704,37 @@
 				"x": 76.000000,
 				"y": 63.000000
 			}
+		},
+		{
+			"name": "GOLDMINE1",
+			"type": "Entity",
+			"entity_index": 0.000000
+		},
+		{
+			"name": "GOLDMINE2",
+			"type": "Entity",
+			"entity_index": 12.000000
+		},
+		{
+			"name": "HARASS_SPAWN_CELL2",
+			"type": "Cell",
+			"cell": {
+				"x": 45.000000,
+				"y": 70.000000
+			}
+		},
+		{
+			"name": "HARASS_SPAWN_CELL3",
+			"type": "Cell",
+			"cell": {
+				"x": 25.000000,
+				"y": 34.000000
+			}
+		},
+		{
+			"name": "GOLDMINE3",
+			"type": "Entity",
+			"entity_index": 2.000000
 		}
 	]
 }

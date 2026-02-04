@@ -903,7 +903,9 @@ void match_shell_update(MatchShellState* state) {
         } 
         state->displayed_gold_amounts[player_id] = match_shell_update_displayed_gold_amount(state->displayed_gold_amounts[player_id], state->match_state.players[player_id].gold);
         if (state->scenario_global_objective_counter.type == GLOBAL_OBJECTIVE_COUNTER_GOLD) {
-            state->scenario_global_objective_counter.gold.values[player_id] = match_shell_update_displayed_gold_amount(state->scenario_global_objective_counter.gold.values[player_id], state->match_state.players[player_id].gold_mined_total);
+            state->scenario_global_objective_counter.gold.values[player_id] = std::min(
+                match_shell_update_displayed_gold_amount(state->scenario_global_objective_counter.gold.values[player_id], state->match_state.players[player_id].gold_mined_total),
+                state->scenario_global_objective_counter.gold.max_value);
         }
     }
 

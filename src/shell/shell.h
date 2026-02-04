@@ -103,6 +103,7 @@ enum GlobalObjectiveCounterType {
 
 struct GlobalObjectiveCounterGold {
     uint32_t values[MAX_PLAYERS];
+    uint32_t max_value;
 };
 
 struct GlobalObjectiveCounter {

@@ -118,6 +118,7 @@ scenario.match_input_type.UNLOAD = 16
 scenario.match_input_type.MOVE_CELL = 1
 scenario.match_input_type.STOP = 8
 
+scenario.PLAYER_NONE = 4
 scenario.sound = {}
 scenario.sound.BUILDING_DESTROY = 11
 scenario.sound.CAMO_OFF = 29
@@ -272,7 +273,8 @@ function scenario.clear_objectives() end
 
 --- Sets the global objective counter
 --- @param value number
-function scenario.set_global_objective_counter(value) end
+--- @param max_value number
+function scenario.set_global_objective_counter(value, max_value) end
 
 --- Returns true if the specified entity is visible to the player.
 --- @param entity_id number
@@ -305,6 +307,11 @@ function scenario.entity_find_spawn_cell(entity_type, spawn_cell) end
 --- @param player_id number
 --- @return number
 function scenario.entity_create(entity_type, cell, player_id) end
+
+--- Returns the ID of the player who controls the specified goldmine
+--- @param goldmine_id number
+--- @return number
+function scenario.entity_get_player_who_controls_goldmine(goldmine_id) end
 
 --- Spawns an enemy squad. The entities table should be an array of entity types.
 --- Returns the squad ID of the created squad, or SQUAD_ID_NULL if no squad was created.

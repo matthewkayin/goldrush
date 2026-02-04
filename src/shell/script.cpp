@@ -59,6 +59,7 @@ static int script_clear_objectives(lua_State* lua_state);
 static int script_set_global_objective_counter(lua_State* lua_state);
 static int script_entity_find_spawn_cell(lua_State* lua_state);
 static int script_entity_create(lua_State* lua_state);
+static int script_entity_get_player_who_controls_goldmine(lua_State* lua_state);
 
 // Entities
 static int script_entity_is_visible_to_player(lua_State* lua_state);
@@ -126,6 +127,7 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "entity_get_gold_cost", script_entity_get_gold_cost },
     { "entity_find_spawn_cell", script_entity_find_spawn_cell },
     { "entity_create", script_entity_create },
+    { "entity_get_player_who_controls_goldmine", script_entity_get_player_who_controls_goldmine },
 
     // Bot
     { "bot_add_squad", script_bot_add_squad },
@@ -149,6 +151,7 @@ static const ScriptConstant GOLD_CONSTANTS[] = {
     { "CAMERA_MODE_MINIMAP_DRAG", CAMERA_MODE_MINIMAP_DRAG },
     { "CAMERA_MODE_PAN", CAMERA_MODE_PAN },
     { "CAMERA_MODE_HELD", CAMERA_MODE_HELD },
+    { "PLAYER_NONE", PLAYER_NONE },
     { NULL, 0 }
 };
 
@@ -1270,20 +1273,24 @@ static int script_clear_objectives(lua_State* lua_state) {
 
 // Sets the global objective counter
 // @param value number
+// @param max_value number
 static int script_set_global_objective_counter(lua_State* lua_state) {
-    const int arg_types[] = { LUA_TNUMBER };
-    script_validate_arguments(lua_state, arg_types, 1);
+    const int arg_types[] = { LUA_TNUMBER, LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 2);
 
     uint32_t value = (uint32_t)lua_tonumber(lua_state, 1);
     if (value >= GLOBAL_OBJECTIVE_COUNTER_TYPE_COUNT) {
         script_error(lua_state, "Global objective counter value of %u is invalid.", value);
     }
 
+    uint32_t max_value = (uint32_t)lua_tonumber(lua_state, 2);
+
     GlobalObjectiveCounter counter;
     counter.type = (GlobalObjectiveCounterType)value;
     switch (counter.type) {
         case GLOBAL_OBJECTIVE_COUNTER_GOLD: {
             memset(&counter.gold, 0, sizeof(counter.gold));
+            counter.gold.max_value = max_value;
             break;
         }
         case GLOBAL_OBJECTIVE_COUNTER_OFF:
@@ -1604,6 +1611,34 @@ static int script_entity_create(lua_State* lua_state) {
 
     EntityId entity_id = entity_create(state->match_state, (EntityType)entity_type, cell, player_id);
     lua_pushnumber(lua_state, entity_id);
+
+    return 1;
+}
+
+// Returns the ID of the player who controls the specified goldmine
+// @param goldmine_id number
+// @return number
+static int script_entity_get_player_who_controls_goldmine(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    const MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    EntityId entity_id = (EntityId)lua_tonumber(lua_state, 1);
+    uint32_t entity_index = script_validate_entity_id(lua_state, state, entity_id);
+
+    const Entity& goldmine = state->match_state.entities[entity_index];
+
+    EntityId hall_surrounding_goldmine_id = match_find_entity(state->match_state, [&goldmine](const Entity& hall, EntityId /*hall_id*/) {
+        return hall.type == ENTITY_HALL &&
+            entity_is_selectable(hall) &&
+            bot_does_entity_surround_goldmine(hall, goldmine.cell);
+    });
+
+    uint8_t controlling_player_id = hall_surrounding_goldmine_id != ID_NULL
+        ? state->match_state.entities.get_by_id(hall_surrounding_goldmine_id).player_id
+        : PLAYER_NONE;
+    lua_pushnumber(lua_state, controlling_player_id);
 
     return 1;
 }
