@@ -686,15 +686,9 @@ const char* script_lua_type_str(int lua_type) {
 }
 
 void script_error(lua_State* lua_state, const char* message, ...) {
-    lua_Debug debug;
-    lua_getstack(lua_state, 1, &debug);
-    lua_getinfo(lua_state, "Sl", &debug);
-
     const size_t ERROR_BUFFER_LENGTH = 1024;
     char error_str[ERROR_BUFFER_LENGTH];
     char* error_str_ptr = error_str;
-
-    error_str_ptr += sprintf(error_str_ptr, "%s:%i %s", debug.source, debug.currentline, message);
 
     __builtin_va_list arg_ptr;
     va_start(arg_ptr, message);
@@ -810,8 +804,10 @@ int script_sprintf(char* str_ptr, lua_State* lua_state, int stack_index) {
             offset += sprintf(str_ptr + offset, "{ ");
             lua_pushnil(lua_state);
             while (lua_next(lua_state, stack_index) != 0) {
-                const char* key = lua_tostring(lua_state, -2);
-                offset += sprintf(str_ptr + offset, "%s = ", key);
+                int key_type = lua_type(lua_state, -2);
+                if (key_type == LUA_TSTRING) {
+                    offset += sprintf(str_ptr + offset, "%s = ", lua_tostring(lua_state, -2));
+                }
                 offset += script_sprintf(str_ptr + offset, lua_state, lua_gettop(lua_state));
                 offset += sprintf(str_ptr + offset, ", ");
                 lua_pop(lua_state, 1);
@@ -1638,6 +1634,7 @@ static int script_bot_add_squad(lua_State* lua_state) {
 
     // Target cell
     lua_getfield(lua_state, 1, "target_cell");
+    script_validate_type(lua_state, -1, "target_cell", LUA_TTABLE);
     ivec2 target_cell = script_lua_to_ivec2(lua_state, -1, "target_cell");
     lua_pop(lua_state, 1);
 
@@ -1881,6 +1878,7 @@ static int script_queue_match_input(lua_State* lua_state) {
 
             // Target cell
             lua_getfield(lua_state, 1, "target_cell");
+            script_validate_type(lua_state, -1, "target_cell", LUA_TTABLE);
             input.move.target_cell = script_lua_to_ivec2(lua_state, -1, "target_cell");
             lua_pop(lua_state, 1);
 
@@ -1914,6 +1912,7 @@ static int script_queue_match_input(lua_State* lua_state) {
 
             // Cell
             lua_getfield(lua_state, 1, "building_cell");
+            script_validate_type(lua_state, -1, "building_cell", LUA_TTABLE);
             input.build.target_cell = script_lua_to_ivec2(lua_state, -1, "building_cell");
             lua_pop(lua_state, 1);
 

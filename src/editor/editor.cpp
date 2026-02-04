@@ -1118,7 +1118,10 @@ void editor_update() {
     }
 
     // Launch test run
-    if (editor_can_single_use_tool_be_used() &&
+    if (!editor_is_in_menu() && 
+            !state.is_minimap_dragging && 
+            state.camera_drag_mouse_position.x == -1 && 
+            !editor_is_toolbar_open() &&
             !input_is_action_pressed(INPUT_ACTION_LEFT_CLICK) &&
             !input_is_action_pressed(INPUT_ACTION_RIGHT_CLICK) &&
             input_is_action_just_pressed(INPUT_ACTION_F5)) {
