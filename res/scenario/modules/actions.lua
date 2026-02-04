@@ -12,7 +12,7 @@ function actions.update()
         local success, error_message = coroutine.resume(co)
 
         if not success then
-            error(error_message)
+            error(debug.traceback(co, error_message))
         elseif coroutine.status(co) == "dead" then
             table.remove(actions.active_coroutines, index)
         else

@@ -21,7 +21,7 @@ end
 
 function objectives.announce_objectives_failed()
     objectives.current_objective = nil
-    scenario.play_sound(scenario.UI_CLICK)
+    scenario.play_sound(scenario.sound.UI_CLICK)
     scenario.chat(scenario.CHAT_COLOR_GOLD, "Objective Failed", "")
     actions.wait(3.0)
     scenario.clear_objectives()

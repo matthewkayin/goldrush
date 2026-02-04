@@ -2,11 +2,11 @@ local actions = require("actions")
 local objectives = require("objectives")
 local squad_util = require("squad_util")
 
-local OBJECTIVE_MINE_GOLD = "Mine 10,000 Gold before your Opponent"
+local OBJECTIVE_MINE_GOLD = "Mine 5000 Gold before your Opponent"
 
 local ENEMY_PLAYER_ID = 1
 
-local TARGET_GOLD_COUNT = 10000
+local TARGET_GOLD_COUNT = 5000
 local HARASS_TRIGGER_DISTANCE = 16
 
 local BUILDER_MODE_ORDER_HALL = 0
@@ -16,10 +16,10 @@ local BUILDER_MODE_ORDER_BUNKER = 3
 local BUILDER_MODE_BUILDING_BUNKER = 4
 local BUILDER_MODE_RELEASED = 5
 
-local has_given_bunker_hint = false
 local has_sent_reactive_harass = false
 local cached_bot_should_produce = false
 local has_finished_opener = false
+local is_match_over = false
 local builder_state1 = {}
 local builder_state2 = {}
 
@@ -80,7 +80,7 @@ function scenario_init()
         objectives.announce_new_objective(OBJECTIVE_MINE_GOLD)
         objectives.add_objective({
             objective = {
-                description = "Mine 10,000 Gold",
+                description = "Mine 5000 Gold",
             },
             complete_fn = function ()
                 return scenario.player_get_gold_mined_total(scenario.PLAYER_ID) >= TARGET_GOLD_COUNT
@@ -100,24 +100,19 @@ end
 function scenario_update()
     objectives.update()
 
-    if objectives.current_objective == OBJECTIVE_MINE_GOLD and scenario.are_objectives_complete() then
+    if not is_match_over and objectives.current_objective == OBJECTIVE_MINE_GOLD and scenario.are_objectives_complete() then
         actions.run(function ()
             objectives.announce_objectives_complete()
             scenario.set_match_over_victory()
         end)
-    elseif scenario.player_get_gold_mined_total(ENEMY_PLAYER_ID) >= TARGET_GOLD_COUNT then
+        is_match_over = true
+    end
+    if not is_match_over and scenario.player_get_gold_mined_total(ENEMY_PLAYER_ID) >= TARGET_GOLD_COUNT then
         actions.run(function ()
             objectives.announce_objectives_failed()
             scenario.set_match_over_defeat()
         end)
-    end
-
-    if not has_given_bunker_hint and scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.BUNKER) >= 1 then
-        has_given_bunker_hint = true
-        actions.run(function ()
-            actions.wait(3.0)
-            scenario.hint("Garrison cowboys inside your new bunker.")
-        end)
+        is_match_over = true
     end
 
     -- Reactive harass
@@ -130,8 +125,6 @@ function scenario_update()
                 spawn_cell = scenario.constants.HARASS_SPAWN_CELL,
                 target_cell = scenario.constants.HARASS_TARGET_CELL,
                 entity_types = {
-                    scenario.entity_type.BANDIT,
-                    scenario.entity_type.BANDIT,
                     scenario.entity_type.BANDIT,
                     scenario.entity_type.BANDIT,
                     scenario.entity_type.COWBOY,
@@ -230,7 +223,6 @@ function builder_state_update(builder_state)
             return
         end
 
-        -- TODO: garrison defense squad into bunker
         local squad_entity_ids = {}
         table.insert(squad_entity_ids, builder_state.bunker_id)
         for index=1,4 do
