@@ -157,8 +157,7 @@ const char* match_shell_script_get_entity_type_str(EntityType type);
 const char* match_shell_script_get_entity_mode_str(EntityMode mode);
 const char* match_shell_script_get_target_type_str(TargetType type);
 const char* match_shell_script_get_global_objective_counter_type_str(GlobalObjectiveCounterType type);
-void match_shell_script_handle_error(MatchShellState* state);
-static int script_traceback(lua_State* lua_state);
+void match_shell_script_call(MatchShellState* state, const char* func_name);
 
 bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, const char* script_path) {
     // Check for script existance
@@ -249,11 +248,10 @@ bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, c
         lua_close(state->scenario_lua_state);
         return false;
     }
+    lua_pop(state->scenario_lua_state, 1);
 
     // Call scenario_init() 
-    if (lua_pcall(state->scenario_lua_state, 0, 0, 0)) {
-        match_shell_script_handle_error(state);
-    }
+    match_shell_script_call(state, "scenario_init");
 
     return true;
 }
@@ -360,62 +358,36 @@ void match_shell_script_register_scenario_constants(lua_State* lua_state) {
 }
 
 void match_shell_script_update(MatchShellState* state) {
+    match_shell_script_call(state, "scenario_update");
+}
+
+void match_shell_script_call(MatchShellState* state, const char* func_name) {
     lua_getglobal(state->scenario_lua_state, "debug");
     lua_getfield(state->scenario_lua_state, -1, "traceback");
     lua_remove(state->scenario_lua_state, -2);
-    lua_getglobal(state->scenario_lua_state, "scenario_update");
+    lua_getglobal(state->scenario_lua_state, func_name);
     if (lua_pcall(state->scenario_lua_state, 0, 0, -2)) {
-        match_shell_script_handle_error(state);
-    }
-}
+        const char* error_str = lua_tostring(state->scenario_lua_state, -1);
 
-void match_shell_script_handle_error(MatchShellState* state) {
-    const char* error_str = lua_tostring(state->scenario_lua_state, -1);
+        // Lua is not giving us the short_src so we will
+        // manually look through the string to find the tail end 
+        // (past the path separators)
 
-    // Lua is not giving us the short_src so we will
-    // manually look through the string to find the tail end 
-    // (past the path separators)
-
-    size_t index = 0;
-    size_t path_sep_index = 0;
-    while (error_str[index] != ':') {
-        if (error_str[index] == GOLD_PATH_SEPARATOR) {
-            path_sep_index = index;
+        size_t index = 0;
+        size_t path_sep_index = 0;
+        while (error_str[index] != ':') {
+            if (error_str[index] == GOLD_PATH_SEPARATOR) {
+                path_sep_index = index;
+            }
+            index++;
         }
-        index++;
-    }
-    if (path_sep_index != 0) {
-        error_str += path_sep_index + 1;
-    }
+        if (path_sep_index != 0) {
+            error_str += path_sep_index + 1;
+        }
 
-    log_error("%s", error_str);
-    match_shell_leave_match(state, false);
-}
-
-static int script_traceback(lua_State* lua_state) {
-    log_error("Script traceback invoked.");
-    if (!lua_isstring(lua_state, 1)) {
-        return 1;
+        log_error("%s", error_str);
+        match_shell_leave_match(state, false);
     }
-    lua_getglobal(lua_state, "debug");
-    if (!lua_istable(lua_state, -1)) {
-        lua_pop(lua_state, 1);
-        return 1;
-    }
-    lua_getfield(lua_state, -1, "traceback");
-    if (!lua_isfunction(lua_state, -1)) {
-        lua_pop(lua_state, 2);
-        return 1;
-    }
-    lua_pushvalue(lua_state, 1);
-    lua_pushinteger(lua_state, 2);
-    lua_call(lua_state, 2, 1);
-    if (lua_isstring(lua_state, 1)) {
-        log_error("Trace: %s", lua_tostring(lua_state, 1));
-    } else {
-        log_error("ERROR is not string.");
-    }
-    return 1;
 }
 
 const char* match_shell_script_get_entity_type_str(EntityType type) {
