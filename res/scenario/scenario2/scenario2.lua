@@ -208,6 +208,7 @@ function builder_state_update(builder_state)
             while scenario.player_get_gold(ENEMY_PLAYER_ID) < scenario.entity_get_gold_cost(scenario.entity_type.BUNKER) do
                 coroutine.yield()
             end
+            scenario.log("BUILDER STATE", builder_state)
             scenario.queue_match_input({
                 player_id = ENEMY_PLAYER_ID,
                 type = scenario.match_input_type.BUILD,

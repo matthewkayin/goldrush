@@ -158,6 +158,7 @@ const char* match_shell_script_get_entity_mode_str(EntityMode mode);
 const char* match_shell_script_get_target_type_str(TargetType type);
 const char* match_shell_script_get_global_objective_counter_type_str(GlobalObjectiveCounterType type);
 void match_shell_script_handle_error(MatchShellState* state);
+static int script_traceback(lua_State* lua_state);
 
 bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, const char* script_path) {
     // Check for script existance
@@ -359,8 +360,11 @@ void match_shell_script_register_scenario_constants(lua_State* lua_state) {
 }
 
 void match_shell_script_update(MatchShellState* state) {
+    lua_getglobal(state->scenario_lua_state, "debug");
+    lua_getfield(state->scenario_lua_state, -1, "traceback");
+    lua_remove(state->scenario_lua_state, -2);
     lua_getglobal(state->scenario_lua_state, "scenario_update");
-    if (lua_pcall(state->scenario_lua_state, 0, 0, 0)) {
+    if (lua_pcall(state->scenario_lua_state, 0, 0, -2)) {
         match_shell_script_handle_error(state);
     }
 }
@@ -374,7 +378,7 @@ void match_shell_script_handle_error(MatchShellState* state) {
 
     size_t index = 0;
     size_t path_sep_index = 0;
-    while (error_str[index] != '\0') {
+    while (error_str[index] != ':') {
         if (error_str[index] == GOLD_PATH_SEPARATOR) {
             path_sep_index = index;
         }
@@ -386,6 +390,32 @@ void match_shell_script_handle_error(MatchShellState* state) {
 
     log_error("%s", error_str);
     match_shell_leave_match(state, false);
+}
+
+static int script_traceback(lua_State* lua_state) {
+    log_error("Script traceback invoked.");
+    if (!lua_isstring(lua_state, 1)) {
+        return 1;
+    }
+    lua_getglobal(lua_state, "debug");
+    if (!lua_istable(lua_state, -1)) {
+        lua_pop(lua_state, 1);
+        return 1;
+    }
+    lua_getfield(lua_state, -1, "traceback");
+    if (!lua_isfunction(lua_state, -1)) {
+        lua_pop(lua_state, 2);
+        return 1;
+    }
+    lua_pushvalue(lua_state, 1);
+    lua_pushinteger(lua_state, 2);
+    lua_call(lua_state, 2, 1);
+    if (lua_isstring(lua_state, 1)) {
+        log_error("Trace: %s", lua_tostring(lua_state, 1));
+    } else {
+        log_error("ERROR is not string.");
+    }
+    return 1;
 }
 
 const char* match_shell_script_get_entity_type_str(EntityType type) {
