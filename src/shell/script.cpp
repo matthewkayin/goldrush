@@ -1743,24 +1743,6 @@ static int script_bot_squad_exists(lua_State* lua_state) {
     return 1;
 }
 
-/*
- * TODO: 
- * x change bot functions to be prefixed with bot_
- * x update scenario1 and 2 script to reflect this
- * / make it so that we can set target cell and so that we can add entities to a squad
- * - alternatively: just reserve the 4 squad entities? and then make a squad out of them
- * / make a scenario constant type squad ID, this should be a table containing the bot ID and the squad ID both
- * / make 2 defense squads in enemy main of 4 cowboys each
- * x reserve the two builders at match start, tell them to build
- * x when the builders are done building, tell them to build a bunker
- * - when the bunker is done building, add it to the respective defense squad and tell cowboys to garrison
- * - create a match_input_move function to do this
- * x if the town hall is destroyed, release the builder and retreat to base (you might have to give an input for this bc bot might be already saturated)
- * x make sure to release the builder after bunker is built
- * - check gold mine levels
- * - remove the hidden goldmines?
- */
-
 // Sets a bot config flag to the specified value
 // @param player_id number
 // @param flag number

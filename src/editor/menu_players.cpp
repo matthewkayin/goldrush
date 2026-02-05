@@ -25,6 +25,14 @@ static const UiSliderParams STARTING_GOLD_SLIDER_PARAMS = (UiSliderParams) {
     .step = 50
 };
 
+static const UiSliderParams MACRO_CYCLE_COOLDOWN_SLIDER_PARAMS = (UiSliderParams) {
+    .display = UI_SLIDER_DISPLAY_RAW_VALUE,
+    .size = UI_SLIDER_SIZE_NORMAL,
+    .min = 0,
+    .max = 180,
+    .step = 30
+};
+
 static const std::vector<std::string> YES_NO_DROPDOWN_OPTIONS = { "No", "Yes" };
 static const std::vector<std::string> TARGET_BASE_COUNT_DROPDOWN_OPTIONS = { "0", "1", "2", "Match Enemy" };
 static const uint32_t TARGET_BASE_COUNT_MATCH_ENEMY_INDEX = 3;
@@ -119,6 +127,13 @@ void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorMenuMode&
                         bot_config.target_base_count = target_base_count_selection == TARGET_BASE_COUNT_MATCH_ENEMY_INDEX
                             ? BOT_TARGET_BASE_COUNT_MATCH_ENEMY
                             : target_base_count_selection;
+                    }
+                });
+
+                scroll_items.push_back([&ui, &bot_config]() {
+                    uint32_t macro_cycle_cooldown = bot_config.macro_cycle_cooldown / UPDATES_PER_SECOND;
+                    if (editor_menu_slider(ui, "Macro Cooldown:", &macro_cycle_cooldown, MACRO_CYCLE_COOLDOWN_SLIDER_PARAMS, MENU_RECT)) {
+                        bot_config.macro_cycle_cooldown = macro_cycle_cooldown * UPDATES_PER_SECOND;
                     }
                 });
             }

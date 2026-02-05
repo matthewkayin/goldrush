@@ -1008,7 +1008,11 @@ void editor_update() {
             });
         } else if (state.tool == EDITOR_TOOL_SELECT && was_painting) {
             if (state.tool_select_end == state.tool_select_origin) {
-                editor_tool_select_clear_selection();
+                const bool is_tool_select_end_inside_existing_selection =
+                    state.tool_select_selection.x != -1 && state.tool_select_selection.has_point(state.tool_select_end);
+                if (!is_tool_select_end_inside_existing_selection) {
+                    editor_tool_select_clear_selection();
+                }
                 return;
             }
             Rect select_rect = editor_tool_select_get_select_rect();

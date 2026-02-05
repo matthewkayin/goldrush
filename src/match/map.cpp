@@ -119,6 +119,7 @@ void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, 
                 }
 
                 Direction stair_direction = map_get_tile_stair_direction(tile);
+                GOLD_ASSERT(stair_direction != DIRECTION_COUNT);
                 int stair_mouth_cell_distance = stair_direction == DIRECTION_SOUTH ? 4 : 3;
                 ivec2 stair_mouth_cell = stair_min + (DIRECTION_IVEC2[stair_direction] * stair_mouth_cell_distance);
                 if (!map_is_cell_in_bounds(map, stair_mouth_cell)) {
@@ -839,7 +840,6 @@ Direction map_get_tile_stair_direction(const Tile& tile) {
         case SPRITE_TILE_WALL_SOUTH_EDGE:
             return DIRECTION_SOUTH;
         default:
-            GOLD_ASSERT(false);
             return DIRECTION_COUNT;
     }
 }
@@ -957,7 +957,13 @@ void map_bake_ramps(Map& map, const Noise* noise) {
         // Step back one since that while loop would have moved us beyond the stair max
         const ivec2 stair_max = current - step_direction;
 
-        map_bake_ramp(map, map_get_tile_stair_direction(map_get_tile(map, stair_min)), stair_min, stair_max);
+        Tile stair_min_tile = map_get_tile(map, stair_min);
+        Direction stair_direction = map_get_tile_stair_direction(stair_min_tile);
+        if (stair_direction == DIRECTION_COUNT) {
+            log_error("stair direction is bad. stair min <%i, %i> tile sprite %u", stair_min.x, stair_min.y, stair_min_tile.sprite);
+            GOLD_ASSERT(false);
+        }
+        map_bake_ramp(map, stair_direction, stair_min, stair_max);
 
         // Mark stairs as no longer a ramp so that we only use these cells once
         for (ivec2 cell = stair_min; cell != stair_max + step_direction; cell += step_direction) {

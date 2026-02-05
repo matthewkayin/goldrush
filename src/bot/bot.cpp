@@ -521,7 +521,7 @@ bool bot_is_unoccupied_goldmine_available(const Bot& bot) {
     return false;
 }
 
-EntityId bot_get_least_defended_enemy_base_goldmine_id(const MatchState& state, const Bot& bot) {
+uint32_t bot_get_least_defended_enemy_base_goldmine_id_index(const MatchState& state, const Bot& bot) {
     uint32_t least_defended_base_goldmine_id_index = INDEX_INVALID;
     for (uint32_t goldmine_id_index = 0; goldmine_id_index < bot.goldmine_ids.size(); goldmine_id_index++) {
         const BotBaseInfo& base_info = bot.base_info[goldmine_id_index];
@@ -537,11 +537,7 @@ EntityId bot_get_least_defended_enemy_base_goldmine_id(const MatchState& state, 
         }
     }
 
-    if (least_defended_base_goldmine_id_index == INDEX_INVALID) {
-        return ID_NULL;
-    }
-    
-    return bot.goldmine_ids[least_defended_base_goldmine_id_index];
+    return least_defended_base_goldmine_id_index;
 }
 
 bool bot_is_under_attack(const Bot& bot) {
@@ -651,11 +647,11 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
     }
 
     // Next, see if we can use unreserved units to mount a counterattack
-    EntityId least_defended_enemy_base_goldmine_id = bot_get_least_defended_enemy_base_goldmine_id(state, bot);
+    uint32_t least_defended_enemy_base_goldmine_id_index = bot_get_least_defended_enemy_base_goldmine_id_index(state, bot);
     if (should_counterattack &&
-            least_defended_enemy_base_goldmine_id != ID_NULL &&
+            least_defended_enemy_base_goldmine_id_index != INDEX_INVALID &&
             !unreserved_army.empty() &&
-            unreserved_army_score > bot.base_info.at(least_defended_enemy_base_goldmine_id).defense_score) {
+            unreserved_army_score > bot.base_info.at(least_defended_enemy_base_goldmine_id_index).defense_score) {
         ivec2 counterattack_squad_target_cell = bot_squad_get_attack_target_cell(state, bot, unreserved_army);
         int squad_id = bot_add_squad(bot, {
             .type = BOT_SQUAD_TYPE_ATTACK,
@@ -741,8 +737,8 @@ bool bot_should_attack(const MatchState& state, const Bot& bot) {
     }
 
     // Don't attack if there are no bases to attack
-    EntityId least_defended_enemy_goldmine_id = bot_get_least_defended_enemy_base_goldmine_id(state, bot);
-    if (least_defended_enemy_goldmine_id == ID_NULL) {
+    uint32_t least_defended_enemy_goldmine_id_index = bot_get_least_defended_enemy_base_goldmine_id_index(state, bot);
+    if (least_defended_enemy_goldmine_id_index == INDEX_INVALID) {
         return false;
     }
 
@@ -757,7 +753,7 @@ bool bot_should_attack(const MatchState& state, const Bot& bot) {
     }
 
     // Attack if we have a bigger army than our opponent
-    const int least_defended_base_score = bot.base_info.at(least_defended_enemy_goldmine_id).defense_score;
+    const int least_defended_base_score = bot.base_info.at(least_defended_enemy_goldmine_id_index).defense_score;
     const int minimum_attack_threshold = 
         least_defended_base_score < 4 * BOT_UNIT_SCORE_IN_BUNKER && 
         bitflag_check(bot.config.flags, BOT_CONFIG_SHOULD_HARASS)

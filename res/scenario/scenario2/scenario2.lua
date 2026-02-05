@@ -18,7 +18,7 @@ local BUILDER_MODE_BUILDING_BUNKER = 4
 local BUILDER_MODE_RELEASED = 5
 
 local has_sent_reactive_harass = false
-local has_begun_regular_harassment = false
+local has_done_second_harassment = false
 local cached_bot_should_produce = false
 local has_finished_opener = false
 local is_match_over = false
@@ -38,6 +38,11 @@ local harassable_goldmines = {
         spawn_cell = scenario.constants.HARASS_SPAWN_CELL3
     }
 }
+
+-- TODO: 
+-- - harass the player only once and do it always at their new base
+-- - reduce how many units the enemy makes because it's a little unfair. maybe give them a longer macro cooldown?
+-- - also remember to test scenario 1 again bc it's def broken
 
 function scenario_init()
     builder_state1 = builder_state_init(scenario.constants.HALL_BUILDER1, scenario.constants.BUNKER_CELL1)
@@ -158,17 +163,20 @@ function scenario_update()
     end
 
     -- Bot should harass
-    if not has_begun_regular_harassment and scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.HALL) >= 2 then
-        actions.run(function ()
-            -- Wait an initial 1 minute before harassing,
-            -- afterwards, wait HARASSMENT_INTERVAL amount of time between harassments
-            actions.wait(60.0 * 1.0)
-            while true do
-                harass_goldmine(harass_choose_goldmine())
-                actions.wait(REGULAR_HARASSMENT_INTERVAL)
-            end
-        end)
-        has_begun_regular_harassment = true
+    if not has_done_second_harassment and scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.HALL) >= 2 then
+        local goldmine_number_to_harass = nil
+        if scenario.entity_get_player_who_controls_goldmine(scenario.constants.GOLDMINE2) == scenario.PLAYER_ID then
+            goldmine_number_to_harass = 2
+        elseif scenario.entity.entity_get_player_who_controls_goldmine(scenario.constants.GOLDMINE3) == scenario.PLAYER_ID then
+            goldmine_number_to_harass = 3
+        end
+        if goldmine_number_to_harass then
+            actions.run(function ()
+                actions.wait(60.0 * 1.0)
+                harass_goldmine(goldmine_number_to_harass)
+            end)
+            has_done_second_harassment = true
+        end
     end
 
     actions.update()
@@ -272,18 +280,6 @@ function should_bot_produce()
     return builder_state1.mode ~= BUILDER_MODE_WAIT_GOLD_BUNKER and
         builder_state2.mode ~= BUILDER_MODE_WAIT_GOLD_BUNKER and
         has_finished_opener
-end
-
-function harass_choose_goldmine()
-    local valid_harassable_goldmine_indices = {}
-    for harassable_goldmine_index=1,3 do
-        local controlling_player_id = scenario.entity_get_player_who_controls_goldmine(harassable_goldmines[harassable_goldmine_index].goldmine)
-        if controlling_player_id == scenario.PLAYER_ID then
-            table.insert(valid_harassable_goldmine_indices, harassable_goldmine_index)
-        end
-    end
-    local valid_harassable_goldmine_indices_index = math.random(1, #valid_harassable_goldmine_indices)
-    return valid_harassable_goldmine_indices[valid_harassable_goldmine_indices_index]
 end
 
 function harass_goldmine(harassable_goldmine_index)
