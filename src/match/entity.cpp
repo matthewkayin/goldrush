@@ -1,6 +1,7 @@
 #include "entity.h"
 
 #include <unordered_map>
+#include <cstring>
 
 static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     { ENTITY_GOLDMINE, (EntityData) {

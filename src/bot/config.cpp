@@ -4,6 +4,7 @@
 #include "util/bitflag.h"
 #include "util/util.h"
 #include "match/lcg.h"
+#include <cstring>
 
 BotConfig bot_config_init() {
     BotConfig config;

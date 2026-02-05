@@ -225,6 +225,7 @@ void options_menu_update(OptionsMenuState& state, UI& ui) {
                             .display = option_data.type == OPTION_TYPE_SLIDER
                                 ? UI_SLIDER_DISPLAY_RAW_VALUE
                                 : UI_SLIDER_DISPLAY_PERCENT,
+                            .size = UI_SLIDER_SIZE_NORMAL,
                             .min = option_data.min_value,
                             .max = option_data.max_value,
                             .step = 1

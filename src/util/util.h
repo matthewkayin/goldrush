@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 using EnumToStrFn = const char* (*)(uint32_t);

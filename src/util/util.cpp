@@ -2,6 +2,7 @@
 
 #include "core/logger.h"
 #include "core/asserts.h"
+#include <cstring>
 
 bool string_ends_with(const std::string& str, const char* suffix) {
     size_t suffix_length = strlen(suffix);
