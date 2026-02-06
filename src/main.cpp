@@ -261,8 +261,6 @@ int gold_main(int argc, char** argv) {
             game_update(state);
         }
 
-        sound_update();
-
         // Render
         render_prepare_frame();
 

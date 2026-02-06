@@ -109,6 +109,7 @@ static const Rect SOUND_LISTEN_RECT = (Rect) {
     .h = SCREEN_HEIGHT + (SOUND_LISTEN_MARGIN * 2),
 };
 static const uint32_t SOUND_COOLDOWN_DURATION = 5;
+static const uint32_t SOUND_FIRE_NOT_PLAYING = UINT32_MAX;
 
 // Alerts
 static const uint32_t ALERT_DURATION = 90;
@@ -178,6 +179,7 @@ MatchShellState* match_shell_base_init() {
 
     // Sound
     memset(state->sound_cooldown_timers, 0, sizeof(state->sound_cooldown_timers));
+    state->sound_fire_voice_index = SOUND_FIRE_NOT_PLAYING;
 
     // Animations
     state->rally_flag_animation = animation_create(ANIMATION_RALLY_FLAG);
@@ -911,10 +913,11 @@ void match_shell_update(MatchShellState* state) {
 
     // Play fire sound effects
     bool is_fire_on_screen = match_shell_is_fire_on_screen(state);
-    if (is_fire_on_screen && !sound_is_fire_loop_playing()) {
-        sound_begin_fire_loop();
-    } else if (!is_fire_on_screen && sound_is_fire_loop_playing()) {
-        sound_end_fire_loop();
+    if (is_fire_on_screen && state->sound_fire_voice_index == SOUND_FIRE_NOT_PLAYING) {
+        state->sound_fire_voice_index = sound_play(SOUND_FIRE_BURN, true);
+    } else if (!is_fire_on_screen && state->sound_fire_voice_index != SOUND_FIRE_NOT_PLAYING) {
+        sound_stop(state->sound_fire_voice_index);
+        state->sound_fire_voice_index = SOUND_FIRE_NOT_PLAYING;
     }
 
     // Update chat blinker

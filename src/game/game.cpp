@@ -94,7 +94,7 @@ void game_set_mode(GameState& state, GameSetModeParams params) {
         state.menu_state = nullptr;
     }
     if (game_mode_is_match_shell(state.mode)) {
-        sound_end_fire_loop();
+        sound_stop_all();
         delete state.match_shell_state;
         state.match_shell_state = nullptr;
     }

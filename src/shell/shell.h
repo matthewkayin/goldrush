@@ -178,6 +178,7 @@ struct MatchShellState {
 
     // Sound
     uint32_t sound_cooldown_timers[SOUND_COUNT];
+    uint32_t sound_fire_voice_index;
 
     // Animations
     Animation rally_flag_animation;

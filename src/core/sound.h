@@ -46,8 +46,6 @@ const char* sound_get_name(SoundName sound);
 void sound_set_sfx_volume(uint32_t volume);
 void sound_set_mus_volume(uint32_t volume);
 
-void sound_play(SoundName sound);
-void sound_update();
-bool sound_is_fire_loop_playing();
-void sound_begin_fire_loop();
-void sound_end_fire_loop();
+uint32_t sound_play(SoundName sound, bool looping = false);
+void sound_stop(uint32_t voice_index);
+void sound_stop_all();
