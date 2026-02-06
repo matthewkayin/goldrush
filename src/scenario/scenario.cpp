@@ -6,9 +6,6 @@
 #include "util/json.h"
 #include "util/util.h"
 
-static const uint32_t MAP_FILE_SIGNATURE = 0x46536877;
-static const uint32_t MAP_FILE_VERSION = 0;
-
 Scenario* scenario_base_init() {
     Scenario* scenario = new Scenario();
 
@@ -204,45 +201,51 @@ void scenario_set_noise_map_value(Scenario* scenario, ivec2 cell, uint8_t value)
     scenario_bake_map(scenario);
 }
 
-bool scenario_save_file(const Scenario* scenario, const char* json_full_path, const char* map_short_path, const char* script_short_path) {
+bool scenario_save_file(const Scenario* scenario, const char* json_full_path, const char* script_short_path) {
     const std::string folder_path = filesystem_get_path_folder(json_full_path);
-
-    // Write map file
-    {
-        std::string map_full_path = std::string(folder_path) + std::string(map_short_path);
-        FILE* map_file = fopen(map_full_path.c_str(), "wb");
-        if (map_file == NULL) {
-            log_error("Could not open map file %s for writing.", map_full_path.c_str());
-            return false;
-        }
-
-        // Signature
-        fwrite(&MAP_FILE_SIGNATURE, 1, sizeof(uint32_t), map_file);
-
-        // Version
-        fwrite(&MAP_FILE_VERSION, 1, sizeof(uint32_t), map_file);
-
-        // Map
-        uint8_t map_type_byte = (uint8_t)scenario->map.type;
-        fwrite(&map_type_byte, 1, sizeof(uint8_t), map_file);
-        fwrite(&scenario->map.width, 1, sizeof(int), map_file);
-        fwrite(&scenario->map.height, 1, sizeof(int), map_file);
-        fwrite(&scenario->map.tiles[0], 1, scenario->map.width * scenario->map.height * sizeof(Tile), map_file);
-        for (uint32_t cell_layer = 0; cell_layer < CELL_LAYER_COUNT; cell_layer++) {
-            fwrite(&scenario->map.cells[cell_layer][0], 1, scenario->map.width * scenario->map.height * sizeof(Cell), map_file);
-        }
-
-        // Noise
-        noise_fwrite(scenario->noise, map_file);
-
-        fclose(map_file);
-    }
 
     // Build scenario json
     Json* scenario_json = json_object();
     {
-        json_object_set_string(scenario_json, "map", map_short_path);
+        // Script
         json_object_set_string(scenario_json, "script", script_short_path);
+
+        // Map type
+        json_object_set_string(scenario_json, "map_type", match_setting_data(MATCH_SETTING_MAP_TYPE).values.at(scenario->map.type).c_str());
+
+        // Noise
+        Json* noise_json = json_object();
+        json_object_set_number(noise_json, "width", scenario->noise->width);
+        json_object_set_number(noise_json, "height", scenario->noise->height);
+
+        Json* noise_map_json = json_array();
+        Json* noise_forest_json = json_array();
+        for (int index = 0; index < scenario->noise->width * scenario->noise->height; index++) {
+            json_array_push_number(noise_map_json, scenario->noise->map[index]);
+            json_array_push_number(noise_forest_json, scenario->noise->forest[index]);
+        }
+        json_object_set(noise_json, "map", noise_map_json);
+        json_object_set(noise_json, "forest", noise_forest_json);
+
+        json_object_set(scenario_json, "noise", noise_json);
+
+        // Decorations
+        Json* decorations_json = json_array();
+        for (int y = 0; y < scenario->map.height; y++) {
+            for (int x = 0; x < scenario->map.width; x++) {
+                Cell map_cell = scenario->map.cells[CELL_LAYER_GROUND][x + (y * scenario->map.width)];
+                if (map_cell.type != CELL_DECORATION) {
+                    continue;
+                }
+
+                Json* decoration_json = json_object();
+                json_object_set_number(decoration_json, "hframe", map_cell.decoration_hframe);
+                json_object_set(decoration_json, "cell", json_from_ivec2(ivec2(x, y)));
+
+                json_array_push(decorations_json, decoration_json);
+            }
+        }
+        json_object_set(scenario_json, "decorations", decorations_json);
 
         // Player spawn
         json_object_set(scenario_json, "player_spawn", json_from_ivec2(scenario->player_spawn));
@@ -390,7 +393,7 @@ bool scenario_save_file(const Scenario* scenario, const char* json_full_path, co
     return json_save_success;
 }
 
-Scenario* scenario_open_file(const char* json_path, std::string* map_short_path, std::string* script_short_path) {
+Scenario* scenario_open_file(const char* json_path, std::string* script_short_path) {
     const std::string folder_path = filesystem_get_path_folder(json_path);
 
     Json* scenario_json = NULL;
@@ -411,66 +414,48 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
             goto error;
         }
 
-        // Read map file 
-        *map_short_path = std::string(json_object_get_string(scenario_json, "map"));
-        {
-            std::string map_full_path = std::string(folder_path) + *map_short_path;
-            map_file = fopen(map_full_path.c_str(), "rb");
-            if (map_file == NULL) {
-                log_error("Could not open map file for reading with path %s.", map_full_path.c_str());
-                goto error;
+        // Map type
+        const std::string map_type_string = json_object_get_string(scenario_json, "map_type");
+        MapType map_type = MAP_TYPE_COUNT;
+        for (uint32_t map_type_index = 0; map_type_index < MAP_TYPE_COUNT; map_type_index++) {
+            if (match_setting_data(MATCH_SETTING_MAP_TYPE).values.at(map_type_index) == map_type_string) {
+                map_type = (MapType)map_type_index;
+                break;
             }
-
-            // Signature
-            uint32_t signature;
-            fread(&signature, 1, sizeof(uint32_t), map_file);
-            if (signature != MAP_FILE_SIGNATURE) {
-                log_error("File %s is not a valid map file.", map_full_path.c_str());
-                goto error;
-            }
-
-            // Version
-            uint32_t version;
-            fread(&version, 1, sizeof(uint32_t), map_file);
-            if (version != MAP_FILE_VERSION) {
-                log_error("Scenario version %u not handled", version);
-                goto error;
-            }
-
-            // Map type
-            uint8_t map_type_byte;
-            fread(&map_type_byte, 1, sizeof(uint8_t), map_file);
-            MapType map_type = (MapType)map_type_byte;
-
-            // Map width, height
-            int map_width, map_height;
-            fread(&map_width, 1, sizeof(int), map_file);
-            fread(&map_height, 1, sizeof(int), map_file);
-
-            // Map init
-            map_init(scenario->map, map_type, map_width, map_height);
-
-            // Map tiles
-            fread(&scenario->map.tiles[0], 1, map_width * map_height * sizeof(Tile), map_file);
-
-            // Map cells
-            for (uint32_t cell_layer = 0; cell_layer < CELL_LAYER_COUNT; cell_layer++) {
-                fread(&scenario->map.cells[cell_layer][0], 1, map_width * map_height * sizeof(Cell), map_file);
-            }
-
-            // Noise
-            scenario->noise = noise_fread(map_file);
-            if (scenario->noise == NULL) {
-                log_error("Error reading noise.");
-                goto error;
-            }
-
-            fclose(map_file);
-            map_file = NULL;
         }
+        GOLD_ASSERT(map_type != MAP_TYPE_COUNT);
 
         // Grab script short path
         *script_short_path = std::string(json_object_get_string(scenario_json, "script"));
+
+        // Noise
+        Json* noise_json = json_object_get(scenario_json, "noise");
+        const int noise_width = (int)json_object_get_number(noise_json, "width");
+        const int noise_height = (int)json_object_get_number(noise_json, "height");
+        scenario->noise = noise_init(noise_width, noise_height);
+
+        Json* noise_map_json = json_object_get(noise_json, "map");
+        Json* noise_forest_json = json_object_get(noise_json, "forest");
+        for (size_t index = 0; index < (size_t)(noise_width * noise_height); index++) {
+            scenario->noise->map[index] = (uint8_t)json_array_get_number(noise_map_json, index);
+            scenario->noise->forest[index] = (uint8_t)json_array_get_number(noise_forest_json, index);
+        }
+
+        // Init map
+        map_init(scenario->map, map_type, scenario->noise->width, scenario->noise->height);
+        scenario_bake_map(scenario, false);
+
+        // Decorations
+        Json* decorations_json = json_array();
+        for (size_t index = 0; index < decorations_json->array.length; index++) {
+            Json* decoration_json = json_array_get(decorations_json, index);
+            uint16_t decoration_hframe = (uint16_t)json_object_get_number(decoration_json, "hframe");
+            ivec2 cell = json_to_ivec2(json_object_get(decoration_json, "cell"));
+            scenario->map.cells[CELL_LAYER_GROUND][cell.x + (cell.y * noise_width)] = (Cell) {
+                .type = CELL_DECORATION,
+                .decoration_hframe = decoration_hframe
+            };
+        }
 
         // Player spawn
         scenario->player_spawn = json_to_ivec2(json_object_get(scenario_json, "player_spawn"));
@@ -577,6 +562,13 @@ Scenario* scenario_open_file(const char* json_path, std::string* map_short_path,
             entity.player_id = (uint8_t)json_object_get_number(entity_json, "player_id");
             entity.gold_held = (uint32_t)json_object_get_number(entity_json, "gold_held");
             entity.cell = json_to_ivec2(json_object_get(entity_json, "cell"));
+
+            // Set map cell
+            const EntityData& entity_data = entity_get_data(entity.type);
+            map_set_cell_rect(scenario->map, entity_data.cell_layer, entity.cell, entity_data.cell_size, (Cell) {
+                .type = CELL_UNIT,
+                .id = (EntityId)scenario->entity_count
+            });
 
             scenario->entities[scenario->entity_count] = entity;
             scenario->entity_count++;

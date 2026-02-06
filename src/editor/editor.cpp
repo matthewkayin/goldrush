@@ -127,7 +127,6 @@ struct EditorState {
 
     Scenario* scenario;
     std::string scenario_path;
-    std::string scenario_map_short_path;
     std::string scenario_script_short_path;
     bool scenario_is_saved;
     UI ui;
@@ -1916,7 +1915,6 @@ static void SDLCALL editor_save_callback(void* /*user_data*/, const char* const*
 
 void editor_set_scenario_paths_to_defaults() {
     state.scenario_path = "";
-    state.scenario_map_short_path = "map.dat";
     state.scenario_script_short_path = "script.lua";
 }
 
@@ -1925,7 +1923,7 @@ void editor_save(const char* path) {
     if (!string_ends_with(full_path, ".json")) {
         full_path += ".json";
     }
-    bool success = scenario_save_file(state.scenario, full_path.c_str(), state.scenario_map_short_path.c_str(), state.scenario_script_short_path.c_str());
+    bool success = scenario_save_file(state.scenario, full_path.c_str(), state.scenario_script_short_path.c_str());
     if (success) {
         state.scenario_path = full_path;
         state.scenario_is_saved = true;
@@ -1944,9 +1942,8 @@ static void SDLCALL editor_open_callback(void* /*user_data*/, const char* const*
         return;
     }
 
-    std::string map_short_path;
     std::string script_short_path;
-    Scenario* opened_scenario = scenario_open_file(*filelist, &map_short_path, &script_short_path);
+    Scenario* opened_scenario = scenario_open_file(*filelist, &script_short_path);
     if (opened_scenario == NULL) {
         return;
     }
@@ -1954,7 +1951,6 @@ static void SDLCALL editor_open_callback(void* /*user_data*/, const char* const*
     editor_free_current_document();
     state.scenario = opened_scenario;
     state.scenario_path = std::string(*filelist);
-    state.scenario_map_short_path = map_short_path;
     state.scenario_script_short_path = script_short_path;
     state.scenario_is_saved = true;
 }
