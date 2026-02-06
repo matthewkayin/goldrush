@@ -18,7 +18,6 @@ local BUILDER_MODE_BUILDING_BUNKER = 4
 local BUILDER_MODE_RELEASED = 5
 
 local has_sent_reactive_harass = false
-local has_done_second_harassment = false
 local cached_bot_should_produce = false
 local has_finished_opener = false
 local is_match_over = false
@@ -26,23 +25,21 @@ local builder_state1 = {}
 local builder_state2 = {}
 local harassable_goldmines = {
     {
-        goldmine = scenario.constants.GOLDMINE1,
-        spawn_cell = scenario.constants.HARASS_SPAWN_CELL1
+        goldmine_id = scenario.constants.GOLDMINE2,
+        spawn_cell = scenario.constants.HARASS_SPAWN_CELL2,
+        has_harassed_player_at_location = false
     },
     {
-        goldmine = scenario.constants.GOLDMINE2,
-        spawn_cell = scenario.constants.HARASS_SPAWN_CELL2
+        goldmine_id = scenario.constants.GOLDMINE3,
+        spawn_cell = scenario.constants.HARASS_SPAWN_CELL3,
+        has_harassed_player_at_location = false
     },
     {
-        goldmine = scenario.constants.GOLDMINE3,
-        spawn_cell = scenario.constants.HARASS_SPAWN_CELL3
+        goldmine_id = scenario.constants.GOLDMINE4,
+        spawn_cell = scenario.constants.HARASS_SPAWN_CELL4,
+        has_harassed_player_at_location = false
     }
 }
-
--- TODO: 
--- - harass the player only once and do it always at their new base
--- - reduce how many units the enemy makes because it's a little unfair. maybe give them a longer macro cooldown?
--- - also remember to test scenario 1 again bc it's def broken
 
 function scenario_init()
     builder_state1 = builder_state_init(scenario.constants.HALL_BUILDER1, scenario.constants.BUNKER_CELL1)
@@ -141,7 +138,14 @@ function scenario_update()
         local player_is_attacking_base1 = scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.HALL_CELL1, HARASS_TRIGGER_DISTANCE)
         local player_is_attacking_base2 = scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.HALL_CELL2, HARASS_TRIGGER_DISTANCE)
         if player_is_attacking_base1 or player_is_attacking_base2 then
-            harass_goldmine(1)
+            local params = {}
+            if player_is_attacking_base1 then
+                params.spawn_cell = scenario.constants.HARASS_SPAWN_CELL1_1
+            else
+                params.spawn_cell = scenario.constants.HARASS_SPAWN_CELL1_2
+            end
+            params.goldmine_id = scenario.constants.GOLDMINE1
+            harass_goldmine(params)
             has_sent_reactive_harass = true
         end
 
@@ -163,19 +167,14 @@ function scenario_update()
     end
 
     -- Bot should harass
-    if not has_done_second_harassment and scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.HALL) >= 2 then
-        local goldmine_number_to_harass = nil
-        if scenario.entity_get_player_who_controls_goldmine(scenario.constants.GOLDMINE2) == scenario.PLAYER_ID then
-            goldmine_number_to_harass = 2
-        elseif scenario.entity.entity_get_player_who_controls_goldmine(scenario.constants.GOLDMINE3) == scenario.PLAYER_ID then
-            goldmine_number_to_harass = 3
-        end
-        if goldmine_number_to_harass then
+    for harass_index=1,#harassable_goldmines do
+        if not harassable_goldmines[harass_index].has_harassed_player_at_location and
+                scenario.entity_get_player_who_controls_goldmine(harassable_goldmines[harass_index].goldmine_id) == scenario.PLAYER_ID then
             actions.run(function ()
                 actions.wait(60.0 * 1.0)
-                harass_goldmine(goldmine_number_to_harass)
+                harass_goldmine(harassable_goldmines[harass_index])
             end)
-            has_done_second_harassment = true
+            harassable_goldmines[harass_index].has_harassed_player_at_location = true
         end
     end
 
@@ -282,14 +281,14 @@ function should_bot_produce()
         has_finished_opener
 end
 
-function harass_goldmine(harassable_goldmine_index)
-    local goldmine = scenario.entity_get_info(harassable_goldmines[harassable_goldmine_index].goldmine)
+function harass_goldmine(params)
+    local goldmine = scenario.entity_get_info(params.goldmine_id)
     if not goldmine then
         error("Goldmine constant does not point to a valid entity")
     end
     squad_util.spawn_harass_squad({
         player_id = ENEMY_PLAYER_ID,
-        spawn_cell = harassable_goldmines[harassable_goldmine_index].spawn_cell,
+        spawn_cell = params.spawn_cell,
         target_cell = goldmine.cell,
         entity_types = {
             scenario.entity_type.BANDIT,
