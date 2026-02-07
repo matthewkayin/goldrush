@@ -12,6 +12,7 @@ STATIC_ASSERT(sizeof(int) == sizeof(int32_t));
 
 #if defined(_WIN32)
     #define PLATFORM_WIN32 1
+    #define GOLD_PLATFORM_STR "WINDOWS"
     #define WIN32_LEAN_AND_MEAN
     #define SDL_MAIN_HANDLED
     #ifndef _WIN64
@@ -19,22 +20,25 @@ STATIC_ASSERT(sizeof(int) == sizeof(int32_t));
     #endif
 #elif __APPLE__
     #define PLATFORM_MACOS 1
+    #define GOLD_PLATFORM_STR "MACOS"
 #elif defined(__linux__) || defined(__gnu_linux__)
     #define PLATFORM_LINUX 1
+    #define GOLD_PLATFORM_STR "LINUX"
 #endif
 
 #define APP_NAME "Gold Rush"
 #ifdef RELEASE_VERSION
     #define APP_VERSION RELEASE_VERSION
+    #define GOLD_BUILD_TYPE_STR "Release"
 #else
     #define APP_VERSION "dev"
     #define GOLD_DEBUG
+    #define GOLD_BUILD_TYPE_STR "Debug"
 #endif
 
 #ifdef GOLD_DEBUG
     // #define GOLD_RAND_SEED 1768947521
     // #define GOLD_TEST_MODE_SEED 934781452
-    // #define GOLD_DEBUG_DESYNC
     // #define TRACY_ENABLE
 #endif
 

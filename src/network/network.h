@@ -22,6 +22,7 @@ uint8_t network_get_player_count();
 
 void network_service();
 bool network_poll_events(NetworkEvent* event);
+void network_cleanup_event(const NetworkEvent& event);
 void network_disconnect();
 
 void network_search_lobbies(const char* query);

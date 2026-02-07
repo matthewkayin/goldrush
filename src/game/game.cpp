@@ -4,7 +4,6 @@
 #include "core/logger.h"
 #include "match/lcg.h"
 #include "profile/profile.h"
-#include "editor/editor.h"
 #include <ctime>
 
 GameState game_init() {
@@ -52,10 +51,6 @@ void game_set_mode(GameState& state, GameSetModeParams params) {
 
     #ifdef GOLD_STEAM
         if (params.menu.steam_invite_id != 0) {
-            network_set_backend(NETWORK_BACKEND_STEAM);
-            CSteamID steam_id;
-            steam_id.SetFromUint64(params.menu.steam_invite_id);
-            network_steam_accept_invite(steam_id);
         }
     #endif
     }
@@ -170,14 +165,6 @@ void game_update(GameState& state) {
                     int lcg_seed = (int)time(NULL);
                 #endif
 
-                // Generate noise
-                MapType map_type = (MapType)network_get_match_setting(MATCH_SETTING_MAP_TYPE);
-                MapSize map_size = (MapSize)network_get_match_setting(MATCH_SETTING_MAP_SIZE);
-                int noise_lcg_seed = lcg_seed;
-                uint64_t map_seed = (uint64_t)noise_lcg_seed;
-                uint64_t forest_seed = (uint64_t)lcg_rand(&noise_lcg_seed);
-                NoiseGenParams params = noise_create_noise_gen_params(map_type, map_size, map_seed, forest_seed);
-                Noise* noise = noise_generate(params);
 
                 network_begin_loading_match(lcg_seed, noise);
 

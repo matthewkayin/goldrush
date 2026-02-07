@@ -1,5 +1,26 @@
 #include "desync.h"
 
+#include "core/filesystem.h"
+#include "core/logger.h"
+#include "profile/profile.h"
+#include <algorithm>
+#include <cstdlib>
+
+struct DesyncState {
+    uint32_t a;
+    uint32_t b;
+
+#ifdef GOLD_DEBUG
+    bool desync_debug = false;
+    uint8_t* buffer;
+    size_t buffer_size;
+    size_t buffer_capacity;
+
+    std::string desync_folder_path;
+#endif
+};
+static DesyncState state;
+
 STATIC_ASSERT(sizeof(Tile) == 16ULL);
 STATIC_ASSERT(sizeof(Cell) == 8ULL);
 STATIC_ASSERT(sizeof(Animation) == 24ULL);
@@ -18,33 +39,16 @@ STATIC_ASSERT(sizeof(BotSquadType) == 4ULL);
 STATIC_ASSERT(sizeof(BotDesiredSquad) == 92ULL);
 STATIC_ASSERT(sizeof(BotBaseInfo) == 12ULL);
 
-#include "core/filesystem.h"
-#include "core/logger.h"
-#include "profile/profile.h"
-#include <algorithm>
-#include <cstdlib>
-
-struct DesyncState {
-    uint32_t a;
-    uint32_t b;
-
-#ifdef GOLD_DEBUG_DESYNC
-    uint8_t* buffer;
-    size_t buffer_size;
-    size_t buffer_capacity;
-
-    std::string desync_folder_path;
-#endif
-};
-static DesyncState state;
-
-#ifdef GOLD_DEBUG_DESYNC
+#ifdef GOLD_DEBUG
 
 std::string desync_get_filepath(uint32_t frame) {
     return state.desync_folder_path + "/" + std::to_string(frame) + ".desync";
 }
 
 bool desync_init(const char* desync_foldername) {
+    state.desync_debug = true;
+    state.desync_folder_path = filesystem_get_data_path() + desync_foldername;
+
     state.buffer_size = 0;
     state.buffer_capacity = 1024ULL * 1024ULL;
     state.buffer = (uint8_t*)malloc(state.buffer_capacity);
@@ -52,14 +56,20 @@ bool desync_init(const char* desync_foldername) {
         return false;
     }
 
-    state.desync_folder_path = filesystem_get_data_path() + desync_foldername;
     SDL_CreateDirectory(state.desync_folder_path.c_str());
     return true;
 }
 
 void desync_quit() {
+    if (!state.desync_debug) {
+        return;
+    }
     SDL_RemovePath(state.desync_folder_path.c_str());
     free(state.buffer);
+}
+
+bool desync_is_debug_enabled() {
+    return state.desync_debug;
 }
 
 #endif
@@ -80,7 +90,8 @@ uint32_t desync_checksum_compute_result(uint32_t a, uint32_t b) {
 }
 
 void desync_write(uint8_t* data, size_t length) {
-    #ifdef GOLD_DEBUG_DESYNC
+#ifdef GOLD_DEBUG
+    if (state.desync_debug) {
         if (state.buffer_size + length > state.buffer_capacity) {
             uint8_t* temp = state.buffer;
             state.buffer_capacity *= 2;
@@ -91,7 +102,8 @@ void desync_write(uint8_t* data, size_t length) {
 
         memcpy(state.buffer + state.buffer_size, data, length);
         state.buffer_size += length;
-    #endif
+    }
+#endif
 
     for (size_t index = 0; index < length; index++) {
         desync_checksum_add_byte(&state.a, &state.b, data[index]);
@@ -135,18 +147,12 @@ void desync_write_unordered_map(const std::unordered_map<T, U>& map) {
     }
 }
 
-#ifdef GOLD_DEBUG_DESYNC
 uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot bots[MAX_PLAYERS], uint32_t frame) {
-#else
-uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot bots[MAX_PLAYERS]) {
-#endif
-    GOLD_PROFILE_SCOPE;
-
     desync_checksum_init(&state.a, &state.b);
 
-    #ifdef GOLD_DEBUG_DESYNC
-        state.buffer_size = 0;
-    #endif
+#ifdef GOLD_DEBUG
+    state.buffer_size = 0;
+#endif
 
     // LCG seed
     desync_write_value<int>(match_state.lcg_seed);
@@ -306,7 +312,8 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot 
     }
 
     // Write to desync file
-    #ifdef GOLD_DEBUG_DESYNC
+#ifdef GOLD_DEBUG
+    if (state.desync_debug) {
         GOLD_ASSERT(state.buffer_size != 0);
         std::string desync_filepath = desync_get_filepath(frame);
         FILE* desync_file = fopen(desync_filepath.c_str(), "wb");
@@ -317,13 +324,23 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot 
             fwrite(state.buffer, state.buffer_size, 1, desync_file);
             fclose(desync_file);
         }
-    #endif
+    }
+#endif
 
     // Return checksum
     return desync_checksum_compute_result(state.a, state.b);
 }
 
-#ifdef GOLD_DEBUG_DESYNC
+uint32_t desync_get_checksum_frequency() {
+#ifdef GOLD_DEBUG
+    if (state.desync_debug) {
+        return 4U;
+    }
+#endif
+    return 60U;
+}
+
+#ifdef GOLD_DEBUG
 
 uint32_t desync_compute_buffer_checksum(uint8_t* data, size_t length) {
     uint32_t a, b;

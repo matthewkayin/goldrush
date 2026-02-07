@@ -132,13 +132,6 @@ static const int HEALTHBAR_PADDING = 4;
 // Rally flag offset
 static const ivec2 RALLY_FLAG_OFFSET = ivec2(-4, -15);
 
-// Desync
-#ifdef GOLD_DEBUG_DESYNC
-    static const uint32_t DESYNC_FREQUENCY = 4U;
-#else
-    static const uint32_t DESYNC_FREQUENCY = 60U;
-#endif
-
 MatchShellState* match_shell_base_init() {
     MatchShellState* state = new MatchShellState();
 
@@ -553,7 +546,7 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
             match_shell_compare_checksums(state, state->checksums[event.checksum.player_id].size() - 1);
             break;
         }
-    #ifdef GOLD_DEBUG_DESYNC
+    #ifdef GOLD_DEBUG
         case NETWORK_EVENT_SERIALIZED_FRAME: {
             match_shell_handle_serialized_frame(event.serialized_frame.state_buffer, event.serialized_frame.state_buffer_length);
             free(event.serialized_frame.state_buffer);
@@ -1062,12 +1055,8 @@ void match_shell_update(MatchShellState* state) {
     }
 
     // Checksum
-    if (!state->replay_mode && state->match_timer % DESYNC_FREQUENCY == 0) {
-        #ifdef GOLD_DEBUG_DESYNC
-            uint32_t checksum = desync_compute_match_checksum(state->match_state, state->bots, state->match_timer);
-        #else
-            uint32_t checksum = desync_compute_match_checksum(state->match_state, state->bots);
-        #endif
+    if (!state->replay_mode && state->match_timer % desync_get_checksum_frequency() == 0) {
+        uint32_t checksum = desync_compute_match_checksum(state->match_state, state->bots, state->match_timer);
         network_send_checksum(checksum);
         state->checksums[network_get_player_id()].push_back(checksum);
         match_shell_compare_checksums(state, state->checksums[network_get_player_id()].size() - 1);
@@ -2921,8 +2910,6 @@ bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t fram
 }
 
 void match_shell_compare_checksums(MatchShellState* state, uint32_t frame) {
-    GOLD_PROFILE_SCOPE;
-
     // If we haven't gotten to this frame yet, hen we can't say for sure that it's out of sync
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_READY) {
@@ -2933,12 +2920,16 @@ void match_shell_compare_checksums(MatchShellState* state, uint32_t frame) {
         }
     }
 
-    if (match_shell_are_checksums_out_of_sync(state, frame)) {
+    const bool out_of_sync = match_shell_are_checksums_out_of_sync(state, frame);
+    if (out_of_sync) {
         log_error("DESYNC on frame %u", frame);
 
         state->mode = MATCH_SHELL_MODE_DESYNC;
+    }
 
-        #ifdef GOLD_DEBUG_DESYNC
+#ifdef GOLD_DEBUG
+    if (desync_is_debug_enabled()) {
+        if (out_of_sync) {
             size_t state_buffer_length;
             uint8_t* state_buffer = desync_read_serialized_frame(frame, &state_buffer_length);
             if (state_buffer == NULL) {
@@ -2949,17 +2940,14 @@ void match_shell_compare_checksums(MatchShellState* state, uint32_t frame) {
             network_send_serialized_frame(state_buffer, state_buffer_length);
             free(state_buffer);
             log_info("DESYNC Sent serialized frame with size %llu.", state_buffer_length);
-        #endif
-#ifdef GOLD_DEBUG_DESYNC
-    } else {
-        desync_delete_serialized_frame(frame);
-    }
-#else
+        } else {
+            desync_delete_serialized_frame(frame);
+        }
     }
 #endif
 }
 
-#ifdef GOLD_DEBUG_DESYNC
+#ifdef GOLD_DEBUG
 
 void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t incoming_state_buffer_length) {
         uint32_t frame;

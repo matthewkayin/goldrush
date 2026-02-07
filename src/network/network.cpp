@@ -367,6 +367,12 @@ bool network_poll_events(NetworkEvent* event) {
     return true;
 }
 
+void network_cleanup_event(const NetworkEvent& event) {
+    if (event.type == NETWORK_EVENT_MATCH_LOAD) {
+        free(event.match_load.noise);
+    }
+}
+
 void network_disconnect() {
     if (state.backend == NETWORK_BACKEND_LAN && state.lan_scanner != ENET_SOCKET_NULL) {
         network_lan_scanner_destroy();
