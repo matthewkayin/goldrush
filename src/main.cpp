@@ -46,6 +46,10 @@ struct GameState {
     GameMode mode;
     MenuState* menu_state = nullptr;
     MatchShellState* match_shell_state = nullptr;
+
+#ifdef GOLD_DEBUG
+    Bot test_bot;
+#endif
 };
 static GameState state;
 
@@ -53,6 +57,10 @@ bool gold_get_argv(int argc, char** argv, const char* key, const char** result);
 bool game_is_running();
 void game_set_mode_match(int lcg_seed, Noise* noise);
 void game_set_mode_replay(const char* replay_path);
+
+#ifdef GOLD_DEBUG
+void game_test_update();
+#endif
 
 int gold_main(int argc, char** argv) {
     // Lua doc
@@ -76,7 +84,7 @@ int gold_main(int argc, char** argv) {
     std::string desync_foldername = "desync";
 
     logfile_path = filesystem_get_timestamp_str() + ".log";
-    char* logfile_path_value;
+    const char* logfile_path_value;
     if (gold_get_argv(argc, argv, "--logfile", &logfile_path_value)) {
         logfile_path = logfile_path_value;
         desync_foldername = "desync_" + logfile_path.substr(0, logfile_path.find('.'));
@@ -156,14 +164,14 @@ int gold_main(int argc, char** argv) {
 #ifdef GOLD_DEBUG
     // Launch mode
     state.launch_mode = LAUNCH_MODE_GAME;
-    char* launch_mode_str;
+    const char* launch_mode_str;
     if (gold_get_argv(argc, argv, "--launch-mode", &launch_mode_str)) {
         if (strcmp(launch_mode_str, "test-host") == 0) {
-            state.launch_mode == LAUNCH_MODE_TEST_HOST;
+            state.launch_mode = LAUNCH_MODE_TEST_HOST;
         } else if (strcmp(launch_mode_str, "test-join") == 0) {
-            state.launch_mode == LAUNCH_MODE_TEST_JOIN;
+            state.launch_mode = LAUNCH_MODE_TEST_JOIN;
         } else if (strcmp(launch_mode_str, "editor") == 0) {
-            state.launch_mode == LAUNCH_MODE_EDITOR;
+            state.launch_mode = LAUNCH_MODE_EDITOR;
         } else {
             log_error("Launch mdoe %s not recognized.", launch_mode_str);
             return 1;
@@ -175,7 +183,6 @@ int gold_main(int argc, char** argv) {
     if ((state.launch_mode == LAUNCH_MODE_TEST_HOST || state.launch_mode == LAUNCH_MODE_TEST_JOIN) && !desync_debug) {
         debug_playback_speed = 4;
     }
-    Bot test_bot;
 
     if (state.launch_mode == LAUNCH_MODE_EDITOR) {
         log_info("Launching as scenario editor.");
@@ -275,6 +282,13 @@ int gold_main(int argc, char** argv) {
                 network_cleanup_event(event);
             }
 
+            // Test mode update
+        #ifdef GOLD_DEBUG
+            if (state.launch_mode == LAUNCH_MODE_TEST_HOST || state.launch_mode == LAUNCH_MODE_TEST_JOIN) {
+                game_test_update();
+            }
+        #endif
+
             // Update
             switch (state.mode) {
                 case GAME_MODE_MENU: {
@@ -326,6 +340,7 @@ int gold_main(int argc, char** argv) {
                         }
                     #endif
 
+                        sound_stop_all();
                         state.menu_state = menu_init();
                         delete state.match_shell_state;
                         state.mode = GAME_MODE_MENU;
@@ -364,7 +379,22 @@ int gold_main(int argc, char** argv) {
         // Render
         render_prepare_frame();
 
-        game_render(state);
+        switch (state.mode) {
+            case GAME_MODE_MENU: {
+                menu_render(state.menu_state);
+                break;
+            }
+            case GAME_MODE_MATCH: {
+                match_shell_render(state.match_shell_state);
+                break;
+            }
+        #ifdef GOLD_DEBUG
+            case GAME_MODE_EDITOR: {
+                editor_render();
+                break;
+            }
+        #endif
+        }
 
         #ifdef GOLD_DEBUG
             if (should_render_debug_info) {
@@ -420,7 +450,7 @@ int gold_main(int argc, char** argv) {
 
     // Cleanup the game state
 #ifdef GOLD_DEBUG
-    if (state.launch_mode == GAME_MODE_EDITOR) {
+    if (state.launch_mode == LAUNCH_MODE_EDITOR) {
         editor_quit();
     }
 #endif
@@ -493,6 +523,21 @@ void game_set_mode_match(int lcg_seed, Noise* noise) {
     state.match_shell_state = match_shell_init(lcg_seed, noise);
     delete state.menu_state;
     state.mode = GAME_MODE_MATCH;
+
+#ifdef GOLD_DEBUG
+    if (state.launch_mode == LAUNCH_MODE_TEST_HOST || state.launch_mode == LAUNCH_MODE_TEST_JOIN) {
+    #ifdef GOLD_TEST_SEED
+        int test_lcg_seed = GOLD_TEST_SEED
+    #else
+        int test_lcg_seed = rand();
+    #endif
+        log_debug("TEST seed set to %u", test_lcg_seed);
+        BotConfig bot_config = bot_config_init_from_difficulty(DIFFICULTY_HARD);
+        bot_config.opener = BOT_OPENER_TECH_FIRST;
+        bot_config.preferred_unit_comp = bot_config_roll_preferred_unit_comp(&test_lcg_seed);
+        state.test_bot = bot_init(state.match_shell_state->match_state, network_get_player_id(), bot_config);
+    }
+#endif
 }
 
 void game_set_mode_replay(const char* replay_path) {
@@ -504,6 +549,127 @@ void game_set_mode_replay(const char* replay_path) {
     delete state.menu_state;
     state.mode = GAME_MODE_MATCH;
 }
+
+#ifdef GOLD_DEBUG
+
+void game_test_update() {
+    if (state.mode == GAME_MODE_MENU) {
+        switch (state.menu_state->mode) {
+        #ifndef GOLD_STEAM
+            case MENU_MODE_USERNAME: {
+                state.menu_state->username = state.launch_mode == LAUNCH_MODE_TEST_HOST 
+                    ? "Burr" 
+                    : "Hamilton";
+                network_set_username(state.menu_state->username.c_str());
+                menu_set_mode(state.menu_state, MENU_MODE_MAIN);
+                break;
+            }
+        #endif
+            case MENU_MODE_MAIN: {
+            #ifdef GOLD_STEAM
+                network_set_backend(NETWORK_BACKEND_STEAM);
+                menu_set_mode(state.menu_state, MENU_MODE_LOBBYLIST);
+            #else
+                menu_set_mode_local_network_lobbylist(state.menu_state);
+            #endif
+                break;
+            }
+            case MENU_MODE_LOBBYLIST: {
+                if (state.launch_mode == LAUNCH_MODE_TEST_HOST) {
+                    menu_set_mode(state.menu_state, MENU_MODE_CREATE_LOBBY);
+                } else if (state.launch_mode == LAUNCH_MODE_TEST_JOIN) {
+                    if (network_get_lobby_count() == 0) {
+                        network_search_lobbies("");
+                    } else {
+                        network_join_lobby(network_get_lobby(0).connection_info);
+                        menu_set_mode(state.menu_state, MENU_MODE_CONNECTING);
+                    }
+                }
+                break;
+            }
+            case MENU_MODE_CREATE_LOBBY: {
+                network_open_lobby(state.menu_state->lobby_name.c_str(), (NetworkLobbyPrivacy)state.menu_state->lobby_privacy);
+                menu_set_mode(state.menu_state, MENU_MODE_CONNECTING);
+                break;
+            }
+            case MENU_MODE_LOBBY: {
+                if (state.launch_mode == LAUNCH_MODE_TEST_HOST) {
+                    if (network_get_match_setting((uint8_t)MATCH_SETTING_MAP_SIZE) != MAP_SIZE_MEDIUM) {
+                        network_set_match_setting((uint8_t)MATCH_SETTING_MAP_SIZE, (uint8_t)MAP_SIZE_MEDIUM);
+                        break;
+                    }
+                    if (network_get_match_setting((uint8_t)MATCH_SETTING_TEAMS) != TEAMS_ENABLED) {
+                        network_set_match_setting((uint8_t)MATCH_SETTING_TEAMS, (uint8_t)TEAMS_ENABLED);
+                        break;
+                    }
+                    if (network_get_match_setting((uint8_t)MATCH_SETTING_DIFFICULTY) != DIFFICULTY_HARD) {
+                        network_set_match_setting((uint8_t)MATCH_SETTING_DIFFICULTY, (uint8_t)DIFFICULTY_HARD);
+                        break;
+                    }
+                    if (network_get_player_count() == 1) {
+                        // wait for player 2
+                        break;
+                    }
+                    if (network_get_player_count() < MAX_PLAYERS) {
+                        network_add_bot();
+                        break;
+                    }
+                    if (network_get_player(2).team != 0) {
+                        network_set_player_team(2, 0);
+                        break;
+                    }
+                    if (network_get_player(3).team != 1) {
+                        network_set_player_team(3, 1);
+                        break;
+                    }
+                    if (network_get_player(1).status == NETWORK_PLAYER_STATUS_READY) {
+                        menu_set_mode(state.menu_state, MENU_MODE_LOAD_MATCH);
+                    }
+                } else if (state.launch_mode == LAUNCH_MODE_TEST_JOIN) {
+                    if (network_get_player(network_get_player_id()).team == 0 &&
+                            network_get_match_setting((uint8_t)MATCH_SETTING_TEAMS) == TEAMS_ENABLED) {
+                        network_set_player_team(network_get_player_id(), 1);
+                        break;
+                    }
+                    if (network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_NOT_READY) {
+                        network_set_player_ready(true);
+                    }
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    } else if (state.mode == GAME_MODE_MATCH) {
+        if (state.match_shell_state->mode == MATCH_SHELL_MODE_NOT_STARTED ||
+                state.match_shell_state->mode == MATCH_SHELL_MODE_LEAVE_MATCH ||
+                state.match_shell_state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM ||
+                state.match_shell_state->mode == MATCH_SHELL_MODE_DESYNC) {
+            return;
+        }
+
+        if (state.match_shell_state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY || 
+                state.match_shell_state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT) {
+            match_shell_leave_match(state.match_shell_state, false);
+        } else if (state.match_shell_state->match_timer % TURN_DURATION == 0 && 
+                state.match_shell_state->match_state.players[network_get_player_id()].active &&
+                state.match_shell_state->input_queue.empty()) {
+            uint32_t turn_number = state.match_shell_state->match_timer / TURN_DURATION;
+            MatchInput input = turn_number % TURN_OFFSET == 0
+                    ? bot_get_turn_input(state.match_shell_state->match_state, state.test_bot, state.match_shell_state->match_timer)
+                    : (MatchInput) { .type = MATCH_INPUT_NONE };
+            state.match_shell_state->input_queue.push_back(input);
+
+            // Check for surrender
+            if (bot_should_surrender(state.match_shell_state->match_state, state.test_bot, state.match_shell_state->match_timer)) {
+                network_send_chat("gg");
+                match_shell_leave_match(state.match_shell_state, false);
+            }
+        }
+    }
+}
+
+#endif
 
 // APP ENTRY
 

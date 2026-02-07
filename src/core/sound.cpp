@@ -11,6 +11,7 @@
 
 #define SOUND_AUDIO_CHANNEL_COUNT 2
 #define SOUND_VOICE_COUNT 32
+#define SOUND_MIX_BUFFER_SIZE 4096
 
 struct SoundParams {
     const char* path;
@@ -190,8 +191,9 @@ static void sound_sdl_audio_callback(void* /*user_data*/, SDL_AudioStream* strea
     const int BYTES_PER_FRAME = SOUND_AUDIO_CHANNEL_COUNT * sizeof(float);
 
     int requested_frames = additional_amount / BYTES_PER_FRAME;
-    float mix_buffer[requested_frames * SOUND_AUDIO_CHANNEL_COUNT];
+    float mix_buffer[SOUND_MIX_BUFFER_SIZE * SOUND_AUDIO_CHANNEL_COUNT];
     memset(mix_buffer, 0, sizeof(mix_buffer));
+    GOLD_ASSERT(requested_frames * SOUND_AUDIO_CHANNEL_COUNT < SOUND_MIX_BUFFER_SIZE);
 
     for (int voice_index = 0; voice_index < SOUND_VOICE_COUNT; voice_index++) {
         SoundVoice* voice = &state.voices[voice_index];
