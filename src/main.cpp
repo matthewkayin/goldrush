@@ -88,6 +88,9 @@ int gold_main(int argc, char** argv) {
     if (gold_get_argv(argc, argv, "--logfile", &logfile_path_value)) {
         logfile_path = logfile_path_value;
         desync_foldername = "desync_" + logfile_path.substr(0, logfile_path.find('.'));
+
+        std::string replay_filename = logfile_path.substr(0, logfile_path.find('.')) + ".rep";
+        replay_set_filename(replay_filename.c_str());
     }
 #endif
     filesystem_create_required_folders();
@@ -158,14 +161,11 @@ int gold_main(int argc, char** argv) {
     state.match_shell_state = nullptr;
     state.menu_state = nullptr;
 
-#ifdef GOLD_STEAM
-#endif
-
-#ifdef GOLD_DEBUG
     // Launch mode
+#ifdef GOLD_DEBUG
     state.launch_mode = LAUNCH_MODE_GAME;
     const char* launch_mode_str;
-    if (gold_get_argv(argc, argv, "--launch-mode", &launch_mode_str)) {
+    if (gold_get_argv(argc, argv, "--launch", &launch_mode_str)) {
         if (strcmp(launch_mode_str, "test-host") == 0) {
             state.launch_mode = LAUNCH_MODE_TEST_HOST;
         } else if (strcmp(launch_mode_str, "test-join") == 0) {

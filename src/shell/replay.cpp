@@ -14,13 +14,15 @@ static const uint8_t REPLAY_BLOCK_TYPE_INPUTS = 0;
 static const uint8_t REPLAY_BLOCK_TYPE_CHAT = 1 << 4;
 
 #ifdef GOLD_DEBUG
-    static char arg_replay_file[128];
-    static bool use_arg_replay_file = false;
 
-    void replay_debug_set_file_name(char* argv) {
-        strcpy(arg_replay_file, argv);
-        use_arg_replay_file = true;
-    }
+static char arg_replay_file[128];
+static bool use_arg_replay_file = false;
+
+void replay_set_filename(const char* filename) {
+    strcpy(arg_replay_file, filename);
+    use_arg_replay_file = true;
+}
+
 #endif
 
 FILE* replay_file_open(int32_t lcg_seed, MapType map_type, const Noise* noise, MatchPlayer players[MAX_PLAYERS]) {

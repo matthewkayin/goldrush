@@ -13,7 +13,7 @@ struct ReplayChatMessage {
 };
 
 #ifdef GOLD_DEBUG
-    void replay_debug_set_file_name(char* argv);
+void replay_set_filename(const char* argv);
 #endif
 FILE* replay_file_open(int32_t lcg_seed, MapType map_type, const Noise* noise, MatchPlayer players[MAX_PLAYERS]);
 void replay_file_close(FILE* file);
