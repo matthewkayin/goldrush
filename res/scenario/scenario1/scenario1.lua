@@ -1,5 +1,6 @@
 local actions = require("actions")
 local objectives = require("objectives")
+local squad_util = require("squad_util")
 
 local OBJECTIVE_FIND_GOLDMINE = "Find a Goldmine"
 local OBJECTIVE_BUILD_HALL = "Build a Town Hall"
@@ -136,15 +137,15 @@ function on_objectives_complete()
             objectives.announce_objectives_complete()
 
             -- Bandit attack
-            local squad_entities = {}
-            table.insert(squad_entities, scenario.entity_type.BANDIT)
-            table.insert(squad_entities, scenario.entity_type.BANDIT)
-            table.insert(squad_entities, scenario.entity_type.BANDIT)
-            bandit_attack_squad_id = scenario.bot_spawn_squad({
+            bandit_attack_squad_id = squad_util.spawn_harass_squad({
                 player_id = ENEMY_BANDITS_PLAYER_ID,
                 spawn_cell = scenario.constants.BANDIT_ATTACK_SPAWN_CELL,
                 target_cell = scenario.constants.BANDIT_ATTACK_TARGET_CELL,
-                entities = squad_entities
+                entity_types = {
+                    scenario.entity_type.BANDIT,
+                    scenario.entity_type.BANDIT,
+                    scenario.entity_type.BANDIT
+                }
             })
 
             scenario.play_sound(scenario.sound.ALERT_BELL)

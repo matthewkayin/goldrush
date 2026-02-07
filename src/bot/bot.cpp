@@ -3609,9 +3609,13 @@ void bot_reserve_entity(Bot& bot, EntityId entity_id, bool log) {
 
 void bot_release_entity(Bot& bot, EntityId entity_id, bool log) {
     if (log) {
-        log_debug("BOT: release entity %u", entity_id);
+        log_debug("BOT: %u release entity %u", bot.player_id, entity_id);
     }
     GOLD_ASSERT(bot.is_entity_reserved.find(entity_id) != bot.is_entity_reserved.end());
+    if (bot.is_entity_reserved.find(entity_id) != bot.is_entity_reserved.end()) {
+        log_warn("BOT: %u tried to release an unreserved entity.", bot.player_id);
+        return;
+    }
     bot.is_entity_reserved.erase(entity_id);
 }
 

@@ -88,5 +88,8 @@
         "span": "cpp"
     },
     "C_Cpp.errorSquiggles": "enabled",
-    "Lua.completion.autoRequire": false
+    "Lua.completion.autoRequire": false,
+    "Lua.diagnostics.disable": [
+        "lowercase-global"
+    ]
 }

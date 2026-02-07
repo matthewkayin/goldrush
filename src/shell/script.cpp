@@ -550,7 +550,10 @@ void match_shell_script_generate_doc() {
         return;
     }
 
-    fprintf(file, "--- @meta\n");
+    fprintf(file, "--- @meta\n\n");
+
+    fprintf(file, "--- @class scenario\n");
+    fprintf(file, "--- @field constants table\n");
     fprintf(file, "%s = {}\n\n", MODULE_NAME);
 
     fprintf(file, "--- @class ivec2\n");

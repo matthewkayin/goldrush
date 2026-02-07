@@ -489,11 +489,10 @@ int gold_main(int argc, char** argv) {
 bool gold_get_argv(int argc, char** argv, const char* key, const char** result) {
     for (int argn = 1; argn < argc; argn++) {
         if (strcmp(argv[argn], key) == 0) {
-            if (*result != NULL && argn + 1 == argc) {
-                printf("System argument %s requires a value.\n", key);
+            if (result != NULL && argn + 1 == argc) {
                 return false;
             }
-            if (*result != NULL) {
+            if (result != NULL) {
                 *result = argv[argn + 1];
             }
             return true;
