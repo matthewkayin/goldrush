@@ -1205,7 +1205,7 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
     }
 
     uint32_t hall_index = bot_find_hall_index_with_least_nearby_buildings(state, bot.player_id, building_type == ENTITY_BUNKER);
-    log_debug("BOT %u build_building, hall index with least nearby buildings %u", hall_index);
+    log_debug("BOT %u build_building, hall index with least nearby buildings %u", bot.player_id, hall_index);
     if (hall_index == INDEX_INVALID) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
@@ -1224,7 +1224,7 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
         building_location = bot_find_building_location(state, state.entities[hall_index].cell + ivec2(1, 1), entity_get_data(building_type).cell_size);
     }
     if (building_location.x == -1) {
-        log_warn("BOT: building location not found for building type %s", entity_get_data(building_type).name);
+        log_warn("BOT %u: building location not found for building type %s", bot.player_id, entity_get_data(building_type).name);
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
@@ -3612,7 +3612,7 @@ void bot_release_entity(Bot& bot, EntityId entity_id, bool log) {
         log_debug("BOT: %u release entity %u", bot.player_id, entity_id);
     }
     GOLD_ASSERT(bot.is_entity_reserved.find(entity_id) != bot.is_entity_reserved.end());
-    if (bot.is_entity_reserved.find(entity_id) != bot.is_entity_reserved.end()) {
+    if (bot.is_entity_reserved.find(entity_id) == bot.is_entity_reserved.end()) {
         log_warn("BOT: %u tried to release an unreserved entity.", bot.player_id);
         return;
     }

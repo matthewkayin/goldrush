@@ -331,7 +331,7 @@ const char* match_input_type_str(MatchInputType type) {
 }
 
 void match_input_print(char* out_ptr, const MatchInput& input) {
-    out_ptr += sprintf(out_ptr, "%s ", match_input_type_str((MatchInputType)input.type));
+    out_ptr += sprintf(out_ptr, "%s | ", match_input_type_str((MatchInputType)input.type));
     switch (input.type) {
         case MATCH_INPUT_NONE:
             return;

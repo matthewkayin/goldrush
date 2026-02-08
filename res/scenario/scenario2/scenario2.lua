@@ -190,6 +190,7 @@ function builder_state_init(builder_id, bunker_cell)
 end
 
 function builder_state_release(builder_state)
+    scenario.log("builder_state, entity", builder_state.builder_id, " - releasing builder")
     scenario.bot_release_entity(ENEMY_PLAYER_ID, builder_state.builder_id)
     builder_state.mode = BUILDER_MODE_RELEASED
 end
@@ -201,11 +202,13 @@ function builder_state_update(builder_state)
 
     local builder = scenario.entity_get_info(builder_state.builder_id)
     if not builder or builder.health == 0 then
+        scenario.log("builder_state, entity", builder_state.builder_id, " - is dead")
         builder_state_release(builder_state)
         return
     end
 
     if builder_state.mode == BUILDER_MODE_ORDER_HALL and builder.mode == scenario.entity_mode.UNIT_BUILD then
+        scenario.log("builder_state, entity", builder_state.builder_id, " - is now building hall")
         builder_state.mode = BUILDER_MODE_BUILDING_HALL
         builder_state.hall_id = builder.target.id
         return
@@ -214,15 +217,18 @@ function builder_state_update(builder_state)
     if builder_state.mode == BUILDER_MODE_BUILDING_HALL and builder.mode ~= scenario.entity_mode.UNIT_BUILD then
         local hall = scenario.entity_get_info(builder_state.hall_id)
         if not hall or hall.health == 0 then
+            scenario.log("builder_state, entity", builder_state.builder_id, " - hall is nil or dead", hall)
             builder_state_release(builder_state)
             return
         end
 
+        scenario.log("builder_state, entity", builder_state.builder_id, " - begin awaiting gold for bunker")
         builder_state.mode = BUILDER_MODE_WAIT_GOLD_BUNKER
         actions.run(function ()
             while scenario.player_get_gold(ENEMY_PLAYER_ID) < scenario.entity_get_gold_cost(scenario.entity_type.BUNKER) do
                 coroutine.yield()
             end
+            scenario.log("builder_state, entity", builder_state.builder_id, " - queue bunker input")
             scenario.queue_match_input({
                 player_id = ENEMY_PLAYER_ID,
                 type = scenario.match_input_type.BUILD,
@@ -236,6 +242,7 @@ function builder_state_update(builder_state)
     end
 
     if builder_state.mode == BUILDER_MODE_ORDER_BUNKER and builder.mode == scenario.entity_mode.UNIT_BUILD then
+        scenario.log("builder_state, entity", builder_state.builder_id, " - is now building bunker")
         builder_state.mode = BUILDER_MODE_BUILDING_BUNKER
         builder_state.bunker_id = builder.target.id
         return
@@ -244,10 +251,12 @@ function builder_state_update(builder_state)
     if builder_state.mode == BUILDER_MODE_BUILDING_BUNKER and builder.mode ~= scenario.entity_mode.UNIT_BUILD then
         local bunker = scenario.entity_get_info(builder_state.bunker_id)
         if not bunker or bunker.health == 0 then
+            scenario.log("builder_state, entity", builder_state.builder_id, " - bunker is nil or dead", bunker)
             builder_state_release(builder_state)
             return
         end
 
+        scenario.log("builder_state, entity", builder_state.builder_id, " - finished bunker")
         local squad_entity_ids = {}
         table.insert(squad_entity_ids, builder_state.bunker_id)
         for index=1,4 do
