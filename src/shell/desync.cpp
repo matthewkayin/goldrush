@@ -148,7 +148,7 @@ void desync_write_unordered_map(const std::unordered_map<T, U>& map) {
 }
 
 uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot bots[MAX_PLAYERS], uint32_t frame) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
 
     desync_checksum_init(&state.a, &state.b);
 

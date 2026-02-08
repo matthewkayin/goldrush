@@ -667,7 +667,7 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
 }
 
 void match_update(MatchState& state) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
     
     // Update entities
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
@@ -1051,7 +1051,7 @@ EntityId entity_goldmine_create(MatchState& state, ivec2 cell, uint32_t gold_lef
 }
 
 void entity_update(MatchState& state, uint32_t entity_index) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
 
     EntityId entity_id = state.entities.get_id_of(entity_index);
     Entity& entity = state.entities[entity_index];

@@ -75,7 +75,7 @@ void replay_file_close(FILE* file) {
 }
 
 void replay_file_write_inputs(FILE* file, uint8_t player_id, const std::vector<MatchInput>* inputs) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
 
     if (file == NULL) {
         return;

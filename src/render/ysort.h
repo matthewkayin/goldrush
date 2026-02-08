@@ -19,6 +19,6 @@ void _ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int 
 
 #define ysort_render_params(params, low, high)           \
     {                                                    \
-        GOLD_PROFILE_SCOPE_NAME("ysort_render_params");  \
+        ZoneScopedN("ysort_render_params");  \
         _ysort_render_params(params, low, high);         \
     }

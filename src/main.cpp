@@ -464,7 +464,7 @@ int gold_main(int argc, char** argv) {
 
         render_present_frame();
 
-        GOLD_PROFILE_FRAME_MARK;
+        FrameMark;
     } // End game loop
 
     // DEINITIALIZE

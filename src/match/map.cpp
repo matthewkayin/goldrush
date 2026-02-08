@@ -1816,7 +1816,7 @@ int map_are_regions_connected(const Map& map, int region_a, int region_b) {
 }
 
 ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
 
     if (from == to) {
         return to;
@@ -1915,7 +1915,7 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
 }
 
 std::vector<int> map_get_region_path(const Map& map, ivec2 from, ivec2 to) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
 
     std::vector<int> path;
 
@@ -2058,7 +2058,7 @@ ivec2 map_get_region_connection_cell_closest_to_cell(const Map& map, ivec2 cell,
 }
 
 void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
 
     static const int EXPLORED_INDEX_NOT_EXPLORED = -1;
     static const int EXPLORED_INDEX_IGNORE_CELL = -2;
@@ -2287,7 +2287,7 @@ ivec2 map_get_ideal_mine_exit_path_rally_cell(const Map& map, ivec2 mine_cell, i
 }
 
 void map_get_ideal_mine_exit_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, std::vector<ivec2>* path) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
 
     ivec2 rally_cell = map_get_ideal_mine_exit_path_rally_cell(map, mine_cell, hall_cell);
     ivec2 mine_exit_cell = map_get_exit_cell(map, CELL_LAYER_GROUND, mine_cell, 3, 1, rally_cell, MAP_OPTION_IGNORE_MINERS);
@@ -2309,7 +2309,7 @@ ivec2 map_get_ideal_mine_entrance_cell(const Map& map, ivec2 mine_cell, ivec2 ha
 }
 
 void map_get_ideal_mine_entrance_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, std::vector<ivec2>* path) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
 
     std::vector<ivec2> mine_exit_path;
     map_get_ideal_mine_exit_path(map, mine_cell, hall_cell, &mine_exit_path);

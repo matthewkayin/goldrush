@@ -560,7 +560,7 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
 // UPDATE
 
 void match_shell_update(MatchShellState* state) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
     
     if (state->mode == MATCH_SHELL_MODE_LEAVE_MATCH || state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM) {
         return;
@@ -2975,7 +2975,7 @@ void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t 
 // RENDER
 
 void match_shell_render(const MatchShellState* state) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
     
     std::vector<RenderSpriteParams> above_fog_sprite_params;
     std::vector<RenderSpriteParams> ysort_params;
@@ -2992,7 +2992,7 @@ void match_shell_render(const MatchShellState* state) {
 
     // Elevation passes
     {
-        GOLD_PROFILE_SCOPE_NAME("elevation passes");
+        ZoneScopedN("elevation passes");
 
         // Begin elevation passes
         static const int ELEVATION_COUNT = 2;
@@ -3192,7 +3192,7 @@ void match_shell_render(const MatchShellState* state) {
 
     // Entities
     {
-        GOLD_PROFILE_SCOPE_NAME("entities");
+        ZoneScopedN("entities");
 
         for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
             const Entity& entity = state->match_state.entities[entity_index];
@@ -3321,7 +3321,7 @@ void match_shell_render(const MatchShellState* state) {
 
     // Queued entity target rally points
     if (state->selection.size() == 1) {
-        GOLD_PROFILE_SCOPE_NAME("queued entity targets");
+        ZoneScopedN("queued entity targets");
 
         const Entity& entity = state->match_state.entities.get_by_id(state->selection[0]);
         // Check if it's an allied unit
@@ -3348,7 +3348,7 @@ void match_shell_render(const MatchShellState* state) {
 
     // Render ysort params
     {
-        GOLD_PROFILE_SCOPE_NAME("render ysort params");
+        ZoneScopedN("render ysort params");
 
         ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
         for (const RenderSpriteParams& params : ysort_params) {
@@ -3497,7 +3497,7 @@ void match_shell_render(const MatchShellState* state) {
 
     // Sky
     {
-        GOLD_PROFILE_SCOPE_NAME("sky");
+        ZoneScopedN("sky");
         // Sky entities select rings
         for (EntityId entity_id : state->selection) {
             const Entity& entity = state->match_state.entities.get_by_id(entity_id);
@@ -3570,7 +3570,7 @@ void match_shell_render(const MatchShellState* state) {
 
     // Fog of War
     {
-        GOLD_PROFILE_SCOPE_NAME("fog of war");
+        ZoneScopedN("fog of war");
         for (int fog_pass = 0; fog_pass < 2; fog_pass++) {
             for (int y = 0; y < max_visible_tiles.y; y++) {
                 for (int x = 0; x < max_visible_tiles.x; x++) {
@@ -3634,7 +3634,7 @@ void match_shell_render(const MatchShellState* state) {
 
     // UI
     {
-        GOLD_PROFILE_SCOPE_NAME("ui");
+        ZoneScopedN("ui");
 
         // UI Building Placement
         if (state->mode == MATCH_SHELL_MODE_BUILDING_PLACE && !match_shell_is_mouse_in_ui()) {
@@ -4260,7 +4260,7 @@ void match_shell_render(const MatchShellState* state) {
     // MINIMAP
     // Minimap tiles
     {
-        GOLD_PROFILE_SCOPE_NAME("minimap");
+        ZoneScopedN("minimap");
         for (int y = 0; y < state->match_state.map.height; y++) {
             for (int x = 0; x < state->match_state.map.width; x++) {
                 render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), match_shell_get_minimap_pixel_for_cell(state, ivec2(x, y)));

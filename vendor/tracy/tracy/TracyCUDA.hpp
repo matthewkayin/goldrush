@@ -514,7 +514,7 @@ namespace tracy
 
         void Collect()
         {
-            GOLD_PROFILE_SCOPE;
+            ZoneScoped;
             CUPTI::FlushActivity();
         }
 
@@ -543,13 +543,13 @@ namespace tracy
 
         void StartProfiling()
         {
-            GOLD_PROFILE_SCOPE;
+            ZoneScoped;
             CUPTI::BeginInstrumentation(this);
         }
 
         void StopProfiling()
         {
-            GOLD_PROFILE_SCOPE;
+            ZoneScoped;
             CUPTI::EndInstrumentation();
             printStats();
         }
@@ -587,7 +587,7 @@ namespace tracy
         // are "global" across all contexts; that said, each Tracy GPU context needs
         // its own GpuCalibration message, but for now there's just a singleton context.
         void Recalibrate() {
-            GOLD_PROFILE_SCOPE;
+            ZoneScoped;
             // NOTE(marcos): only one thread should do the calibration, but there's
             // no good reason to block threads that also trying to do the same
             static std::mutex m;
@@ -640,7 +640,7 @@ namespace tracy
         struct CUPTI {
         static void CUPTIAPI OnBufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords)
         {
-            GOLD_PROFILE_SCOPE;
+            ZoneScoped;
             // TODO(marcos): avoid malloc and instead suballocate from a large circular buffer;
             // according to the CUPTI documentation: "To minimize profiling overhead the client
             // should return as quickly as possible from these callbacks."
@@ -654,7 +654,7 @@ namespace tracy
         {
             // CUDA 6.0 onwards: all buffers from this callback are "global" buffers
             // (i.e. there is no context/stream specific buffer; ctx is always NULL)
-            GOLD_PROFILE_SCOPE;
+            ZoneScoped;
             tracy::SetThreadName("NVIDIA CUPTI Worker");
             CUptiResult status;
             CUpti_Activity* record = nullptr;
@@ -1205,7 +1205,7 @@ namespace tracy
         static void FlushActivityAsync()
         {
             #if TRACY_CUDA_ENABLE_COLLECTOR_THREAD
-            GOLD_PROFILE_SCOPE;
+            ZoneScoped;
             auto& collector = PersistentState::Get().collector;
             collector.signal.notify_one();
             #endif
@@ -1238,7 +1238,7 @@ namespace tracy
 
         CUDACtx(uint8_t gpuContextID = 255)
         {
-            GOLD_PROFILE_SCOPE;
+            ZoneScoped;
 
             if (gpuContextID != 255) {
                 m_tracyGpuContext = gpuContextID;
@@ -1286,7 +1286,7 @@ namespace tracy
 
         ~CUDACtx()
         {
-            GOLD_PROFILE_SCOPE;
+            ZoneScoped;
         }
 
         struct Singleton {

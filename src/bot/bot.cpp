@@ -115,7 +115,7 @@ Bot bot_init(const MatchState& state, uint8_t player_id, BotConfig config) {
 }
 
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_timer) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
 
     GOLD_ASSERT_MESSAGE(state.players[bot.player_id].active, "bot_get_turn_input should not be called after bot has surrendered.");
 
@@ -220,7 +220,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 // STRATEGY
 
 void bot_strategy_update(const MatchState& state, Bot& bot) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
     
     // Handle base under attack
     for (uint32_t goldmine_id_index = 0; goldmine_id_index < bot.goldmine_ids.size(); goldmine_id_index++) {
@@ -772,7 +772,7 @@ bool bot_should_all_in(const Bot& bot) {
 // PRODUCTION
 
 MatchInput bot_get_production_input(const MatchState& state, Bot& bot, uint32_t match_timer) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
     
     // Saturate bases
     MatchInput saturate_bases_input = bot_saturate_bases(state, bot);
@@ -1847,7 +1847,7 @@ void bot_squad_remove_entity_by_id(Bot& bot, BotSquad& squad, EntityId entity_id
 }
 
 MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, uint32_t match_timer) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
 
     // Remove dead units
     bot_squad_remove_dead_units(state, bot, squad);
@@ -3151,7 +3151,7 @@ MatchInput bot_squad_landmines_micro(const MatchState& state, Bot& bot, const Bo
 // SCOUTING
 
 void bot_scout_gather_info(const MatchState& state, Bot& bot) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
     
     // Check for scout death
     if (bot.scout_id != ID_NULL) {
@@ -3365,7 +3365,7 @@ void bot_update_base_info(const MatchState& state, Bot& bot) {
 }
 
 MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_timer) {
-    GOLD_PROFILE_SCOPE;
+    ZoneScoped;
     
     if (bot.scout_id == ID_NULL) {
         if (!bot_should_scout(bot, match_timer)) {
