@@ -2,6 +2,9 @@
 
 #include "defines.h"
 #include "core/logger.h"
+#include "core/filesystem.h"
+#include "util/json.h"
+#include "shell/hotkey.h"
 #include <cstring>
 #include <algorithm>
 #include <functional>
@@ -34,7 +37,6 @@ void input_init(SDL_Window* window) {
     state.window = window;
     input_update_screen_scale();
     input_stop_text_input();
-    input_set_hotkey_mapping_to_default(state.hotkey_mapping);
 
     state.should_capture_mouse = true;
     state.mouse_scroll = 0;
@@ -42,6 +44,60 @@ void input_init(SDL_Window* window) {
     #ifndef GOLD_DEBUG
         SDL_SetWindowMouseGrab(state.window, true);
     #endif
+
+    // Begin with hotkeys set to defaults
+    input_set_hotkey_mapping_to_default(state.hotkey_mapping);
+
+    // Load hotkey mapping
+    std::string hotkey_path = filesystem_get_data_path() + "hotkeys.json";
+    Json* hotkey_json = json_read(hotkey_path.c_str());
+    if (!hotkey_json) {
+        log_info("hotkeys.json does not exist. Saving defaults.");
+        input_save_hotkey_mapping();
+        return;
+    }
+
+    for (size_t index = 0; index < hotkey_json->object.length; index++) {
+        const char* key = hotkey_json->object.keys[index];
+        int hotkey;
+        for (hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_ACTION_COUNT; hotkey++) {
+            char hotkey_name[128];
+            hotkey_get_name(hotkey_name, (InputAction)hotkey);
+            if (strcmp(key, hotkey_name) == 0) {
+                break;
+            }
+        }
+        if (hotkey == INPUT_ACTION_COUNT) {
+            log_warn("Hotkey %s not recognized.", key);
+            continue;
+        }
+
+        SDL_Scancode value = (SDL_Scancode)((int)json_object_get_number(hotkey_json, key));
+        if (!input_is_key_valid_hotkey_mapping(value)) {
+            log_warn("Hotkey value %i for key %s is not valid.", value, key);
+            continue;
+        }
+
+        input_set_hotkey_mapping((InputAction)hotkey, value);
+    }
+    
+    log_info("Loaded hotkey mapping.");
+}
+
+void input_save_hotkey_mapping() {
+    Json* hotkey_json = json_object();
+    for (int hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_ACTION_COUNT; hotkey++) {
+        char hotkey_name[128];
+        hotkey_get_name(hotkey_name, (InputAction)hotkey);
+        json_object_set_number(hotkey_json, hotkey_name, input_get_hotkey_mapping((InputAction)hotkey));
+    }
+    if (!json_write(hotkey_json, input_get_saved_hotkeys_path().c_str())) {
+        log_error("Could not save hotkeys file.");
+    }
+}
+
+const std::string input_get_saved_hotkeys_path() {
+    return filesystem_get_data_path() + "hotkeys.json";
 }
 
 void input_update_screen_scale() {

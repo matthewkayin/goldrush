@@ -317,7 +317,11 @@ void json_fprintf(FILE* file, const Json* json, size_t depth) {
             break;
         }
         case JSON_TYPE_NUMBER: {
-            fprintf(file, "%f", json->number.value);
+            if ((double)((int)json->number.value) == json->number.value) {
+                fprintf(file, "%i", (int)json->number.value);
+            } else {
+                fprintf(file, "%f", json->number.value);
+            }
             break;
         }
         case JSON_TYPE_BOOLEAN: {

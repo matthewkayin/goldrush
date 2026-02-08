@@ -3,7 +3,6 @@
 #include "logger.h"
 #include "sound.h"
 #include "input.h"
-#include "shell/hotkey.h"
 #include "core/filesystem.h"
 #include "render/render.h"
 #include <unordered_map>
@@ -67,55 +66,29 @@ void options_load() {
     std::string options_file_path = filesystem_get_data_path() + OPTIONS_FILE_NAME;
     std::ifstream options_file(options_file_path);
     if (options_file.is_open()) {
-        std::string hotkey_names[INPUT_ACTION_COUNT];
-        char hotkey_name_buffer[128];
-        for (int hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_ACTION_COUNT; hotkey++) {
-            hotkey_get_name(hotkey_name_buffer, (InputAction)hotkey);
-            hotkey_names[hotkey] = std::string(hotkey_name_buffer);
-        }
-
         std::string line;
-        bool options_mode = true;
         while (std::getline(options_file, line)) {
-            if (line == "[hotkeys]") {
-                options_mode = false;
-                continue;
-            }
-
             size_t equals_index = line.find('=');
             std::string key = line.substr(0, equals_index);
             std::string value = line.substr(equals_index + 1);
 
-            if (options_mode) {
-                int option;
-                for (option = 0; option < OPTION_COUNT; option++) {
-                    const OptionData& option_data = OPTION_DATA.at((OptionName)option);
+            int option;
+            for (option = 0; option < OPTION_COUNT; option++) {
+                const OptionData& option_data = OPTION_DATA.at((OptionName)option);
 
-                    if (key == std::string(option_data.name)) {
-                        uint32_t option_value = (uint32_t)std::stoi(value);
-                        if (option_value < option_data.min_value || option_value > option_data.max_value) {
-                            log_warn("Option value of %u for %s is out of range.", option_value, option_data.name);
-                            continue;
-                        }
+                if (key == std::string(option_data.name)) {
+                    uint32_t option_value = (uint32_t)std::stoi(value);
+                    if (option_value < option_data.min_value || option_value > option_data.max_value) {
+                        log_warn("Option value of %u for %s is out of range.", option_value, option_data.name);
+                        continue;
+                    }
 
-                        options[(OptionName)option] = option_value;
-                        break;
-                    }
+                    options[(OptionName)option] = option_value;
+                    break;
                 }
-                if (option == OPTION_COUNT) {
-                    log_warn("Unrecognized option key %s with value %s", key.c_str(), value.c_str());
-                }
-            } else {
-                int hotkey;
-                for (hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_ACTION_COUNT; hotkey++) {
-                    if (key == hotkey_names[hotkey]) {
-                        input_set_hotkey_mapping((InputAction)hotkey, (SDL_Scancode)std::stoi(value));
-                        break;
-                    }
-                }
-                if (hotkey == INPUT_ACTION_COUNT) {
-                    log_warn("Unrecognized hotkey mapping key %s with value %s", key.c_str(), value.c_str());
-                }
+            }
+            if (option == OPTION_COUNT) {
+                log_warn("Unrecognized option key %s with value %s", key.c_str(), value.c_str());
             }
         }
     } else {
@@ -137,14 +110,6 @@ void options_save() {
 
     for (int option = 0; option < OPTION_COUNT; option++) {
         fprintf(options_file, "%s=%i\n", OPTION_DATA.at((OptionName)option).name, options[(OptionName)option]);
-    }
-
-    fprintf(options_file, "[hotkeys]\n");
-
-    for (int hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_ACTION_COUNT; hotkey++) {
-        char hotkey_name[128];
-        hotkey_get_name(hotkey_name, (InputAction)hotkey);
-        fprintf(options_file, "%s=%i\n", hotkey_name, input_get_hotkey_mapping((InputAction)hotkey));
     }
 
     fclose(options_file);

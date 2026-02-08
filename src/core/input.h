@@ -97,6 +97,10 @@ enum InputAction {
 };
 
 void input_init(SDL_Window* window);
+
+void input_save_hotkey_mapping();
+const std::string input_get_saved_hotkeys_path();
+
 void input_set_mouse_capture_enabled(bool value);
 void input_update_screen_scale();
 void input_poll_events();

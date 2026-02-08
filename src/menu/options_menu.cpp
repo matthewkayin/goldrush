@@ -484,6 +484,7 @@ void options_menu_save_hotkey_changes(OptionsMenuState& state) {
     for (int hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_ACTION_COUNT; hotkey++) {
         input_set_hotkey_mapping((InputAction)hotkey, state.hotkey_pending_changes[hotkey]);
     }
+    input_save_hotkey_mapping();
 }
 
 void options_menu_set_hotkey_mapping_to_grid(SDL_Scancode* hotkey_mapping) {
