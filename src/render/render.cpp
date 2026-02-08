@@ -4,14 +4,13 @@
 #include "core/logger.h"
 #include "core/filesystem.h"
 #include "core/asserts.h"
+#include "core/options.h"
 #include "math/mat4.h"
 #include <SDL3/SDL_ttf.h>
 #include <glad/glad.h>
 #include <vector>
 #include <unordered_map>
 
-#define WINDOWED_WIDTH 1280
-#define WINDOWED_HEIGHT 720
 #define MAX_BATCH_VERTICES 32768
 #define FONT_GLYPH_COUNT 95
 #define FONT_FIRST_CHAR 32U // space
@@ -315,7 +314,7 @@ bool render_init(SDL_Window* window) {
     glActiveTexture(GL_TEXTURE0);
 
     render_update_screen_scale();
-    SDL_GL_SetSwapInterval(1);
+    option_apply(OPTION_VSYNC);
 
     log_info("Initialized renderer. Vendor: %s. Renderer: %s. Version: %s.", glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION));
     return true;

@@ -44,7 +44,7 @@ bool sound_init();
 void sound_quit();
 const char* sound_get_name(SoundName sound);
 void sound_set_sfx_volume(uint32_t volume);
-void sound_set_mus_volume(uint32_t volume);
+void sound_set_music_volume(uint32_t volume);
 
 uint32_t sound_play(SoundName sound, bool looping = false);
 void sound_stop(uint32_t voice_index);

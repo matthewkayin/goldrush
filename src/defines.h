@@ -55,6 +55,8 @@ STATIC_ASSERT(sizeof(int) == sizeof(int32_t));
 
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 360
+#define WINDOWED_WIDTH 1280
+#define WINDOWED_HEIGHT 720
 #define UPDATES_PER_SECOND 60
 #define MAX_PLAYERS 4
 #define PLAYER_NONE MAX_PLAYERS

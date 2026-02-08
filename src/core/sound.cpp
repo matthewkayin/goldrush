@@ -3,6 +3,7 @@
 #include "core/logger.h"
 #include "core/asserts.h"
 #include "core/filesystem.h"
+#include "core/options.h"
 #include <SDL3/SDL.h>
 #include <vector>
 #include <unordered_map>
@@ -276,6 +277,8 @@ bool sound_init() {
     SDL_AudioDeviceID audio_device = SDL_GetAudioStreamDevice(state.audio_stream);
     SDL_ResumeAudioDevice(audio_device);
 
+    option_apply(OPTION_SFX_VOLUME);
+    option_apply(OPTION_MUSIC_VOLUME);
     log_info("Initialized sound system. Device: %s", SDL_GetAudioDeviceName(audio_device));
 
     return true;
@@ -303,7 +306,7 @@ void sound_set_sfx_volume(uint32_t volume) {
     SDL_SetAudioStreamGain(state.audio_stream, (float)volume / 100.0f);
 }
 
-void sound_set_mus_volume(uint32_t volume) {}
+void sound_set_music_volume(uint32_t volume) {}
 
 int sound_voice_frames_remaining(const SoundVoice* voice) {
     // This should only be called on a playing voice

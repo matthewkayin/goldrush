@@ -114,6 +114,9 @@ int gold_main(int argc, char** argv) {
     }
 #endif
 
+    // Load options
+    options_load();
+
     // Init SDL
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         log_error("Failed to initialize SDL: %s", SDL_GetError());
@@ -134,7 +137,23 @@ int gold_main(int argc, char** argv) {
 #endif
 
     // Create window
-    SDL_Window* window = SDL_CreateWindow(APP_NAME, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL);
+    SDL_Window* window;
+    {
+        int window_width = SCREEN_WIDTH;
+        int window_height = SCREEN_HEIGHT;
+        SDL_WindowFlags flags = SDL_WINDOW_OPENGL;
+        if (option_get_value(OPTION_DISPLAY) == RENDER_DISPLAY_FULLSCREEN) {
+            SDL_DisplayID* display_id = SDL_GetDisplays(NULL);
+            const SDL_DisplayMode* display_mode = SDL_GetDesktopDisplayMode(display_id[0]);
+            window_width = display_mode->w;
+            window_height = display_mode->h;
+            flags |= SDL_WINDOW_FULLSCREEN;
+        } else {
+            window_width = WINDOWED_WIDTH;
+            window_height = WINDOWED_HEIGHT;
+        }
+        window = SDL_CreateWindow(APP_NAME, window_width, window_height, flags);
+    }
 
     // Init subsystems
     if (!render_init(window)) {
@@ -155,7 +174,6 @@ int gold_main(int argc, char** argv) {
     }
 
     input_init(window);
-    options_load();
     srand((uint32_t)time(0));
 
     state.match_shell_state = nullptr;
