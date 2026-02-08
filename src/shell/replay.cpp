@@ -3,6 +3,7 @@
 #include "network/types.h"
 #include "core/filesystem.h"
 #include "core/logger.h"
+#include "profile/profile.h"
 
 static const uint32_t REPLAY_FILE_SIGNATURE = 0x46591214;
 static const uint32_t REPLAY_FILE_VERSION = 0;
@@ -74,6 +75,8 @@ void replay_file_close(FILE* file) {
 }
 
 void replay_file_write_inputs(FILE* file, uint8_t player_id, const std::vector<MatchInput>* inputs) {
+    GOLD_PROFILE_SCOPE;
+
     if (file == NULL) {
         return;
     }

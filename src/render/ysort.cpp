@@ -20,10 +20,10 @@ int ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int l
     return i + 1;
 }
 
-void ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high) {
+void _ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high) {
     if (low < high) {
         int partition_index = ysort_render_params_partition(params, low, high);
-        ysort_render_params(params, low, partition_index - 1);
-        ysort_render_params(params, partition_index + 1, high);
+        _ysort_render_params(params, low, partition_index - 1);
+        _ysort_render_params(params, partition_index + 1, high);
     }
 }

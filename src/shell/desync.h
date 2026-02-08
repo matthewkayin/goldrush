@@ -1,11 +1,10 @@
 #pragma once
 
 #include "defines.h"
-
-#ifdef GOLD_DEBUG
-
 #include "match/state.h"
 #include "bot/bot.h"
+
+#ifdef GOLD_DEBUG
 
 bool desync_init(const char* desync_foldername);
 void desync_quit();

@@ -20,10 +20,15 @@ ifneq ($(RELEASE_VERSION),)
 endif
 
 ifeq ($(RELEASE_VERSION),)
-	COMPILER_FLAGS += -O0 -g -Wall -Wextra -Wshadow -Ivendor/tracy
+	COMPILER_FLAGS += -O0 -g -Wall -Wextra -Wshadow
 	LINKER_FLAGS += -g
 else
 	COMPILER_FLAGS += -O2
+endif
+
+ifeq ($(RELEASE_VERSION),profile)
+	COMPILER_FLAGS += -Ivendor/tracy
+	DEFINES += -DTRACY_ENABLE
 endif
 
 ifeq ($(OS),Windows_NT)

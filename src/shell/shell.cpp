@@ -2896,7 +2896,7 @@ bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t fram
             continue;
         }
         if (state->checksums[player_id][frame] != state->checksums[network_get_player_id()][frame]) {
-            log_debug("DESYNC found on frame %u between player %u (checksum %u) and player %u (checksum %u)", 
+            log_error("DESYNC found on frame %u between player %u (checksum %u) and player %u (checksum %u)", 
                 frame, 
                 player_id, 
                 state->checksums[player_id][frame],
@@ -2910,7 +2910,7 @@ bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t fram
 }
 
 void match_shell_compare_checksums(MatchShellState* state, uint32_t frame) {
-    // If we haven't gotten to this frame yet, hen we can't say for sure that it's out of sync
+    // If we haven't gotten to this frame yet, then we can't say for sure that it's out of sync
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_READY) {
             continue;
@@ -2980,8 +2980,8 @@ void match_shell_render(const MatchShellState* state) {
     std::vector<RenderSpriteParams> above_fog_sprite_params;
     std::vector<RenderSpriteParams> ysort_params;
 
-    ivec2 base_pos = ivec2(-(state->camera_offset.x % TILE_SIZE), -(state->camera_offset.y % TILE_SIZE));
-    ivec2 base_coords = ivec2(state->camera_offset.x / TILE_SIZE, state->camera_offset.y / TILE_SIZE);
+    const ivec2 base_pos = ivec2(-(state->camera_offset.x % TILE_SIZE), -(state->camera_offset.y % TILE_SIZE));
+    const ivec2 base_coords = ivec2(state->camera_offset.x / TILE_SIZE, state->camera_offset.y / TILE_SIZE);
     ivec2 max_visible_tiles = ivec2(SCREEN_WIDTH / TILE_SIZE, (SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / TILE_SIZE);
     if (base_pos.x != 0) {
         max_visible_tiles.x++;
@@ -2990,193 +2990,198 @@ void match_shell_render(const MatchShellState* state) {
         max_visible_tiles.y++;
     }
 
-    // Begin elevation passes
-    static const int ELEVATION_COUNT = 2;
-    for (uint32_t elevation = 0; elevation < ELEVATION_COUNT; elevation++) {
-        // Render map
-        for (int y = 0; y < max_visible_tiles.y; y++) {
-            for (int x = 0; x < max_visible_tiles.x; x++) {
-                int map_index = (base_coords.x + x) + ((base_coords.y + y) * state->match_state.map.width);
-                Tile tile = state->match_state.map.tiles[map_index];
+    // Elevation passes
+    {
+        GOLD_PROFILE_SCOPE_NAME("elevation passes");
 
-                ivec2 tile_params_position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
-                RenderSpriteParams tile_params = (RenderSpriteParams) {
-                    .sprite = tile.sprite,
-                    .frame = tile.frame,
-                    .position = tile_params_position,
-                    .ysort_position = tile_params_position.y,
-                    .options = RENDER_SPRITE_NO_CULL,
-                    .recolor_id = 0
-                };
+        // Begin elevation passes
+        static const int ELEVATION_COUNT = 2;
+        for (uint32_t elevation = 0; elevation < ELEVATION_COUNT; elevation++) {
+            // Render map
+            for (int y = 0; y < max_visible_tiles.y; y++) {
+                for (int x = 0; x < max_visible_tiles.x; x++) {
+                    int map_index = (base_coords.x + x) + ((base_coords.y + y) * state->match_state.map.width);
+                    Tile tile = state->match_state.map.tiles[map_index];
 
-                bool should_render_on_ground_level = 
-                    map_is_tile_ground(state->match_state.map, base_coords + ivec2(x, y)) || 
-                    map_is_tile_ramp(state->match_state.map, base_coords + ivec2(x, y));
-                if (elevation == 0 && 
-                        !map_is_tile_ground(state->match_state.map, base_coords + ivec2(x, y)) &&
-                        !map_is_tile_water(state->match_state.map, base_coords + ivec2(x, y))) {
-                    render_sprite_frame(map_get_plain_ground_tile_sprite(state->match_state.map.type), ivec2(0, 0), base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
-                }
-                if ((should_render_on_ground_level && elevation == 0) || 
-                        (!should_render_on_ground_level && elevation == tile.elevation)) {
-                    render_sprite_frame(tile_params.sprite, tile_params.frame, tile_params.position, tile_params.options, tile_params.recolor_id);
-                } 
-
-                // Decorations
-                Cell cell = state->match_state.map.cells[CELL_LAYER_GROUND][map_index];
-                if (cell.type == CELL_DECORATION && tile.elevation == elevation) {
-                    SpriteName decoration_sprite = map_get_decoration_sprite(state->match_state.map.type);
-                    const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
-                    const int decoration_extra_height = decoration_sprite_info.frame_height - TILE_SIZE;
-                    ysort_params.push_back((RenderSpriteParams) {
-                        .sprite = decoration_sprite,
-                        .frame = ivec2(cell.decoration_hframe, 0),
-                        .position = ivec2(tile_params_position.x, tile_params_position.y - decoration_extra_height),
+                    ivec2 tile_params_position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
+                    RenderSpriteParams tile_params = (RenderSpriteParams) {
+                        .sprite = tile.sprite,
+                        .frame = tile.frame,
+                        .position = tile_params_position,
                         .ysort_position = tile_params_position.y,
                         .options = RENDER_SPRITE_NO_CULL,
                         .recolor_id = 0
-                    });
-                }
-
-                #ifdef GOLD_DEBUG
-                    if (state->debug_show_region_lines && elevation == tile.elevation) {
-                        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                            ivec2 neighbor = base_coords + ivec2(x, y) + DIRECTION_IVEC2[direction];
-                            if (!map_is_cell_in_bounds(state->match_state.map, neighbor) || map_get_region(state->match_state.map, neighbor) == state->match_state.map.regions[map_index]) {
-                                continue;
-                            }
-                            ivec2 tile_pos = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
-                            if (direction == DIRECTION_NORTH) {
-                                render_draw_rect((Rect) {
-                                    .x = tile_pos.x, .y = tile_pos.y,
-                                    .w = TILE_SIZE, .h = 1
-                                }, RENDER_COLOR_WHITE);
-                            } else if (direction == DIRECTION_SOUTH) {
-                                render_draw_rect((Rect) {
-                                    .x = tile_pos.x, .y = tile_pos.y + TILE_SIZE - 1,
-                                    .w = TILE_SIZE, .h = 1
-                                }, RENDER_COLOR_WHITE);
-                            } else if (direction == DIRECTION_WEST) {
-                                render_draw_rect((Rect) {
-                                    .x = tile_pos.x, .y = tile_pos.y, 
-                                    .w = 1, .h = TILE_SIZE
-                                }, RENDER_COLOR_WHITE);
-                            } else if (direction == DIRECTION_EAST) {
-                                render_draw_rect((Rect) {
-                                    .x = tile_pos.x + TILE_SIZE - 1, .y = tile_pos.y, 
-                                    .w = 1, .h = TILE_SIZE
-                                }, RENDER_COLOR_WHITE);
-                            }
-                        }
-                    }
-                #endif
-            }  // End for each x
-        } // End for each y
-
-        // For each cell layer
-        for (int cell_layer = CELL_LAYER_UNDERGROUND; cell_layer < CELL_LAYER_GROUND + 1; cell_layer++) {
-            // Dead entities
-            for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
-                const Entity& entity = state->match_state.entities[entity_index];
-                const EntityData& entity_data = entity_get_data(entity.type);
-                if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED)) {
-                    continue;
-                }
-                if (entity_data.cell_layer != cell_layer || 
-                        entity_get_elevation(entity, state->match_state.map) != elevation) {
-                    continue;
-                }
-                if (!match_shell_is_entity_visible(state, entity)) {
-                    continue;
-                }
-                
-                RenderSpriteParams params = match_shell_create_entity_render_params(state, entity);
-                render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
-            }
-
-            // Select rings and healthbars
-            for (EntityId id : state->selection) {
-                const Entity& entity = state->match_state.entities.get_by_id(id);
-                const EntityData& entity_data = entity_get_data(entity.type);
-                if (entity_data.cell_layer != cell_layer || 
-                        entity_get_elevation(entity, state->match_state.map) != elevation) {
-                    continue;
-                }
-                if (entity_is_in_mine(state->match_state, entity)) {
-                    continue;
-                }
-                match_shell_render_entity_select_rings_and_healthbars(state, entity);
-            }
-
-            // Move animation
-            if (animation_is_playing(state->move_animation) &&
-                    map_get_tile(state->match_state.map, state->move_animation_position / TILE_SIZE).elevation == elevation) {
-                if (state->move_animation.name == ANIMATION_UI_MOVE_CELL && cell_layer == CELL_LAYER_GROUND) {
-                    ivec2 params_position = state->move_animation_position - state->camera_offset;
-                    RenderSpriteParams params = (RenderSpriteParams) {
-                        .sprite = SPRITE_UI_MOVE,
-                        .frame = state->move_animation.frame,
-                        .position = params_position,
-                        .ysort_position = params_position.y,
-                        .options = RENDER_SPRITE_CENTERED,
-                        .recolor_id = 0
                     };
-                    ivec2 ui_move_cell = state->move_animation_position / TILE_SIZE;
-                    if (match_get_fog(state->match_state, state->match_state.players[network_get_player_id()].team, ui_move_cell) > 0) {
-                        render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
-                    } else {
-                        above_fog_sprite_params.push_back(params);
-                    }
-                } else if (state->move_animation.frame.x % 2 == 0) {
-                    uint32_t entity_index = state->match_state.entities.get_index_of(state->move_animation_entity_id);
-                    if (entity_index != INDEX_INVALID) {
-                        const Entity& entity = state->match_state.entities[entity_index];
-                        if (entity_get_data(entity.type).cell_layer == cell_layer) {
-                            match_shell_render_entity_move_animation(state, entity, state->move_animation);
-                        }
-                    } else if (cell_layer == CELL_LAYER_GROUND) {
-                        auto it = state->match_state.remembered_entities[state->match_state.players[network_get_player_id()].team].find(state->move_animation_entity_id);
-                        if (it != state->match_state.remembered_entities[state->match_state.players[network_get_player_id()].team].end()) {
-                            ivec2 entity_center_position = (it->second.cell * TILE_SIZE) + ((ivec2(it->second.cell_size, it->second.cell_size) * TILE_SIZE) / 2);
 
-                            render_sprite_frame(match_shell_get_entity_select_ring(it->second.type, state->move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
-                        }
+                    bool should_render_on_ground_level = 
+                        map_is_tile_ground(state->match_state.map, base_coords + ivec2(x, y)) || 
+                        map_is_tile_ramp(state->match_state.map, base_coords + ivec2(x, y));
+                    if (elevation == 0 && 
+                            !map_is_tile_ground(state->match_state.map, base_coords + ivec2(x, y)) &&
+                            !map_is_tile_water(state->match_state.map, base_coords + ivec2(x, y))) {
+                        render_sprite_frame(map_get_plain_ground_tile_sprite(state->match_state.map.type), ivec2(0, 0), base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
                     }
-                }
-            }
+                    if ((should_render_on_ground_level && elevation == 0) || 
+                            (!should_render_on_ground_level && elevation == tile.elevation)) {
+                        render_sprite_frame(tile_params.sprite, tile_params.frame, tile_params.position, tile_params.options, tile_params.recolor_id);
+                    } 
 
-            // Highlight animation
-            if (animation_is_playing(state->highlight_animation) && state->highlight_animation.frame.x % 2 == 0) {
-                uint32_t entity_index = state->match_state.entities.get_index_of(state->highlight_entity_id);
-                if (entity_index != INDEX_INVALID) {
+                    // Decorations
+                    Cell cell = state->match_state.map.cells[CELL_LAYER_GROUND][map_index];
+                    if (cell.type == CELL_DECORATION && tile.elevation == elevation) {
+                        SpriteName decoration_sprite = map_get_decoration_sprite(state->match_state.map.type);
+                        const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
+                        const int decoration_extra_height = decoration_sprite_info.frame_height - TILE_SIZE;
+                        ysort_params.push_back((RenderSpriteParams) {
+                            .sprite = decoration_sprite,
+                            .frame = ivec2(cell.decoration_hframe, 0),
+                            .position = ivec2(tile_params_position.x, tile_params_position.y - decoration_extra_height),
+                            .ysort_position = tile_params_position.y,
+                            .options = RENDER_SPRITE_NO_CULL,
+                            .recolor_id = 0
+                        });
+                    }
+
+                    #ifdef GOLD_DEBUG
+                        if (state->debug_show_region_lines && elevation == tile.elevation) {
+                            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                                ivec2 neighbor = base_coords + ivec2(x, y) + DIRECTION_IVEC2[direction];
+                                if (!map_is_cell_in_bounds(state->match_state.map, neighbor) || map_get_region(state->match_state.map, neighbor) == state->match_state.map.regions[map_index]) {
+                                    continue;
+                                }
+                                ivec2 tile_pos = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
+                                if (direction == DIRECTION_NORTH) {
+                                    render_draw_rect((Rect) {
+                                        .x = tile_pos.x, .y = tile_pos.y,
+                                        .w = TILE_SIZE, .h = 1
+                                    }, RENDER_COLOR_WHITE);
+                                } else if (direction == DIRECTION_SOUTH) {
+                                    render_draw_rect((Rect) {
+                                        .x = tile_pos.x, .y = tile_pos.y + TILE_SIZE - 1,
+                                        .w = TILE_SIZE, .h = 1
+                                    }, RENDER_COLOR_WHITE);
+                                } else if (direction == DIRECTION_WEST) {
+                                    render_draw_rect((Rect) {
+                                        .x = tile_pos.x, .y = tile_pos.y, 
+                                        .w = 1, .h = TILE_SIZE
+                                    }, RENDER_COLOR_WHITE);
+                                } else if (direction == DIRECTION_EAST) {
+                                    render_draw_rect((Rect) {
+                                        .x = tile_pos.x + TILE_SIZE - 1, .y = tile_pos.y, 
+                                        .w = 1, .h = TILE_SIZE
+                                    }, RENDER_COLOR_WHITE);
+                                }
+                            }
+                        }
+                    #endif
+                }  // End for each x
+            } // End for each y
+
+            // For each cell layer
+            for (int cell_layer = CELL_LAYER_UNDERGROUND; cell_layer < CELL_LAYER_GROUND + 1; cell_layer++) {
+                // Dead entities
+                for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
                     const Entity& entity = state->match_state.entities[entity_index];
-                    if (entity_get_data(entity.type).cell_layer == cell_layer) {
-                        match_shell_render_entity_move_animation(state, entity, state->highlight_animation);
-                    }
-                }
-            }
-
-            // Underground entities
-            if (cell_layer == CELL_LAYER_UNDERGROUND) {
-                for (const Entity& entity : state->match_state.entities) {
                     const EntityData& entity_data = entity_get_data(entity.type);
-                    if (entity_data.cell_layer != CELL_LAYER_UNDERGROUND ||
-                            entity_get_elevation(entity, state->match_state.map) != elevation) {
+                    if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED)) {
                         continue;
                     }
-                    if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
+                    if (entity_data.cell_layer != cell_layer || 
+                            entity_get_elevation(entity, state->match_state.map) != elevation) {
                         continue;
                     }
                     if (!match_shell_is_entity_visible(state, entity)) {
                         continue;
                     }
-
+                    
                     RenderSpriteParams params = match_shell_create_entity_render_params(state, entity);
                     render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
                 }
-            }
-        } // End for each cell layer
-    } // End for each elevation
+
+                // Select rings and healthbars
+                for (EntityId id : state->selection) {
+                    const Entity& entity = state->match_state.entities.get_by_id(id);
+                    const EntityData& entity_data = entity_get_data(entity.type);
+                    if (entity_data.cell_layer != cell_layer || 
+                            entity_get_elevation(entity, state->match_state.map) != elevation) {
+                        continue;
+                    }
+                    if (entity_is_in_mine(state->match_state, entity)) {
+                        continue;
+                    }
+                    match_shell_render_entity_select_rings_and_healthbars(state, entity);
+                }
+
+                // Move animation
+                if (animation_is_playing(state->move_animation) &&
+                        map_get_tile(state->match_state.map, state->move_animation_position / TILE_SIZE).elevation == elevation) {
+                    if (state->move_animation.name == ANIMATION_UI_MOVE_CELL && cell_layer == CELL_LAYER_GROUND) {
+                        ivec2 params_position = state->move_animation_position - state->camera_offset;
+                        RenderSpriteParams params = (RenderSpriteParams) {
+                            .sprite = SPRITE_UI_MOVE,
+                            .frame = state->move_animation.frame,
+                            .position = params_position,
+                            .ysort_position = params_position.y,
+                            .options = RENDER_SPRITE_CENTERED,
+                            .recolor_id = 0
+                        };
+                        ivec2 ui_move_cell = state->move_animation_position / TILE_SIZE;
+                        if (match_get_fog(state->match_state, state->match_state.players[network_get_player_id()].team, ui_move_cell) > 0) {
+                            render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+                        } else {
+                            above_fog_sprite_params.push_back(params);
+                        }
+                    } else if (state->move_animation.frame.x % 2 == 0) {
+                        uint32_t entity_index = state->match_state.entities.get_index_of(state->move_animation_entity_id);
+                        if (entity_index != INDEX_INVALID) {
+                            const Entity& entity = state->match_state.entities[entity_index];
+                            if (entity_get_data(entity.type).cell_layer == cell_layer) {
+                                match_shell_render_entity_move_animation(state, entity, state->move_animation);
+                            }
+                        } else if (cell_layer == CELL_LAYER_GROUND) {
+                            auto it = state->match_state.remembered_entities[state->match_state.players[network_get_player_id()].team].find(state->move_animation_entity_id);
+                            if (it != state->match_state.remembered_entities[state->match_state.players[network_get_player_id()].team].end()) {
+                                ivec2 entity_center_position = (it->second.cell * TILE_SIZE) + ((ivec2(it->second.cell_size, it->second.cell_size) * TILE_SIZE) / 2);
+
+                                render_sprite_frame(match_shell_get_entity_select_ring(it->second.type, state->move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
+                            }
+                        }
+                    }
+                }
+
+                // Highlight animation
+                if (animation_is_playing(state->highlight_animation) && state->highlight_animation.frame.x % 2 == 0) {
+                    uint32_t entity_index = state->match_state.entities.get_index_of(state->highlight_entity_id);
+                    if (entity_index != INDEX_INVALID) {
+                        const Entity& entity = state->match_state.entities[entity_index];
+                        if (entity_get_data(entity.type).cell_layer == cell_layer) {
+                            match_shell_render_entity_move_animation(state, entity, state->highlight_animation);
+                        }
+                    }
+                }
+
+                // Underground entities
+                if (cell_layer == CELL_LAYER_UNDERGROUND) {
+                    for (const Entity& entity : state->match_state.entities) {
+                        const EntityData& entity_data = entity_get_data(entity.type);
+                        if (entity_data.cell_layer != CELL_LAYER_UNDERGROUND ||
+                                entity_get_elevation(entity, state->match_state.map) != elevation) {
+                            continue;
+                        }
+                        if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
+                            continue;
+                        }
+                        if (!match_shell_is_entity_visible(state, entity)) {
+                            continue;
+                        }
+
+                        RenderSpriteParams params = match_shell_create_entity_render_params(state, entity);
+                        render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+                    }
+                }
+            } // End for each cell layer
+        } // End for each elevation
+    }
 
     // Fires
     for (const Fire& fire : state->match_state.fires) {
@@ -3186,94 +3191,98 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Entities
-    for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
-        const Entity& entity = state->match_state.entities[entity_index];
-        const EntityData& entity_data = entity_get_data(entity.type);
-        if (entity.mode == MODE_UNIT_DEATH_FADE || 
-                entity.mode == MODE_BUILDING_DESTROYED ||
-                entity_data.cell_layer != CELL_LAYER_GROUND) {
-            continue;
-        }
-        if (!match_shell_is_entity_visible(state, entity)) {
-            continue;
-        }
+    {
+        GOLD_PROFILE_SCOPE_NAME("entities");
 
-        RenderSpriteParams params = match_shell_create_entity_render_params(state, entity);
-        const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(state->match_state, entity));
-        Rect render_rect = (Rect) {
-            .x = params.position.x, .y = params.position.y,
-            .w = sprite_info.frame_width, .h = sprite_info.frame_height
-        };
-
-        if (entity.bleed_timer != 0) {
-            const SpriteInfo& bleed_sprite_info = render_get_sprite_info(SPRITE_PARTICLE_BLEED);
-            ivec2 bleed_params_position = ivec2(render_rect.x + (render_rect.w / 2) - bleed_sprite_info.frame_width, 
-                                                render_rect.y + (render_rect.h / 2) - bleed_sprite_info.frame_height);
-            RenderSpriteParams bleed_params = (RenderSpriteParams) {
-                .sprite = SPRITE_PARTICLE_BLEED,
-                .frame = entity.bleed_animation.frame,
-                .position = bleed_params_position,
-                .ysort_position = bleed_params_position.y,
-                .options = RENDER_SPRITE_NO_CULL,
-                .recolor_id = 0
-            };
-            Rect bleed_render_rect = (Rect) {
-                .x = bleed_params.position.x, .y = bleed_params.position.y,
-                .w = bleed_sprite_info.frame_width, .h = bleed_sprite_info.frame_height
-            };
-            if (bleed_render_rect.intersects(SCREEN_RECT)) {
-                ysort_params.push_back(bleed_params);
+        for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
+            const Entity& entity = state->match_state.entities[entity_index];
+            const EntityData& entity_data = entity_get_data(entity.type);
+            if (entity.mode == MODE_UNIT_DEATH_FADE || 
+                    entity.mode == MODE_BUILDING_DESTROYED ||
+                    entity_data.cell_layer != CELL_LAYER_GROUND) {
+                continue;
             }
-        }
-
-        if (!render_rect.intersects(SCREEN_RECT)) {
-            continue;
-        }
-        params.options |= RENDER_SPRITE_NO_CULL;
-
-        ysort_params.push_back(params);
-    }
-
-    // Remembered entities
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (state->replay_mode && (state->replay_fog_index == 0 || state->replay_fog_index == 1)) {
-            break;
-        }
-        if (state->replay_mode && state->replay_fog_player_ids[state->replay_fog_index] != player_id) {
-            continue;
-        }
-        if (!state->replay_mode && player_id != network_get_player_id()) {
-            continue;
-        }
-
-        for (auto it : state->match_state.remembered_entities[state->match_state.players[player_id].team]) {
-            // Don't draw the remembered entity if we can see it, otherwise we will double draw them
-            if (match_shell_is_cell_rect_revealed(state, it.second.cell, it.second.cell_size)) {
+            if (!match_shell_is_entity_visible(state, entity)) {
                 continue;
             }
 
-            const EntityData& entity_data = entity_get_data(it.second.type);
-            const SpriteInfo& sprite_info = render_get_sprite_info(entity_data.sprite);
-
-            ivec2 params_position = (it.second.cell * TILE_SIZE) - state->camera_offset;
-            RenderSpriteParams params = (RenderSpriteParams) {
-                .sprite = entity_data.sprite,
-                .frame = it.second.frame,
-                .position = params_position,
-                .ysort_position = params_position.y,
-                .options = RENDER_SPRITE_NO_CULL,
-                .recolor_id = it.second.recolor_id
-            };
-
+            RenderSpriteParams params = match_shell_create_entity_render_params(state, entity);
+            const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(state->match_state, entity));
             Rect render_rect = (Rect) {
                 .x = params.position.x, .y = params.position.y,
-                .w = sprite_info.frame_width * 2, .h = sprite_info.frame_height * 2
+                .w = sprite_info.frame_width, .h = sprite_info.frame_height
             };
+
+            if (entity.bleed_timer != 0) {
+                const SpriteInfo& bleed_sprite_info = render_get_sprite_info(SPRITE_PARTICLE_BLEED);
+                ivec2 bleed_params_position = ivec2(render_rect.x + (render_rect.w / 2) - bleed_sprite_info.frame_width, 
+                                                    render_rect.y + (render_rect.h / 2) - bleed_sprite_info.frame_height);
+                RenderSpriteParams bleed_params = (RenderSpriteParams) {
+                    .sprite = SPRITE_PARTICLE_BLEED,
+                    .frame = entity.bleed_animation.frame,
+                    .position = bleed_params_position,
+                    .ysort_position = bleed_params_position.y,
+                    .options = RENDER_SPRITE_NO_CULL,
+                    .recolor_id = 0
+                };
+                Rect bleed_render_rect = (Rect) {
+                    .x = bleed_params.position.x, .y = bleed_params.position.y,
+                    .w = bleed_sprite_info.frame_width, .h = bleed_sprite_info.frame_height
+                };
+                if (bleed_render_rect.intersects(SCREEN_RECT)) {
+                    ysort_params.push_back(bleed_params);
+                }
+            }
+
             if (!render_rect.intersects(SCREEN_RECT)) {
                 continue;
             }
+            params.options |= RENDER_SPRITE_NO_CULL;
 
             ysort_params.push_back(params);
+        }
+
+        // Remembered entities
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (state->replay_mode && (state->replay_fog_index == 0 || state->replay_fog_index == 1)) {
+                break;
+            }
+            if (state->replay_mode && state->replay_fog_player_ids[state->replay_fog_index] != player_id) {
+                continue;
+            }
+            if (!state->replay_mode && player_id != network_get_player_id()) {
+                continue;
+            }
+
+            for (auto it : state->match_state.remembered_entities[state->match_state.players[player_id].team]) {
+                // Don't draw the remembered entity if we can see it, otherwise we will double draw them
+                if (match_shell_is_cell_rect_revealed(state, it.second.cell, it.second.cell_size)) {
+                    continue;
+                }
+
+                const EntityData& entity_data = entity_get_data(it.second.type);
+                const SpriteInfo& sprite_info = render_get_sprite_info(entity_data.sprite);
+
+                ivec2 params_position = (it.second.cell * TILE_SIZE) - state->camera_offset;
+                RenderSpriteParams params = (RenderSpriteParams) {
+                    .sprite = entity_data.sprite,
+                    .frame = it.second.frame,
+                    .position = params_position,
+                    .ysort_position = params_position.y,
+                    .options = RENDER_SPRITE_NO_CULL,
+                    .recolor_id = it.second.recolor_id
+                };
+
+                Rect render_rect = (Rect) {
+                    .x = params.position.x, .y = params.position.y,
+                    .w = sprite_info.frame_width * 2, .h = sprite_info.frame_height * 2
+                };
+                if (!render_rect.intersects(SCREEN_RECT)) {
+                    continue;
+                }
+
+                ysort_params.push_back(params);
+            }
         }
     }
 
@@ -3311,36 +3320,40 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Queued entity target rally points
-    for (EntityId entity_id : state->selection) {
-        const Entity& entity = state->match_state.entities.get_by_id(entity_id);
-        // If it's not an allied unit, then we can break out of this whole loop, since the rest of the selection won't be either
-        if (!entity_is_unit(entity.type) || 
-                (!state->replay_mode && entity.player_id != network_get_player_id())) {
-            break;
-        }
+    if (state->selection.size() == 1) {
+        GOLD_PROFILE_SCOPE_NAME("queued entity targets");
 
-        // Render flag for entity's current target
-        if (!entity.target_queue.empty()) {
-            ivec2 queued_target_position = match_shell_get_queued_target_position(state, entity.target);
-            if (queued_target_position.x != -1) {
-                queue_render_rally_flag(queued_target_position, entity.player_id);
+        const Entity& entity = state->match_state.entities.get_by_id(state->selection[0]);
+        // Check if it's an allied unit
+        if (entity_is_unit(entity.type) &&
+                (state->replay_mode || entity.player_id == network_get_player_id())) {
+            // Render flag for entity's current target
+            if (!entity.target_queue.empty()) {
+                ivec2 queued_target_position = match_shell_get_queued_target_position(state, entity.target);
+                if (queued_target_position.x != -1) {
+                    queue_render_rally_flag(queued_target_position, entity.player_id);
+                }
+
             }
 
-        }
-
-        // Render flag for queued targets
-        for (const Target& target : entity.target_queue) {
-            ivec2 queued_target_position = match_shell_get_queued_target_position(state, target);
-            if (queued_target_position.x != -1) {
-                queue_render_rally_flag(queued_target_position, entity.player_id);
+            // Render flag for queued targets
+            for (const Target& target : entity.target_queue) {
+                ivec2 queued_target_position = match_shell_get_queued_target_position(state, target);
+                if (queued_target_position.x != -1) {
+                    queue_render_rally_flag(queued_target_position, entity.player_id);
+                }
             }
         }
     }
 
     // Render ysort params
-    ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
-    for (const RenderSpriteParams& params : ysort_params) {
-        render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+    {
+        GOLD_PROFILE_SCOPE_NAME("render ysort params");
+
+        ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
+        for (const RenderSpriteParams& params : ysort_params) {
+            render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+        }
     }
 
     // Balloon shadows
@@ -3482,127 +3495,134 @@ void match_shell_render(const MatchShellState* state) {
         }
     }
 
-    // Sky entities select rings
-    for (EntityId entity_id : state->selection) {
-        const Entity& entity = state->match_state.entities.get_by_id(entity_id);
-        const EntityData& entity_data = entity_get_data(entity.type);
-        if (entity_data.cell_layer != CELL_LAYER_SKY) {
-            continue;
-        }
-        match_shell_render_entity_select_rings_and_healthbars(state, entity);
-    }
-
-    // Sky entity move animation
-    if (animation_is_playing(state->move_animation) && 
-            state->move_animation.name != ANIMATION_UI_MOVE_CELL &&
-            state->move_animation.frame.x % 2 == 0) {
-        uint32_t entity_index = state->match_state.entities.get_index_of(state->move_animation_entity_id);
-        if (entity_index != INDEX_INVALID) {
-            const Entity& entity = state->match_state.entities[entity_index];
-            if (entity_get_data(entity.type).cell_layer == CELL_LAYER_SKY) {
-                match_shell_render_entity_move_animation(state, entity, state->move_animation);
+    // Sky
+    {
+        GOLD_PROFILE_SCOPE_NAME("sky");
+        // Sky entities select rings
+        for (EntityId entity_id : state->selection) {
+            const Entity& entity = state->match_state.entities.get_by_id(entity_id);
+            const EntityData& entity_data = entity_get_data(entity.type);
+            if (entity_data.cell_layer != CELL_LAYER_SKY) {
+                continue;
             }
-        }
-    }
-
-    // Sky entities
-    ysort_params.clear();
-    for (const Entity& entity : state->match_state.entities) {
-        const EntityData& entity_data = entity_get_data(entity.type);
-        if (entity.mode == MODE_UNIT_DEATH_FADE || 
-                entity.mode == MODE_BUILDING_DESTROYED ||
-                entity_data.cell_layer != CELL_LAYER_SKY) {
-            continue;
-        }
-        if (!match_shell_is_entity_visible(state, entity)) {
-            continue;
+            match_shell_render_entity_select_rings_and_healthbars(state, entity);
         }
 
-        RenderSpriteParams params = match_shell_create_entity_render_params(state, entity);
-        const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(state->match_state, entity));
-        Rect render_rect = (Rect) {
-            .x = params.position.x, .y = params.position.y,
-            .w = sprite_info.frame_width, .h = sprite_info.frame_height
-        };
-        if (!render_rect.intersects(SCREEN_RECT)) {
-            continue;
-        }
-        params.options |= RENDER_SPRITE_NO_CULL;
-
-        ysort_params.push_back(params);
-    }
-    ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
-    for (const RenderSpriteParams& params : ysort_params) {
-        render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
-        if (params.sprite == SPRITE_UNIT_BALLOON) {
-            if ((params.frame.x == 3 || params.frame.x == 4) && params.frame.y != 22) {
-                int steam_hframe = params.frame.x - 3;
-                uint32_t options = RENDER_SPRITE_NO_CULL;
-                if (params.frame.y == 1) {
-                    options |= RENDER_SPRITE_FLIP_H;
+        // Sky entity move animation
+        if (animation_is_playing(state->move_animation) && 
+                state->move_animation.name != ANIMATION_UI_MOVE_CELL &&
+                state->move_animation.frame.x % 2 == 0) {
+            uint32_t entity_index = state->match_state.entities.get_index_of(state->move_animation_entity_id);
+            if (entity_index != INDEX_INVALID) {
+                const Entity& entity = state->match_state.entities[entity_index];
+                if (entity_get_data(entity.type).cell_layer == CELL_LAYER_SKY) {
+                    match_shell_render_entity_move_animation(state, entity, state->move_animation);
                 }
-                render_sprite_frame(SPRITE_UNIT_BALLOON_STEAM, ivec2(steam_hframe, 0), params.position, options, 0);
             }
         }
-    }
 
-    // Sky particles
-    for (const Particle& particle : state->match_state.particles[PARTICLE_LAYER_SKY]) {
-        match_shell_render_particle(state, particle);
+        // Sky entities
+        ysort_params.clear();
+        for (const Entity& entity : state->match_state.entities) {
+            const EntityData& entity_data = entity_get_data(entity.type);
+            if (entity.mode == MODE_UNIT_DEATH_FADE || 
+                    entity.mode == MODE_BUILDING_DESTROYED ||
+                    entity_data.cell_layer != CELL_LAYER_SKY) {
+                continue;
+            }
+            if (!match_shell_is_entity_visible(state, entity)) {
+                continue;
+            }
+
+            RenderSpriteParams params = match_shell_create_entity_render_params(state, entity);
+            const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(state->match_state, entity));
+            Rect render_rect = (Rect) {
+                .x = params.position.x, .y = params.position.y,
+                .w = sprite_info.frame_width, .h = sprite_info.frame_height
+            };
+            if (!render_rect.intersects(SCREEN_RECT)) {
+                continue;
+            }
+            params.options |= RENDER_SPRITE_NO_CULL;
+
+            ysort_params.push_back(params);
+        }
+        ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
+        for (const RenderSpriteParams& params : ysort_params) {
+            render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+            if (params.sprite == SPRITE_UNIT_BALLOON) {
+                if ((params.frame.x == 3 || params.frame.x == 4) && params.frame.y != 22) {
+                    int steam_hframe = params.frame.x - 3;
+                    uint32_t options = RENDER_SPRITE_NO_CULL;
+                    if (params.frame.y == 1) {
+                        options |= RENDER_SPRITE_FLIP_H;
+                    }
+                    render_sprite_frame(SPRITE_UNIT_BALLOON_STEAM, ivec2(steam_hframe, 0), params.position, options, 0);
+                }
+            }
+        }
+
+        // Sky particles
+        for (const Particle& particle : state->match_state.particles[PARTICLE_LAYER_SKY]) {
+            match_shell_render_particle(state, particle);
+        }
     }
 
     // Fog of War
-    for (int fog_pass = 0; fog_pass < 2; fog_pass++) {
-        for (int y = 0; y < max_visible_tiles.y; y++) {
-            for (int x = 0; x < max_visible_tiles.x; x++) {
-                ivec2 fog_cell = base_coords + ivec2(x, y);
-                int fog = match_shell_get_fog(state, fog_cell);
-                if (fog > 0) {
-                    continue;
-                }
-                if (fog_pass == 1 && fog == FOG_EXPLORED) {
-                    continue;
-                }
+    {
+        GOLD_PROFILE_SCOPE_NAME("fog of war");
+        for (int fog_pass = 0; fog_pass < 2; fog_pass++) {
+            for (int y = 0; y < max_visible_tiles.y; y++) {
+                for (int x = 0; x < max_visible_tiles.x; x++) {
+                    ivec2 fog_cell = base_coords + ivec2(x, y);
+                    int fog = match_shell_get_fog(state, fog_cell);
+                    if (fog > 0) {
+                        continue;
+                    }
+                    if (fog_pass == 1 && fog == FOG_EXPLORED) {
+                        continue;
+                    }
 
-                uint32_t neighbors = 0;
-                for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-                    ivec2 neighbor_cell = fog_cell + DIRECTION_IVEC2[direction];
-                    if (!map_is_cell_in_bounds(state->match_state.map, neighbor_cell)) {
-                        neighbors += DIRECTION_MASK[direction];
-                        continue;
+                    uint32_t neighbors = 0;
+                    for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                        ivec2 neighbor_cell = fog_cell + DIRECTION_IVEC2[direction];
+                        if (!map_is_cell_in_bounds(state->match_state.map, neighbor_cell)) {
+                            neighbors += DIRECTION_MASK[direction];
+                            continue;
+                        }
+                        if ((fog_pass == 0 && match_shell_get_fog(state, neighbor_cell) < 1) ||
+                            (fog_pass != 0 && match_shell_get_fog(state, neighbor_cell) == FOG_HIDDEN)) {
+                            neighbors += DIRECTION_MASK[direction];
+                        }
                     }
-                    if ((fog_pass == 0 && match_shell_get_fog(state, neighbor_cell) < 1) ||
-                        (fog_pass != 0 && match_shell_get_fog(state, neighbor_cell) == FOG_HIDDEN)) {
-                        neighbors += DIRECTION_MASK[direction];
-                    }
-                }
 
-                for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
-                    ivec2 neighbor_cell = fog_cell + DIRECTION_IVEC2[direction];
-                    int prev_direction = direction - 1;
-                    int next_direction = (direction + 1) % DIRECTION_COUNT;
-                    if ((neighbors & DIRECTION_MASK[prev_direction]) != DIRECTION_MASK[prev_direction] ||
-                        (neighbors & DIRECTION_MASK[next_direction]) != DIRECTION_MASK[next_direction]) {
-                        continue;
+                    for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
+                        ivec2 neighbor_cell = fog_cell + DIRECTION_IVEC2[direction];
+                        int prev_direction = direction - 1;
+                        int next_direction = (direction + 1) % DIRECTION_COUNT;
+                        if ((neighbors & DIRECTION_MASK[prev_direction]) != DIRECTION_MASK[prev_direction] ||
+                            (neighbors & DIRECTION_MASK[next_direction]) != DIRECTION_MASK[next_direction]) {
+                            continue;
+                        }
+                        if (!map_is_cell_in_bounds(state->match_state.map, neighbor_cell)) {
+                            neighbors += DIRECTION_MASK[direction];
+                            continue;
+                        }
+                        if ((fog_pass == 0 && match_shell_get_fog(state, neighbor_cell) < 1) ||
+                            (fog_pass != 0 && match_shell_get_fog(state, neighbor_cell) == FOG_HIDDEN)) {
+                            neighbors += DIRECTION_MASK[direction];
+                        }
                     }
-                    if (!map_is_cell_in_bounds(state->match_state.map, neighbor_cell)) {
-                        neighbors += DIRECTION_MASK[direction];
-                        continue;
-                    }
-                    if ((fog_pass == 0 && match_shell_get_fog(state, neighbor_cell) < 1) ||
-                        (fog_pass != 0 && match_shell_get_fog(state, neighbor_cell) == FOG_HIDDEN)) {
-                        neighbors += DIRECTION_MASK[direction];
-                    }
+                    int autotile_index = map_neighbors_to_autotile_index(neighbors);
+                    #ifdef GOLD_DEBUG
+                        if (state->debug_fog == DEBUG_FOG_DISABLED) {
+                            continue;
+                        }
+                    #endif
+                    render_sprite_frame(fog_pass == 0 ? SPRITE_FOG_EXPLORED : SPRITE_FOG_HIDDEN, 
+                            ivec2(autotile_index % AUTOTILE_HFRAMES, autotile_index / AUTOTILE_HFRAMES), 
+                            base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
                 }
-                int autotile_index = map_neighbors_to_autotile_index(neighbors);
-                #ifdef GOLD_DEBUG
-                    if (state->debug_fog == DEBUG_FOG_DISABLED) {
-                        continue;
-                    }
-                #endif
-                render_sprite_frame(fog_pass == 0 ? SPRITE_FOG_EXPLORED : SPRITE_FOG_HIDDEN, 
-                        ivec2(autotile_index % AUTOTILE_HFRAMES, autotile_index / AUTOTILE_HFRAMES), 
-                        base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
             }
         }
     }
@@ -3612,716 +3632,724 @@ void match_shell_render(const MatchShellState* state) {
         render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
     }
 
-    // UI Building Placement
-    if (state->mode == MATCH_SHELL_MODE_BUILDING_PLACE && !match_shell_is_mouse_in_ui()) {
-        const EntityData& building_data = entity_get_data(state->building_type);
+    // UI
+    {
+        GOLD_PROFILE_SCOPE_NAME("ui");
 
-        // First draw the building
-        ivec2 building_cell = match_shell_get_building_cell(building_data.cell_size, state->camera_offset);
-        render_sprite_frame(building_data.sprite, ivec2(3, 0), (building_cell * TILE_SIZE) - state->camera_offset, RENDER_SPRITE_NO_CULL, state->match_state.players[network_get_player_id()].recolor_id);
+        // UI Building Placement
+        if (state->mode == MATCH_SHELL_MODE_BUILDING_PLACE && !match_shell_is_mouse_in_ui()) {
+            const EntityData& building_data = entity_get_data(state->building_type);
 
-        // Then draw the green / red squares
-        ivec2 miner_cell = state->match_state.entities.get_by_id(match_get_nearest_builder(state->match_state, state->selection, building_cell)).cell;
-        for (int y = building_cell.y; y < building_cell.y + building_data.cell_size; y++) {
-            for (int x = building_cell.x; x < building_cell.x + building_data.cell_size; x++) {
-                ivec2 cell = ivec2(x, y);
-                bool is_cell_red = !match_shell_is_building_place_cell_valid(state, miner_cell, cell);
-                
-                // Don't allow buildings too close to goldmines
-                if (state->building_type == ENTITY_HALL) {
-                    for (const Entity& goldmine : state->match_state.entities) {
-                        if (goldmine.type == ENTITY_GOLDMINE && entity_goldmine_get_block_building_rect(goldmine.cell).has_point(cell)) {
-                            is_cell_red = true;
+            // First draw the building
+            ivec2 building_cell = match_shell_get_building_cell(building_data.cell_size, state->camera_offset);
+            render_sprite_frame(building_data.sprite, ivec2(3, 0), (building_cell * TILE_SIZE) - state->camera_offset, RENDER_SPRITE_NO_CULL, state->match_state.players[network_get_player_id()].recolor_id);
+
+            // Then draw the green / red squares
+            ivec2 miner_cell = state->match_state.entities.get_by_id(match_get_nearest_builder(state->match_state, state->selection, building_cell)).cell;
+            for (int y = building_cell.y; y < building_cell.y + building_data.cell_size; y++) {
+                for (int x = building_cell.x; x < building_cell.x + building_data.cell_size; x++) {
+                    ivec2 cell = ivec2(x, y);
+                    bool is_cell_red = !match_shell_is_building_place_cell_valid(state, miner_cell, cell);
+                    
+                    // Don't allow buildings too close to goldmines
+                    if (state->building_type == ENTITY_HALL) {
+                        for (const Entity& goldmine : state->match_state.entities) {
+                            if (goldmine.type == ENTITY_GOLDMINE && entity_goldmine_get_block_building_rect(goldmine.cell).has_point(cell)) {
+                                is_cell_red = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    RenderColor cell_color = is_cell_red ? RENDER_COLOR_RED_TRANSPARENT : RENDER_COLOR_GREEN_TRANSPARENT;
+                    Rect cell_rect = (Rect) {
+                        .x = (x * TILE_SIZE) - state->camera_offset.x,
+                        .y = (y * TILE_SIZE) - state->camera_offset.y,
+                        .w = TILE_SIZE,
+                        .h = TILE_SIZE
+                    };
+                    render_fill_rect(cell_rect, cell_color);
+                }
+            }
+        }
+        // End UI building placement
+
+        // UI queued building placements
+        for (EntityId entity_id : state->selection) {
+            const Entity& entity = state->match_state.entities.get_by_id(entity_id);
+            // If it's not an allied unit, then we can break out of this whole loop, since the rest of the selection won't be either
+            if (!entity_is_unit(entity.type) || 
+                    (!state->replay_mode && entity.player_id != network_get_player_id())) {
+                break;
+            }
+
+            if (entity.target.type == TARGET_BUILD && entity.target.id == ID_NULL) {
+                match_shell_render_target_build(state, entity.target, entity.player_id);
+            }
+            for (const Target& target : entity.target_queue) {
+                if (target.type == TARGET_BUILD) {
+                    match_shell_render_target_build(state, target, entity.player_id);
+                } 
+            }
+        }
+
+        // UI Chat
+        static const ivec2 CHAT_PROMPT_POSITION = ivec2(32 + 12, MINIMAP_RECT.y - 20);
+        for (uint32_t chat_index = 0; chat_index < state->chat.size(); chat_index++) {
+            const ChatMessage& message = state->chat[state->chat.size() - chat_index - 1];
+            ivec2 message_pos = CHAT_PROMPT_POSITION + ivec2(0, -((chat_index + 1) * 16));
+            if (strlen(message.prefix) != 0) {
+                render_text(FONT_HACK_SHADOW, message.prefix, message_pos + ivec2(1, 1));
+                render_text(message.prefix_font, message.prefix, message_pos);
+                message_pos.x += render_get_text_size(FONT_HACK_WHITE, message.prefix).x + render_get_text_size(FONT_HACK_WHITE, " ").x;
+            }
+            render_text(FONT_HACK_SHADOW, message.message, message_pos + ivec2(1, 1));
+            render_text(FONT_HACK_WHITE, message.message, message_pos);
+        }
+        if (input_is_text_input_active()) {
+            char prompt_str[128];
+            sprintf(prompt_str, "Chat: %s", state->chat_message.c_str());
+            render_text(FONT_HACK_SHADOW, prompt_str, CHAT_PROMPT_POSITION + ivec2(1, 1));
+            render_text(FONT_HACK_WHITE, prompt_str, CHAT_PROMPT_POSITION);
+            if (state->chat_cursor_visible) {
+                int prompt_width = render_get_text_size(FONT_HACK_WHITE, prompt_str).x;
+                ivec2 cursor_pos = CHAT_PROMPT_POSITION + ivec2(prompt_width - 1, -1);
+                render_text(FONT_HACK_SHADOW, "|", cursor_pos + ivec2(1, 1));
+                render_text(FONT_HACK_WHITE, "|", cursor_pos);
+            }
+        }
+
+        // Select rect
+        if (match_shell_is_selecting(state)) {
+            ivec2 mouse_world_pos = ivec2(input_get_mouse_position().x, std::min(input_get_mouse_position().y, SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT)) + state->camera_offset;
+            Rect select_rect = (Rect) {
+                .x = std::min(state->select_origin.x, mouse_world_pos.x) - state->camera_offset.x, 
+                .y = std::min(state->select_origin.y, mouse_world_pos.y) - state->camera_offset.y,
+                .w = std::abs(state->select_origin.x - mouse_world_pos.x),
+                .h = std::abs(state->select_origin.y - mouse_world_pos.y)
+            };
+            select_rect.x++;
+            select_rect.y++;
+            render_draw_rect(select_rect, RENDER_COLOR_OFFBLACK_A200);
+            select_rect.x--;
+            select_rect.y--;
+            render_draw_rect(select_rect, RENDER_COLOR_WHITE);
+        }
+
+        // UI frames
+        const SpriteInfo& minimap_sprite_info = render_get_sprite_info(SPRITE_UI_MINIMAP);
+        render_sprite_frame(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
+        render_ninepatch(SPRITE_UI_FRAME_BOLTS, BOTTOM_PANEL_RECT);
+        if (state->replay_mode) {
+            render_ninepatch(SPRITE_UI_FRAME_BOLTS, REPLAY_PANEL_RECT);
+        } else {
+            render_ninepatch(SPRITE_UI_FRAME_BOLTS, BUTTON_PANEL_RECT);
+            render_sprite_frame(SPRITE_UI_WANTED_SIGN, ivec2(0, 0), WANTED_SIGN_POSITION, 0, 0);
+        }
+
+        // UI Control groups
+        for (int control_group_index = 0; control_group_index < MATCH_SHELL_CONTROL_GROUP_COUNT; control_group_index++) {
+            // Count the entities in this control group and determine which is the most common
+            uint32_t entity_count = 0;
+            std::unordered_map<EntityType, uint32_t> entity_occurances;
+            EntityType most_common_entity_type = ENTITY_MINER;
+            entity_occurances[ENTITY_MINER] = 0;
+
+            for (EntityId id : state->control_groups[control_group_index]) {
+                uint32_t entity_index = state->match_state.entities.get_index_of(id);
+                if (entity_index == INDEX_INVALID || state->match_state.entities[entity_index].health == 0) {
+                    continue;
+                }
+
+                EntityType entity_type = state->match_state.entities[entity_index].type;
+                auto occurances_it = entity_occurances.find(entity_type);
+                if (occurances_it == entity_occurances.end()) {
+                    entity_occurances[entity_type] = 1;
+                } else {
+                    occurances_it->second++;
+                }
+                if (entity_occurances[entity_type] > entity_occurances[most_common_entity_type]) {
+                    most_common_entity_type = entity_type;
+                }
+                entity_count++;
+            }
+
+            if (entity_count == 0) {
+                continue;
+            }
+
+            int button_frame = 0;
+            FontName font = FONT_M3X6_OFFBLACK;
+            if (state->control_group_selected != control_group_index) {
+                font = FONT_M3X6_DARKBLACK;
+                button_frame = 2;
+            }
+
+            SpriteName button_icon = entity_get_icon(state->match_state, most_common_entity_type, network_get_player_id());
+            const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_CONTROL_GROUP);
+            ivec2 render_pos = ivec2(BOTTOM_PANEL_RECT.x, BOTTOM_PANEL_RECT.y) + ivec2(2, 0) + ivec2((3 + sprite_info.frame_width) * control_group_index, -32);
+            render_sprite_frame(SPRITE_UI_CONTROL_GROUP, ivec2(button_frame, 0), render_pos, RENDER_SPRITE_NO_CULL, 0);
+            render_sprite_frame(button_icon, ivec2(button_frame, 0), render_pos + ivec2(2, 0), RENDER_SPRITE_NO_CULL, 0);
+            char control_group_number_text[4];
+            sprintf(control_group_number_text, "%u", control_group_index == 9 ? 0 : control_group_index + 1);
+            render_text(font, control_group_number_text, render_pos + ivec2(3, -9));
+            char control_group_count_text[4];
+            sprintf(control_group_count_text, "%u", entity_count);
+            ivec2 count_text_size = render_get_text_size(font, control_group_count_text);
+            render_text(font, control_group_count_text, render_pos + ivec2(32 - count_text_size.x, 23 - count_text_size.y));
+        }
+
+        // Idle miner
+        if (!state->replay_mode) {
+            const std::vector<EntityId> idle_miners = match_shell_find_idle_miners(state);
+            if (!idle_miners.empty()) {
+                const Rect idle_miner_button_rect = match_shell_get_idle_miner_button_rect();
+                const bool is_hovered = idle_miner_button_rect.has_point(input_get_mouse_position());
+                const ivec2 render_pos = ivec2(idle_miner_button_rect.x, idle_miner_button_rect.y) - ivec2(0, (int)is_hovered);
+                const FontName font = is_hovered ? FONT_M3X6_WHITE : FONT_M3X6_OFFBLACK;
+                render_sprite_frame(SPRITE_UI_CONTROL_GROUP, ivec2((int)is_hovered, 0), render_pos, RENDER_SPRITE_NO_CULL, 0);
+                render_sprite_frame(SPRITE_BUTTON_ICON_MINER, ivec2((int)is_hovered, 0), render_pos + ivec2(2, 0), RENDER_SPRITE_NO_CULL, 0);
+                char idle_miner_count_text[4];
+                sprintf(idle_miner_count_text, "%u", (uint32_t)idle_miners.size());
+                ivec2 idle_miner_count_text_size = render_get_text_size(font, idle_miner_count_text);
+                render_text(font, idle_miner_count_text, render_pos + ivec2(32 - idle_miner_count_text_size.x, 23 - idle_miner_count_text_size.y));
+            }
+        }
+
+        // UI Status message
+        if (state->status_timer != 0) {
+            int status_message_width = render_get_text_size(FONT_HACK_WHITE, state->status_message.c_str()).x;
+            ivec2 status_message_position = ivec2((SCREEN_WIDTH / 2) - (status_message_width / 2), SCREEN_HEIGHT - 148);
+            render_text(FONT_HACK_SHADOW, state->status_message.c_str(), status_message_position + ivec2(1, 1));
+            render_text(FONT_HACK_WHITE, state->status_message.c_str(), status_message_position);
+        }
+        
+        // Hotkeys
+        for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
+            InputAction hotkey = state->hotkey_group[hotkey_index];
+            if (hotkey == INPUT_HOTKEY_NONE) {
+                continue;
+            }
+
+            const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
+            ivec2 hotkey_position = SHELL_BUTTON_POSITIONS[hotkey_index];
+            Rect hotkey_rect = (Rect) { 
+                .x = hotkey_position.x, .y = hotkey_position.y,
+                .w = sprite_info.frame_width, .h = sprite_info.frame_height
+            };
+            int hframe = 0;
+            if (!match_shell_does_player_meet_hotkey_requirements(state->match_state, hotkey)) {
+                hframe = 2;
+            } else if (match_shell_is_camera_free(state) && !match_shell_is_selecting(state) && hotkey_rect.has_point(input_get_mouse_position())) {
+                hframe = 1;
+                hotkey_position.y--;
+            }
+
+            render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), hotkey_position, RENDER_SPRITE_NO_CULL, 0);
+            render_sprite_frame(match_shell_hotkey_get_sprite(state, hotkey, match_shell_should_render_hotkey_toggled(state, hotkey)), ivec2(hframe, 0), hotkey_position, RENDER_SPRITE_NO_CULL, 0);
+        }
+
+        // UI Tooltip
+        if (match_shell_is_camera_free(state) && 
+                !(match_shell_is_selecting(state) || match_shell_is_in_menu(state))) {
+            uint32_t hotkey_hovered_index;
+            for (hotkey_hovered_index = 0; hotkey_hovered_index < HOTKEY_GROUP_SIZE; hotkey_hovered_index++) {
+                Rect hotkey_rect = (Rect) {
+                    .x = SHELL_BUTTON_POSITIONS[hotkey_hovered_index].x,
+                    .y = SHELL_BUTTON_POSITIONS[hotkey_hovered_index].y,
+                    .w = 32,
+                    .h = 32
+                };
+                if (hotkey_rect.has_point(input_get_mouse_position())) {
+                    break;
+                }
+            }
+
+            InputAction hotkey = INPUT_HOTKEY_NONE;
+            if (hotkey_hovered_index != HOTKEY_GROUP_SIZE) {
+                hotkey = state->hotkey_group[hotkey_hovered_index];
+            }
+
+            const Rect idle_miner_rect = match_shell_get_idle_miner_button_rect();
+            if (idle_miner_rect.has_point(input_get_mouse_position())) {
+                // Determine if we actually have idle miners before rendering the tooltip
+                bool has_idle_miners = false;
+                for (const Entity& entity : state->match_state.entities) {
+                    if (entity.player_id == network_get_player_id() && entity_is_idle_miner(entity)) {
+                        has_idle_miners = true;
+                        break;
+                    }
+                }
+                if (has_idle_miners) {
+                    hotkey = INPUT_HOTKEY_IDLE_MINER;
+                }
+            }
+
+            if (hotkey != INPUT_HOTKEY_NONE) {
+                match_shell_render_tooltip(state, hotkey);
+            } 
+        }
+        // End render tooltip
+
+        // UI Selection list
+        if (state->selection.size() == 1) {
+            const Entity& entity = state->match_state.entities.get_by_id(state->selection[0]);
+            const EntityData& entity_data = entity_get_data(entity.type);
+
+            // Entity name
+            const SpriteInfo& frame_sprite_info = render_get_sprite_info(SPRITE_UI_TEXT_FRAME);
+            ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, entity_data.name);
+            int frame_count = (text_size.x / frame_sprite_info.frame_width) + 1;
+            if (text_size.x % frame_sprite_info.frame_width != 0) {
+                frame_count++;
+            }
+            for (int frame = 0; frame < frame_count; frame++) {
+                int hframe = 1;
+                if (frame == 0) {
+                    hframe = 0;
+                } else if (frame == frame_count - 1) {
+                    hframe = 2;
+                }
+                render_sprite_frame(SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), SELECTION_LIST_TOP_LEFT + ivec2(frame * frame_sprite_info.frame_width, 0), RENDER_SPRITE_NO_CULL, 0);
+            }
+            ivec2 frame_size = ivec2(frame_count * frame_sprite_info.frame_width, frame_sprite_info.frame_height);
+            render_text(FONT_WESTERN8_OFFBLACK, entity_data.name, SELECTION_LIST_TOP_LEFT + ivec2((frame_size.x / 2) - (text_size.x / 2), 0));
+
+            // Entity icon
+            render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
+            render_sprite_frame(entity_get_icon(state->match_state, entity.type, entity.player_id), ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
+
+            if (entity.type == ENTITY_GOLDMINE) {
+                if (entity.mode == MODE_GOLDMINE_COLLAPSED) {
+                    render_text(FONT_HACK_WHITE, "Collapsed!", SELECTION_LIST_TOP_LEFT + ivec2(36, 20));
+                } else {
+                    char gold_left_str[8];
+                    sprintf(gold_left_str, "%u", entity.gold_held);
+                    render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(36, 20), RENDER_SPRITE_NO_CULL, 0);
+                    render_text(FONT_HACK_WHITE, gold_left_str, SELECTION_LIST_TOP_LEFT + ivec2(36 + render_get_sprite_info(SPRITE_UI_GOLD_ICON).frame_width + 2, 21));
+                }
+            } else {
+                ivec2 healthbar_position = SELECTION_LIST_TOP_LEFT + ivec2(34, 18 + 2);
+                ivec2 healthbar_size = ivec2(64, 12);
+                match_shell_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
+
+                char health_text[16];
+                sprintf(health_text, "%i/%i", entity.health, entity_data.max_health);
+                ivec2 health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
+                ivec2 health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2); 
+                render_text(FONT_HACK_WHITE, health_text, health_text_position);
+
+                if (entity_is_unit(entity.type) && entity_data.unit_data.max_energy != 0)  {
+                    healthbar_position += ivec2(0, healthbar_size.y + 1);
+                    match_shell_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_data.unit_data.max_energy);
+                    sprintf(health_text, "%i/%i", entity.energy, entity_data.unit_data.max_energy);
+                    health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
+                    health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2); 
+                    render_text(FONT_HACK_WHITE, health_text, health_text_position);
+                }
+
+                SpriteName stat_icons[4];
+                int stat_count = 0;
+
+                // Detection
+                if (entity_has_detection(state->match_state, entity)) {
+                    stat_icons[stat_count] = SPRITE_UI_STAT_ICON_DETECTION;
+                    stat_count++;
+                }
+
+                // Bleeding
+                if (entity.bleed_timer != 0) {
+                    stat_icons[stat_count] = SPRITE_UI_STAT_ICON_BLEED;
+                    stat_count++;
+                }
+
+                ivec2 stat_position = SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 34); 
+                ivec2 stat_positions[2];
+                const int STAT_ICON_SIZE = render_get_sprite_info(SPRITE_UI_STAT_ICON_DETECTION).frame_width;
+                int STAT_TEXT_PADDING = 1;
+
+                for (int stat_index = 0; stat_index < stat_count; stat_index++) {
+                    render_sprite_frame(stat_icons[stat_index], ivec2(0, 0), stat_position, RENDER_SPRITE_NO_CULL, 0);
+                    stat_positions[stat_index] = stat_position;
+                    stat_position.y += STAT_ICON_SIZE + STAT_TEXT_PADDING; 
+                }
+
+                // Determine if a stat is being hovered
+                int stat_hovered;
+                for (stat_hovered = 0; stat_hovered < stat_count; stat_hovered++) {
+                    Rect stat_rect = (Rect) {
+                        .x = stat_positions[stat_hovered].x,
+                        .y = stat_positions[stat_hovered].y,
+                        .w = STAT_ICON_SIZE, .h = STAT_ICON_SIZE
+                    };
+                    if (stat_rect.has_point(input_get_mouse_position())) {
+                        break;
+                    }
+                }
+
+                // Render stat tooltip
+                if (stat_hovered != stat_count) {
+                    const SpriteInfo& tooltip_info = render_get_sprite_info(SPRITE_UI_TOOLTIP_FRAME);
+                    const char* tooltip_text = match_shell_render_get_stat_tooltip(stat_icons[stat_hovered]);
+
+                    // Determine tooltip size
+                    ivec2 tooltip_text_size = render_get_text_size(FONT_HACK_OFFBLACK, tooltip_text);
+                    int tooltip_width = tooltip_text_size.x + tooltip_info.frame_width;
+                    int tooltip_frame_count = tooltip_width / tooltip_info.frame_width;
+                    if (tooltip_width % tooltip_info.frame_width != 0) {
+                        tooltip_frame_count++;
+                    }
+
+                    // Determine tooltip position
+                    ivec2 tooltip_pos = stat_positions[stat_hovered] + ivec2(STAT_ICON_SIZE - 1, -((tooltip_info.frame_height * 2) - 2));
+
+                    // Render tooltip background
+                    for (int frame_x = 0; frame_x < tooltip_frame_count; frame_x++) {
+                        int hframe = 1;
+                        if (frame_x == 0) {
+                            hframe = 0;
+                        } else if (frame_x == tooltip_frame_count - 1) {
+                            hframe = 2;
+                        }
+
+                        render_sprite_frame(SPRITE_UI_TOOLTIP_FRAME, ivec2(hframe, 0), tooltip_pos + ivec2(tooltip_info.frame_width * frame_x, 0), RENDER_SPRITE_NO_CULL, 0);
+                        render_sprite_frame(SPRITE_UI_TOOLTIP_FRAME, ivec2(hframe, 2), tooltip_pos + ivec2(tooltip_info.frame_width * frame_x, tooltip_info.frame_height), RENDER_SPRITE_NO_CULL, 0);
+                    }
+
+                    // Render tooltip text
+                    render_text(FONT_HACK_OFFBLACK, tooltip_text, tooltip_pos + ivec2(4, 2));
+                }
+            }
+        } else {
+            for (uint32_t selection_index = 0; selection_index < state->selection.size(); selection_index++) {
+                match_shell_render_entity_icon(
+                    state, 
+                    state->match_state.entities.get_by_id(state->selection[selection_index]), 
+                    match_shell_get_selection_list_item_rect(selection_index));
+            }
+        }
+        // End UI Selection List
+
+        // UI Building queues
+        if (state->selection.size() == 1) {
+            const Entity& building = state->match_state.entities.get_by_id(state->selection[0]);
+            if (entity_is_building(building.type) && 
+                    !building.queue.empty() &&
+                    (state->replay_mode || building.player_id == network_get_player_id())) {
+                // Render building queue icon buttons
+                const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
+                for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
+                    Rect icon_rect = (Rect) {
+                        .x = BUILDING_QUEUE_POSITIONS[building_queue_index].x,
+                        .y = BUILDING_QUEUE_POSITIONS[building_queue_index].y,
+                        .w = icon_sprite_info.frame_width,
+                        .h = icon_sprite_info.frame_height 
+                    };
+                    SpriteName item_sprite;
+                    switch (building.queue[building_queue_index].type) {
+                        case BUILDING_QUEUE_ITEM_UNIT: {
+                            item_sprite = entity_get_icon(state->match_state, building.queue[building_queue_index].unit_type, building.player_id);
+                            break;
+                        }
+                        case BUILDING_QUEUE_ITEM_UPGRADE: {
+                            item_sprite = upgrade_get_data(building.queue[building_queue_index].upgrade).icon;
                             break;
                         }
                     }
+                    bool hovered = 
+                        match_shell_is_camera_free(state) && 
+                        !match_shell_is_selecting(state) && 
+                        icon_rect.has_point(input_get_mouse_position());
+                    render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
+                    render_sprite_frame(item_sprite, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
                 }
 
-                RenderColor cell_color = is_cell_red ? RENDER_COLOR_RED_TRANSPARENT : RENDER_COLOR_GREEN_TRANSPARENT;
-                Rect cell_rect = (Rect) {
-                    .x = (x * TILE_SIZE) - state->camera_offset.x,
-                    .y = (y * TILE_SIZE) - state->camera_offset.y,
-                    .w = TILE_SIZE,
-                    .h = TILE_SIZE
-                };
-                render_fill_rect(cell_rect, cell_color);
+                // Render building queue progress bar
+                if (building.timer == BUILDING_QUEUE_BLOCKED) {
+                    render_text(FONT_WESTERN8_GOLD, "Build more houses.", ivec2(BUILDING_QUEUE_PROGRESS_BAR_RECT.x + 1, BUILDING_QUEUE_PROGRESS_BAR_RECT.y - 12));
+                } else if (building.timer == BUILDING_QUEUE_EXIT_BLOCKED) {
+                    render_text(FONT_WESTERN8_GOLD, "Exit is blocked.", ivec2(BUILDING_QUEUE_PROGRESS_BAR_RECT.x + 1, BUILDING_QUEUE_PROGRESS_BAR_RECT.y - 12));
+                } else {
+                    int item_duration = (int)building_queue_item_duration(building.queue[0]);
+                    Rect building_queue_progress_bar_subrect = BUILDING_QUEUE_PROGRESS_BAR_RECT;
+                    building_queue_progress_bar_subrect.w = (BUILDING_QUEUE_PROGRESS_BAR_RECT.w * (item_duration - (int)building.timer) / item_duration);
+                    render_fill_rect(building_queue_progress_bar_subrect, RENDER_COLOR_WHITE);
+                    render_draw_rect(BUILDING_QUEUE_PROGRESS_BAR_RECT, RENDER_COLOR_OFFBLACK);
+                }
             }
         }
-    }
-    // End UI building placement
 
-    // UI queued building placements
-    for (EntityId entity_id : state->selection) {
-        const Entity& entity = state->match_state.entities.get_by_id(entity_id);
-        // If it's not an allied unit, then we can break out of this whole loop, since the rest of the selection won't be either
-        if (!entity_is_unit(entity.type) || 
-                (!state->replay_mode && entity.player_id != network_get_player_id())) {
-            break;
+        // UI Garrisoned units
+        if (state->selection.size() == 1) {
+            const Entity& carrier = state->match_state.entities.get_by_id(state->selection[0]);
+            if (carrier.type == ENTITY_GOLDMINE || 
+                    state->replay_mode ||
+                    carrier.player_id == network_get_player_id()) {
+                const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
+                int index = 0;
+                for (EntityId entity_id : carrier.garrisoned_units) {
+                    const Entity& garrisoned_unit = state->match_state.entities.get_by_id(entity_id);
+                    // We have to make this check here because goldmines might have both allied and enemy units in them
+                    if (!state->replay_mode && garrisoned_unit.player_id != network_get_player_id()) {
+                        continue;
+                    }
+
+                    Rect icon_rect = (Rect) {
+                        .x = GARRISON_ICON_POSITIONS[index].x,
+                        .y = GARRISON_ICON_POSITIONS[index].y,
+                        .w = icon_sprite_info.frame_width,
+                        .h = icon_sprite_info.frame_height
+                    };
+                    match_shell_render_entity_icon(state, garrisoned_unit, icon_rect);
+                    index++;
+                }
+            }
         }
 
-        if (entity.target.type == TARGET_BUILD && entity.target.id == ID_NULL) {
-            match_shell_render_target_build(state, entity.target, entity.player_id);
-        }
-        for (const Target& target : entity.target_queue) {
-            if (target.type == TARGET_BUILD) {
-                match_shell_render_target_build(state, target, entity.player_id);
-            } 
-        }
-    }
-
-    // UI Chat
-    static const ivec2 CHAT_PROMPT_POSITION = ivec2(32 + 12, MINIMAP_RECT.y - 20);
-    for (uint32_t chat_index = 0; chat_index < state->chat.size(); chat_index++) {
-        const ChatMessage& message = state->chat[state->chat.size() - chat_index - 1];
-        ivec2 message_pos = CHAT_PROMPT_POSITION + ivec2(0, -((chat_index + 1) * 16));
-        if (strlen(message.prefix) != 0) {
-            render_text(FONT_HACK_SHADOW, message.prefix, message_pos + ivec2(1, 1));
-            render_text(message.prefix_font, message.prefix, message_pos);
-            message_pos.x += render_get_text_size(FONT_HACK_WHITE, message.prefix).x + render_get_text_size(FONT_HACK_WHITE, " ").x;
-        }
-        render_text(FONT_HACK_SHADOW, message.message, message_pos + ivec2(1, 1));
-        render_text(FONT_HACK_WHITE, message.message, message_pos);
-    }
-    if (input_is_text_input_active()) {
-        char prompt_str[128];
-        sprintf(prompt_str, "Chat: %s", state->chat_message.c_str());
-        render_text(FONT_HACK_SHADOW, prompt_str, CHAT_PROMPT_POSITION + ivec2(1, 1));
-        render_text(FONT_HACK_WHITE, prompt_str, CHAT_PROMPT_POSITION);
-        if (state->chat_cursor_visible) {
-            int prompt_width = render_get_text_size(FONT_HACK_WHITE, prompt_str).x;
-            ivec2 cursor_pos = CHAT_PROMPT_POSITION + ivec2(prompt_width - 1, -1);
-            render_text(FONT_HACK_SHADOW, "|", cursor_pos + ivec2(1, 1));
-            render_text(FONT_HACK_WHITE, "|", cursor_pos);
-        }
-    }
-
-    // Select rect
-    if (match_shell_is_selecting(state)) {
-        ivec2 mouse_world_pos = ivec2(input_get_mouse_position().x, std::min(input_get_mouse_position().y, SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT)) + state->camera_offset;
-        Rect select_rect = (Rect) {
-            .x = std::min(state->select_origin.x, mouse_world_pos.x) - state->camera_offset.x, 
-            .y = std::min(state->select_origin.y, mouse_world_pos.y) - state->camera_offset.y,
-            .w = std::abs(state->select_origin.x - mouse_world_pos.x),
-            .h = std::abs(state->select_origin.y - mouse_world_pos.y)
-        };
-        select_rect.x++;
-        select_rect.y++;
-        render_draw_rect(select_rect, RENDER_COLOR_OFFBLACK_A200);
-        select_rect.x--;
-        select_rect.y--;
-        render_draw_rect(select_rect, RENDER_COLOR_WHITE);
-    }
-
-    // UI frames
-    const SpriteInfo& minimap_sprite_info = render_get_sprite_info(SPRITE_UI_MINIMAP);
-    render_sprite_frame(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
-    render_ninepatch(SPRITE_UI_FRAME_BOLTS, BOTTOM_PANEL_RECT);
-    if (state->replay_mode) {
-        render_ninepatch(SPRITE_UI_FRAME_BOLTS, REPLAY_PANEL_RECT);
-    } else {
-        render_ninepatch(SPRITE_UI_FRAME_BOLTS, BUTTON_PANEL_RECT);
-        render_sprite_frame(SPRITE_UI_WANTED_SIGN, ivec2(0, 0), WANTED_SIGN_POSITION, 0, 0);
-    }
-
-    // UI Control groups
-    for (int control_group_index = 0; control_group_index < MATCH_SHELL_CONTROL_GROUP_COUNT; control_group_index++) {
-        // Count the entities in this control group and determine which is the most common
-        uint32_t entity_count = 0;
-        std::unordered_map<EntityType, uint32_t> entity_occurances;
-        EntityType most_common_entity_type = ENTITY_MINER;
-        entity_occurances[ENTITY_MINER] = 0;
-
-        for (EntityId id : state->control_groups[control_group_index]) {
-            uint32_t entity_index = state->match_state.entities.get_index_of(id);
-            if (entity_index == INDEX_INVALID || state->match_state.entities[entity_index].health == 0) {
+        // Resource counters
+        const SpriteInfo& population_icon_sprite_info = render_get_sprite_info(SPRITE_UI_HOUSE_ICON);
+        const SpriteInfo& gold_icon_sprite_info = render_get_sprite_info(SPRITE_UI_GOLD_ICON);
+        int resource_base_y = 0;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (!state->replay_mode && player_id != network_get_player_id()) {
+                continue;
+            }
+            // TODO: is there a bug in replay mode where players will stop rendering their gold after they get defeated?
+            if (state->replay_mode && !state->match_state.players[player_id].active) {
                 continue;
             }
 
-            EntityType entity_type = state->match_state.entities[entity_index].type;
-            auto occurances_it = entity_occurances.find(entity_type);
-            if (occurances_it == entity_occurances.end()) {
-                entity_occurances[entity_type] = 1;
-            } else {
-                occurances_it->second++;
-            }
-            if (entity_occurances[entity_type] > entity_occurances[most_common_entity_type]) {
-                most_common_entity_type = entity_type;
-            }
-            entity_count++;
-        }
+            int render_x = SCREEN_WIDTH;
+            const ivec2 text_shadow_offset = ivec2(1, 1);
 
-        if (entity_count == 0) {
-            continue;
-        }
+            // Rendering from right to left here
 
-        int button_frame = 0;
-        FontName font = FONT_M3X6_OFFBLACK;
-        if (state->control_group_selected != control_group_index) {
-            font = FONT_M3X6_DARKBLACK;
-            button_frame = 2;
-        }
-
-        SpriteName button_icon = entity_get_icon(state->match_state, most_common_entity_type, network_get_player_id());
-        const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_CONTROL_GROUP);
-        ivec2 render_pos = ivec2(BOTTOM_PANEL_RECT.x, BOTTOM_PANEL_RECT.y) + ivec2(2, 0) + ivec2((3 + sprite_info.frame_width) * control_group_index, -32);
-        render_sprite_frame(SPRITE_UI_CONTROL_GROUP, ivec2(button_frame, 0), render_pos, RENDER_SPRITE_NO_CULL, 0);
-        render_sprite_frame(button_icon, ivec2(button_frame, 0), render_pos + ivec2(2, 0), RENDER_SPRITE_NO_CULL, 0);
-        char control_group_number_text[4];
-        sprintf(control_group_number_text, "%u", control_group_index == 9 ? 0 : control_group_index + 1);
-        render_text(font, control_group_number_text, render_pos + ivec2(3, -9));
-        char control_group_count_text[4];
-        sprintf(control_group_count_text, "%u", entity_count);
-        ivec2 count_text_size = render_get_text_size(font, control_group_count_text);
-        render_text(font, control_group_count_text, render_pos + ivec2(32 - count_text_size.x, 23 - count_text_size.y));
-    }
-
-    // Idle miner
-    if (!state->replay_mode) {
-        const std::vector<EntityId> idle_miners = match_shell_find_idle_miners(state);
-        if (!idle_miners.empty()) {
-            const Rect idle_miner_button_rect = match_shell_get_idle_miner_button_rect();
-            const bool is_hovered = idle_miner_button_rect.has_point(input_get_mouse_position());
-            const ivec2 render_pos = ivec2(idle_miner_button_rect.x, idle_miner_button_rect.y) - ivec2(0, (int)is_hovered);
-            const FontName font = is_hovered ? FONT_M3X6_WHITE : FONT_M3X6_OFFBLACK;
-            render_sprite_frame(SPRITE_UI_CONTROL_GROUP, ivec2((int)is_hovered, 0), render_pos, RENDER_SPRITE_NO_CULL, 0);
-            render_sprite_frame(SPRITE_BUTTON_ICON_MINER, ivec2((int)is_hovered, 0), render_pos + ivec2(2, 0), RENDER_SPRITE_NO_CULL, 0);
-            char idle_miner_count_text[4];
-            sprintf(idle_miner_count_text, "%u", (uint32_t)idle_miners.size());
-            ivec2 idle_miner_count_text_size = render_get_text_size(font, idle_miner_count_text);
-            render_text(font, idle_miner_count_text, render_pos + ivec2(32 - idle_miner_count_text_size.x, 23 - idle_miner_count_text_size.y));
-        }
-    }
-
-    // UI Status message
-    if (state->status_timer != 0) {
-        int status_message_width = render_get_text_size(FONT_HACK_WHITE, state->status_message.c_str()).x;
-        ivec2 status_message_position = ivec2((SCREEN_WIDTH / 2) - (status_message_width / 2), SCREEN_HEIGHT - 148);
-        render_text(FONT_HACK_SHADOW, state->status_message.c_str(), status_message_position + ivec2(1, 1));
-        render_text(FONT_HACK_WHITE, state->status_message.c_str(), status_message_position);
-    }
-    
-    // Hotkeys
-    for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
-        InputAction hotkey = state->hotkey_group[hotkey_index];
-        if (hotkey == INPUT_HOTKEY_NONE) {
-            continue;
-        }
-
-        const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
-        ivec2 hotkey_position = SHELL_BUTTON_POSITIONS[hotkey_index];
-        Rect hotkey_rect = (Rect) { 
-            .x = hotkey_position.x, .y = hotkey_position.y,
-            .w = sprite_info.frame_width, .h = sprite_info.frame_height
-        };
-        int hframe = 0;
-        if (!match_shell_does_player_meet_hotkey_requirements(state->match_state, hotkey)) {
-            hframe = 2;
-        } else if (match_shell_is_camera_free(state) && !match_shell_is_selecting(state) && hotkey_rect.has_point(input_get_mouse_position())) {
-            hframe = 1;
-            hotkey_position.y--;
-        }
-
-        render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), hotkey_position, RENDER_SPRITE_NO_CULL, 0);
-        render_sprite_frame(match_shell_hotkey_get_sprite(state, hotkey, match_shell_should_render_hotkey_toggled(state, hotkey)), ivec2(hframe, 0), hotkey_position, RENDER_SPRITE_NO_CULL, 0);
-    }
-
-    // UI Tooltip
-    if (match_shell_is_camera_free(state) && 
-            !(match_shell_is_selecting(state) || match_shell_is_in_menu(state))) {
-        uint32_t hotkey_hovered_index;
-        for (hotkey_hovered_index = 0; hotkey_hovered_index < HOTKEY_GROUP_SIZE; hotkey_hovered_index++) {
-            Rect hotkey_rect = (Rect) {
-                .x = SHELL_BUTTON_POSITIONS[hotkey_hovered_index].x,
-                .y = SHELL_BUTTON_POSITIONS[hotkey_hovered_index].y,
-                .w = 32,
-                .h = 32
-            };
-            if (hotkey_rect.has_point(input_get_mouse_position())) {
-                break;
-            }
-        }
-
-        InputAction hotkey = INPUT_HOTKEY_NONE;
-        if (hotkey_hovered_index != HOTKEY_GROUP_SIZE) {
-            hotkey = state->hotkey_group[hotkey_hovered_index];
-        }
-
-        const Rect idle_miner_rect = match_shell_get_idle_miner_button_rect();
-        if (idle_miner_rect.has_point(input_get_mouse_position())) {
-            // Determine if we actually have idle miners before rendering the tooltip
-            bool has_idle_miners = false;
-            for (const Entity& entity : state->match_state.entities) {
-                if (entity.player_id == network_get_player_id() && entity_is_idle_miner(entity)) {
-                    has_idle_miners = true;
-                    break;
-                }
-            }
-            if (has_idle_miners) {
-                hotkey = INPUT_HOTKEY_IDLE_MINER;
-            }
-        }
-
-        if (hotkey != INPUT_HOTKEY_NONE) {
-            match_shell_render_tooltip(state, hotkey);
-        } 
-    }
-    // End render tooltip
-
-    // UI Selection list
-    if (state->selection.size() == 1) {
-        const Entity& entity = state->match_state.entities.get_by_id(state->selection[0]);
-        const EntityData& entity_data = entity_get_data(entity.type);
-
-        // Entity name
-        const SpriteInfo& frame_sprite_info = render_get_sprite_info(SPRITE_UI_TEXT_FRAME);
-        ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, entity_data.name);
-        int frame_count = (text_size.x / frame_sprite_info.frame_width) + 1;
-        if (text_size.x % frame_sprite_info.frame_width != 0) {
-            frame_count++;
-        }
-        for (int frame = 0; frame < frame_count; frame++) {
-            int hframe = 1;
-            if (frame == 0) {
-                hframe = 0;
-            } else if (frame == frame_count - 1) {
-                hframe = 2;
-            }
-            render_sprite_frame(SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), SELECTION_LIST_TOP_LEFT + ivec2(frame * frame_sprite_info.frame_width, 0), RENDER_SPRITE_NO_CULL, 0);
-        }
-        ivec2 frame_size = ivec2(frame_count * frame_sprite_info.frame_width, frame_sprite_info.frame_height);
-        render_text(FONT_WESTERN8_OFFBLACK, entity_data.name, SELECTION_LIST_TOP_LEFT + ivec2((frame_size.x / 2) - (text_size.x / 2), 0));
-
-        // Entity icon
-        render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
-        render_sprite_frame(entity_get_icon(state->match_state, entity.type, entity.player_id), ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
-
-        if (entity.type == ENTITY_GOLDMINE) {
-            if (entity.mode == MODE_GOLDMINE_COLLAPSED) {
-                render_text(FONT_HACK_WHITE, "Collapsed!", SELECTION_LIST_TOP_LEFT + ivec2(36, 20));
-            } else {
-                char gold_left_str[8];
-                sprintf(gold_left_str, "%u", entity.gold_held);
-                render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(36, 20), RENDER_SPRITE_NO_CULL, 0);
-                render_text(FONT_HACK_WHITE, gold_left_str, SELECTION_LIST_TOP_LEFT + ivec2(36 + render_get_sprite_info(SPRITE_UI_GOLD_ICON).frame_width + 2, 21));
-            }
-        } else {
-            ivec2 healthbar_position = SELECTION_LIST_TOP_LEFT + ivec2(34, 18 + 2);
-            ivec2 healthbar_size = ivec2(64, 12);
-            match_shell_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
-
-            char health_text[16];
-            sprintf(health_text, "%i/%i", entity.health, entity_data.max_health);
-            ivec2 health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
-            ivec2 health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2); 
-            render_text(FONT_HACK_WHITE, health_text, health_text_position);
-
-            if (entity_is_unit(entity.type) && entity_data.unit_data.max_energy != 0)  {
-                healthbar_position += ivec2(0, healthbar_size.y + 1);
-                match_shell_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_data.unit_data.max_energy);
-                sprintf(health_text, "%i/%i", entity.energy, entity_data.unit_data.max_energy);
-                health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
-                health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2); 
-                render_text(FONT_HACK_WHITE, health_text, health_text_position);
+            // Population text
+            render_x -= (render_get_text_size(FONT_HACK_WHITE, "200/200").x + 2);
+            {
+                char population_text[8];
+                sprintf(population_text, "%u/%u", match_get_player_population(state->match_state, player_id), match_get_player_max_population(state->match_state, player_id));
+                render_text(FONT_HACK_SHADOW, population_text, ivec2(render_x, resource_base_y + 3) + text_shadow_offset);
+                render_text(FONT_HACK_WHITE, population_text, ivec2(render_x, resource_base_y + 3));
             }
 
-            SpriteName stat_icons[4];
-            int stat_count = 0;
-
-            // Detection
-            if (entity_has_detection(state->match_state, entity)) {
-                stat_icons[stat_count] = SPRITE_UI_STAT_ICON_DETECTION;
-                stat_count++;
+            // Population icon
+            render_x -= (population_icon_sprite_info.frame_width + 2);
+            {
+                render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), ivec2(render_x, resource_base_y), RENDER_SPRITE_NO_CULL, 0);
             }
 
-            // Bleeding
-            if (entity.bleed_timer != 0) {
-                stat_icons[stat_count] = SPRITE_UI_STAT_ICON_BLEED;
-                stat_count++;
+            // Gold text
+            render_x -= (render_get_text_size(FONT_HACK_WHITE, "99999").x + 2);
+            {
+                char gold_text[8];
+                sprintf(gold_text, "%u", state->displayed_gold_amounts[player_id]);
+                render_text(FONT_HACK_SHADOW, gold_text, ivec2(render_x, resource_base_y + 3) + text_shadow_offset);
+                render_text(FONT_HACK_WHITE, gold_text, ivec2(render_x, resource_base_y + 3));
             }
 
-            ivec2 stat_position = SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 34); 
-            ivec2 stat_positions[2];
-            const int STAT_ICON_SIZE = render_get_sprite_info(SPRITE_UI_STAT_ICON_DETECTION).frame_width;
-            int STAT_TEXT_PADDING = 1;
-
-            for (int stat_index = 0; stat_index < stat_count; stat_index++) {
-                render_sprite_frame(stat_icons[stat_index], ivec2(0, 0), stat_position, RENDER_SPRITE_NO_CULL, 0);
-                stat_positions[stat_index] = stat_position;
-                stat_position.y += STAT_ICON_SIZE + STAT_TEXT_PADDING; 
+            // Gold icon
+            render_x -= (gold_icon_sprite_info.frame_width + 2);
+            {
+                render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), ivec2(render_x, resource_base_y + 2), RENDER_SPRITE_NO_CULL, 0);
             }
 
-            // Determine if a stat is being hovered
-            int stat_hovered;
-            for (stat_hovered = 0; stat_hovered < stat_count; stat_hovered++) {
-                Rect stat_rect = (Rect) {
-                    .x = stat_positions[stat_hovered].x,
-                    .y = stat_positions[stat_hovered].y,
-                    .w = STAT_ICON_SIZE, .h = STAT_ICON_SIZE
-                };
-                if (stat_rect.has_point(input_get_mouse_position())) {
-                    break;
-                }
+            // Player name
+            if (state->replay_mode) {
+                render_x -= (render_get_text_size(FONT_HACK_WHITE, state->match_state.players[player_id].name).x + 16);
+                render_text(FONT_HACK_SHADOW, state->match_state.players[player_id].name, ivec2(render_x, resource_base_y + 3) + text_shadow_offset);
+                render_text((FontName)(FONT_HACK_PLAYER0 + state->match_state.players[player_id].recolor_id), state->match_state.players[player_id].name, ivec2(render_x, resource_base_y + 3));
             }
 
-            // Render stat tooltip
-            if (stat_hovered != stat_count) {
-                const SpriteInfo& tooltip_info = render_get_sprite_info(SPRITE_UI_TOOLTIP_FRAME);
-                const char* tooltip_text = match_shell_render_get_stat_tooltip(stat_icons[stat_hovered]);
-
-                // Determine tooltip size
-                ivec2 tooltip_text_size = render_get_text_size(FONT_HACK_OFFBLACK, tooltip_text);
-                int tooltip_width = tooltip_text_size.x + tooltip_info.frame_width;
-                int tooltip_frame_count = tooltip_width / tooltip_info.frame_width;
-                if (tooltip_width % tooltip_info.frame_width != 0) {
-                    tooltip_frame_count++;
-                }
-
-                // Determine tooltip position
-                ivec2 tooltip_pos = stat_positions[stat_hovered] + ivec2(STAT_ICON_SIZE - 1, -((tooltip_info.frame_height * 2) - 2));
-
-                // Render tooltip background
-                for (int frame_x = 0; frame_x < tooltip_frame_count; frame_x++) {
-                    int hframe = 1;
-                    if (frame_x == 0) {
-                        hframe = 0;
-                    } else if (frame_x == tooltip_frame_count - 1) {
-                        hframe = 2;
-                    }
-
-                    render_sprite_frame(SPRITE_UI_TOOLTIP_FRAME, ivec2(hframe, 0), tooltip_pos + ivec2(tooltip_info.frame_width * frame_x, 0), RENDER_SPRITE_NO_CULL, 0);
-                    render_sprite_frame(SPRITE_UI_TOOLTIP_FRAME, ivec2(hframe, 2), tooltip_pos + ivec2(tooltip_info.frame_width * frame_x, tooltip_info.frame_height), RENDER_SPRITE_NO_CULL, 0);
-                }
-
-                // Render tooltip text
-                render_text(FONT_HACK_OFFBLACK, tooltip_text, tooltip_pos + ivec2(4, 2));
-            }
-        }
-    } else {
-        for (uint32_t selection_index = 0; selection_index < state->selection.size(); selection_index++) {
-            match_shell_render_entity_icon(
-                state, 
-                state->match_state.entities.get_by_id(state->selection[selection_index]), 
-                match_shell_get_selection_list_item_rect(selection_index));
-        }
-    }
-    // End UI Selection List
-
-    // UI Building queues
-    if (state->selection.size() == 1) {
-        const Entity& building = state->match_state.entities.get_by_id(state->selection[0]);
-        if (entity_is_building(building.type) && 
-                !building.queue.empty() &&
-                (state->replay_mode || building.player_id == network_get_player_id())) {
-            // Render building queue icon buttons
-            const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
-            for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
-                Rect icon_rect = (Rect) {
-                    .x = BUILDING_QUEUE_POSITIONS[building_queue_index].x,
-                    .y = BUILDING_QUEUE_POSITIONS[building_queue_index].y,
-                    .w = icon_sprite_info.frame_width,
-                    .h = icon_sprite_info.frame_height 
-                };
-                SpriteName item_sprite;
-                switch (building.queue[building_queue_index].type) {
-                    case BUILDING_QUEUE_ITEM_UNIT: {
-                        item_sprite = entity_get_icon(state->match_state, building.queue[building_queue_index].unit_type, building.player_id);
-                        break;
-                    }
-                    case BUILDING_QUEUE_ITEM_UPGRADE: {
-                        item_sprite = upgrade_get_data(building.queue[building_queue_index].upgrade).icon;
-                        break;
-                    }
-                }
-                bool hovered = 
-                    match_shell_is_camera_free(state) && 
-                    !match_shell_is_selecting(state) && 
-                    icon_rect.has_point(input_get_mouse_position());
-                render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
-                render_sprite_frame(item_sprite, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
-            }
-
-            // Render building queue progress bar
-            if (building.timer == BUILDING_QUEUE_BLOCKED) {
-                render_text(FONT_WESTERN8_GOLD, "Build more houses.", ivec2(BUILDING_QUEUE_PROGRESS_BAR_RECT.x + 1, BUILDING_QUEUE_PROGRESS_BAR_RECT.y - 12));
-            } else if (building.timer == BUILDING_QUEUE_EXIT_BLOCKED) {
-                render_text(FONT_WESTERN8_GOLD, "Exit is blocked.", ivec2(BUILDING_QUEUE_PROGRESS_BAR_RECT.x + 1, BUILDING_QUEUE_PROGRESS_BAR_RECT.y - 12));
-            } else {
-                int item_duration = (int)building_queue_item_duration(building.queue[0]);
-                Rect building_queue_progress_bar_subrect = BUILDING_QUEUE_PROGRESS_BAR_RECT;
-                building_queue_progress_bar_subrect.w = (BUILDING_QUEUE_PROGRESS_BAR_RECT.w * (item_duration - (int)building.timer) / item_duration);
-                render_fill_rect(building_queue_progress_bar_subrect, RENDER_COLOR_WHITE);
-                render_draw_rect(BUILDING_QUEUE_PROGRESS_BAR_RECT, RENDER_COLOR_OFFBLACK);
-            }
-        }
-    }
-
-    // UI Garrisoned units
-    if (state->selection.size() == 1) {
-        const Entity& carrier = state->match_state.entities.get_by_id(state->selection[0]);
-        if (carrier.type == ENTITY_GOLDMINE || 
-                state->replay_mode ||
-                carrier.player_id == network_get_player_id()) {
-            const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
-            int index = 0;
-            for (EntityId entity_id : carrier.garrisoned_units) {
-                const Entity& garrisoned_unit = state->match_state.entities.get_by_id(entity_id);
-                // We have to make this check here because goldmines might have both allied and enemy units in them
-                if (!state->replay_mode && garrisoned_unit.player_id != network_get_player_id()) {
-                    continue;
-                }
-
-                Rect icon_rect = (Rect) {
-                    .x = GARRISON_ICON_POSITIONS[index].x,
-                    .y = GARRISON_ICON_POSITIONS[index].y,
-                    .w = icon_sprite_info.frame_width,
-                    .h = icon_sprite_info.frame_height
-                };
-                match_shell_render_entity_icon(state, garrisoned_unit, icon_rect);
-                index++;
-            }
-        }
-    }
-
-    // Resource counters
-    const SpriteInfo& population_icon_sprite_info = render_get_sprite_info(SPRITE_UI_HOUSE_ICON);
-    const SpriteInfo& gold_icon_sprite_info = render_get_sprite_info(SPRITE_UI_GOLD_ICON);
-    int resource_base_y = 0;
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (!state->replay_mode && player_id != network_get_player_id()) {
-            continue;
-        }
-        // TODO: is there a bug in replay mode where players will stop rendering their gold after they get defeated?
-        if (state->replay_mode && !state->match_state.players[player_id].active) {
-            continue;
+            resource_base_y += population_icon_sprite_info.frame_height;
         }
 
-        int render_x = SCREEN_WIDTH;
-        const ivec2 text_shadow_offset = ivec2(1, 1);
+        // Objectives
+        if (!state->scenario_objectives.empty()) {
+            const SpriteInfo& menu_button_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_BURGER);
+            ivec2 objectives_text_pos = MENU_BUTTON_POSITION + ivec2(1, menu_button_sprite_info.frame_height + 4);
+            render_text(FONT_HACK_SHADOW, "Objectives:", objectives_text_pos + ivec2(1, 1));
+            render_text(FONT_HACK_GOLD_SATURATED, "Objectives:", objectives_text_pos);
 
-        // Rendering from right to left here
-
-        // Population text
-        render_x -= (render_get_text_size(FONT_HACK_WHITE, "200/200").x + 2);
-        {
-            char population_text[8];
-            sprintf(population_text, "%u/%u", match_get_player_population(state->match_state, player_id), match_get_player_max_population(state->match_state, player_id));
-            render_text(FONT_HACK_SHADOW, population_text, ivec2(render_x, resource_base_y + 3) + text_shadow_offset);
-            render_text(FONT_HACK_WHITE, population_text, ivec2(render_x, resource_base_y + 3));
-        }
-
-        // Population icon
-        render_x -= (population_icon_sprite_info.frame_width + 2);
-        {
-            render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), ivec2(render_x, resource_base_y), RENDER_SPRITE_NO_CULL, 0);
-        }
-
-        // Gold text
-        render_x -= (render_get_text_size(FONT_HACK_WHITE, "99999").x + 2);
-        {
-            char gold_text[8];
-            sprintf(gold_text, "%u", state->displayed_gold_amounts[player_id]);
-            render_text(FONT_HACK_SHADOW, gold_text, ivec2(render_x, resource_base_y + 3) + text_shadow_offset);
-            render_text(FONT_HACK_WHITE, gold_text, ivec2(render_x, resource_base_y + 3));
-        }
-
-        // Gold icon
-        render_x -= (gold_icon_sprite_info.frame_width + 2);
-        {
-            render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), ivec2(render_x, resource_base_y + 2), RENDER_SPRITE_NO_CULL, 0);
-        }
-
-        // Player name
-        if (state->replay_mode) {
-            render_x -= (render_get_text_size(FONT_HACK_WHITE, state->match_state.players[player_id].name).x + 16);
-            render_text(FONT_HACK_SHADOW, state->match_state.players[player_id].name, ivec2(render_x, resource_base_y + 3) + text_shadow_offset);
-            render_text((FontName)(FONT_HACK_PLAYER0 + state->match_state.players[player_id].recolor_id), state->match_state.players[player_id].name, ivec2(render_x, resource_base_y + 3));
-        }
-
-        resource_base_y += population_icon_sprite_info.frame_height;
-    }
-
-    // Objectives
-    if (!state->scenario_objectives.empty()) {
-        const SpriteInfo& menu_button_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_BURGER);
-        ivec2 objectives_text_pos = MENU_BUTTON_POSITION + ivec2(1, menu_button_sprite_info.frame_height + 4);
-        render_text(FONT_HACK_SHADOW, "Objectives:", objectives_text_pos + ivec2(1, 1));
-        render_text(FONT_HACK_GOLD_SATURATED, "Objectives:", objectives_text_pos);
-
-        objectives_text_pos += ivec2(4, 20);
-        const SpriteInfo& checkbox_sprite_info = render_get_sprite_info(SPRITE_UI_OBJECTIVE_CHECKBOX);
-        for (const Objective& objective : state->scenario_objectives) {
-            render_sprite_frame(SPRITE_UI_OBJECTIVE_CHECKBOX, ivec2((int)objective.is_complete, 0), objectives_text_pos, RENDER_SPRITE_NO_CULL, 0);
-
-            // Determine objective text
-            char objective_text[128];
-            char* objective_text_ptr = objective_text;
-            objective_text_ptr += sprintf(objective_text_ptr, "%s", objective.description.c_str());
-            if (!objective.is_complete && objective.counter_type != OBJECTIVE_COUNTER_TYPE_NONE) {
-                uint32_t counter_value = 0; 
-                if (objective.counter_type == OBJECTIVE_COUNTER_TYPE_ENTITY) {
-                    counter_value = match_shell_get_player_entity_count(state, network_get_player_id(), (EntityType)objective.counter_value);
-                } else if (objective.counter_type == OBJECTIVE_COUNTER_TYPE_VARIABLE) {
-                    counter_value = objective.counter_value;
-                }
-
-                objective_text_ptr += sprintf(objective_text_ptr, " (%u/%u)", counter_value, objective.counter_target);
-            }
-
-            // Render objective text
-            ivec2 text_pos = objectives_text_pos + ivec2(checkbox_sprite_info.frame_width + 2, 1);
-            render_text(FONT_HACK_SHADOW, objective_text, text_pos + ivec2(1, 1));
-            render_text(FONT_HACK_GOLD_SATURATED, objective_text, text_pos);
-
-            objectives_text_pos.y += checkbox_sprite_info.frame_height + 4;
-        }
-
-        if (state->scenario_global_objective_counter.type == GLOBAL_OBJECTIVE_COUNTER_GOLD) {
-            objectives_text_pos.x = 1;
-            render_text(FONT_HACK_SHADOW, "Gold Mined:", objectives_text_pos + ivec2(1, 1));
-            render_text(FONT_HACK_GOLD_SATURATED, "Gold Mined:", objectives_text_pos);
             objectives_text_pos += ivec2(4, 20);
+            const SpriteInfo& checkbox_sprite_info = render_get_sprite_info(SPRITE_UI_OBJECTIVE_CHECKBOX);
+            for (const Objective& objective : state->scenario_objectives) {
+                render_sprite_frame(SPRITE_UI_OBJECTIVE_CHECKBOX, ivec2((int)objective.is_complete, 0), objectives_text_pos, RENDER_SPRITE_NO_CULL, 0);
 
-            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                if (!state->match_state.players[player_id].active) {
-                    continue;
+                // Determine objective text
+                char objective_text[128];
+                char* objective_text_ptr = objective_text;
+                objective_text_ptr += sprintf(objective_text_ptr, "%s", objective.description.c_str());
+                if (!objective.is_complete && objective.counter_type != OBJECTIVE_COUNTER_TYPE_NONE) {
+                    uint32_t counter_value = 0; 
+                    if (objective.counter_type == OBJECTIVE_COUNTER_TYPE_ENTITY) {
+                        counter_value = match_shell_get_player_entity_count(state, network_get_player_id(), (EntityType)objective.counter_value);
+                    } else if (objective.counter_type == OBJECTIVE_COUNTER_TYPE_VARIABLE) {
+                        counter_value = objective.counter_value;
+                    }
+
+                    objective_text_ptr += sprintf(objective_text_ptr, " (%u/%u)", counter_value, objective.counter_target);
                 }
 
-                // Determine text
-                char text[64];
-                sprintf(text, "%s: %u", state->match_state.players[player_id].name, state->scenario_global_objective_counter.gold.values[player_id]);
-
-                // Render text
+                // Render objective text
                 ivec2 text_pos = objectives_text_pos + ivec2(checkbox_sprite_info.frame_width + 2, 1);
-                render_text(FONT_HACK_SHADOW, text, text_pos + ivec2(1, 1));
-                render_text(FONT_HACK_GOLD_SATURATED, text, text_pos);
+                render_text(FONT_HACK_SHADOW, objective_text, text_pos + ivec2(1, 1));
+                render_text(FONT_HACK_GOLD_SATURATED, objective_text, text_pos);
 
                 objectives_text_pos.y += checkbox_sprite_info.frame_height + 4;
             }
-        }
-    }
 
-    // Menu button icon
-    {
-        const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_BURGER);
-        Rect menu_button_rect = (Rect) {
-            .x = MENU_BUTTON_POSITION.x, .y = MENU_BUTTON_POSITION.y,
-            .w = sprite_info.frame_width, .h = sprite_info.frame_height
-        };
-        bool hovered = 
-            state->mode == MATCH_SHELL_MODE_MENU || 
-            state->mode == MATCH_SHELL_MODE_MENU_SURRENDER || 
-                (match_shell_is_camera_free(state) && 
-                !(match_shell_is_selecting(state)) && 
-                menu_button_rect.has_point(input_get_mouse_position()));
-        render_sprite_frame(SPRITE_UI_BUTTON_BURGER, ivec2((int)hovered, 0), MENU_BUTTON_POSITION, RENDER_SPRITE_NO_CULL, 0);
-    }
+            if (state->scenario_global_objective_counter.type == GLOBAL_OBJECTIVE_COUNTER_GOLD) {
+                objectives_text_pos.x = 1;
+                render_text(FONT_HACK_SHADOW, "Gold Mined:", objectives_text_pos + ivec2(1, 1));
+                render_text(FONT_HACK_GOLD_SATURATED, "Gold Mined:", objectives_text_pos);
+                objectives_text_pos += ivec2(4, 20);
 
-    // UI Disconnect frame
-    if (state->disconnect_timer > DISCONNECT_GRACE) {
-        render_ninepatch(SPRITE_UI_FRAME, DISCONNECT_FRAME_RECT);
-        ivec2 text_size = render_get_text_size(FONT_HACK_GOLD, "Waiting for players...");
-        render_text(FONT_HACK_GOLD, "Waiting for players...", ivec2(DISCONNECT_FRAME_RECT.x + (DISCONNECT_FRAME_RECT.w / 2) - (text_size.x / 2), DISCONNECT_FRAME_RECT.y + 8));
-        int player_text_y = 32;
-        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE || !(state->inputs[player_id].empty() || state->inputs[player_id].front().empty())) {
-                continue;
+                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                    if (!state->match_state.players[player_id].active) {
+                        continue;
+                    }
+
+                    // Determine text
+                    char text[64];
+                    sprintf(text, "%s: %u", state->match_state.players[player_id].name, state->scenario_global_objective_counter.gold.values[player_id]);
+
+                    // Render text
+                    ivec2 text_pos = objectives_text_pos + ivec2(checkbox_sprite_info.frame_width + 2, 1);
+                    render_text(FONT_HACK_SHADOW, text, text_pos + ivec2(1, 1));
+                    render_text(FONT_HACK_GOLD_SATURATED, text, text_pos);
+
+                    objectives_text_pos.y += checkbox_sprite_info.frame_height + 4;
+                }
             }
+        }
 
-            render_text(FONT_HACK_GOLD, network_get_player(player_id).name, ivec2(DISCONNECT_FRAME_RECT.x + 8, DISCONNECT_FRAME_RECT.y + player_text_y));
-            player_text_y += 16;
+        // Menu button icon
+        {
+            const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_BURGER);
+            Rect menu_button_rect = (Rect) {
+                .x = MENU_BUTTON_POSITION.x, .y = MENU_BUTTON_POSITION.y,
+                .w = sprite_info.frame_width, .h = sprite_info.frame_height
+            };
+            bool hovered = 
+                state->mode == MATCH_SHELL_MODE_MENU || 
+                state->mode == MATCH_SHELL_MODE_MENU_SURRENDER || 
+                    (match_shell_is_camera_free(state) && 
+                    !(match_shell_is_selecting(state)) && 
+                    menu_button_rect.has_point(input_get_mouse_position()));
+            render_sprite_frame(SPRITE_UI_BUTTON_BURGER, ivec2((int)hovered, 0), MENU_BUTTON_POSITION, RENDER_SPRITE_NO_CULL, 0);
+        }
+
+        // UI Disconnect frame
+        if (state->disconnect_timer > DISCONNECT_GRACE) {
+            render_ninepatch(SPRITE_UI_FRAME, DISCONNECT_FRAME_RECT);
+            ivec2 text_size = render_get_text_size(FONT_HACK_GOLD, "Waiting for players...");
+            render_text(FONT_HACK_GOLD, "Waiting for players...", ivec2(DISCONNECT_FRAME_RECT.x + (DISCONNECT_FRAME_RECT.w / 2) - (text_size.x / 2), DISCONNECT_FRAME_RECT.y + 8));
+            int player_text_y = 32;
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE || !(state->inputs[player_id].empty() || state->inputs[player_id].front().empty())) {
+                    continue;
+                }
+
+                render_text(FONT_HACK_GOLD, network_get_player(player_id).name, ivec2(DISCONNECT_FRAME_RECT.x + 8, DISCONNECT_FRAME_RECT.y + player_text_y));
+                player_text_y += 16;
+            }
         }
     }
 
     // MINIMAP
     // Minimap tiles
-    for (int y = 0; y < state->match_state.map.height; y++) {
-        for (int x = 0; x < state->match_state.map.width; x++) {
-            render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), match_shell_get_minimap_pixel_for_cell(state, ivec2(x, y)));
+    {
+        GOLD_PROFILE_SCOPE_NAME("minimap");
+        for (int y = 0; y < state->match_state.map.height; y++) {
+            for (int x = 0; x < state->match_state.map.width; x++) {
+                render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), match_shell_get_minimap_pixel_for_cell(state, ivec2(x, y)));
+            }
         }
-    }
-    // Minimap entities
-    for (const Entity& entity : state->match_state.entities) {
-        if (!entity_is_selectable(entity) || !match_shell_is_entity_visible(state, entity)) {
-            continue;
-        }
-
-        int entity_cell_size = entity_get_data(entity.type).cell_size;
-        Rect entity_rect = (Rect) {
-            .x = entity.cell.x, .y = entity.cell.y,
-            .w = entity_cell_size, .h = entity_cell_size
-        };
-        render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, match_shell_get_minimap_pixel_for_entity(state, entity));
-    }
-    // Minimap remembered entities
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (state->replay_mode && (state->replay_fog_index == 0 || state->replay_fog_index == 0)) {
-            break;
-        }
-        if (state->replay_mode && state->replay_fog_player_ids[state->replay_fog_index] != player_id) {
-            continue;
-        }
-        if (!state->replay_mode && player_id != network_get_player_id()) {
-            continue;
-        }
-
-        for (auto it : state->match_state.remembered_entities[state->match_state.players[player_id].team]) {
-            Rect entity_rect = (Rect) {
-                .x = it.second.cell.x, .y = it.second.cell.y,
-                .w = it.second.cell_size, .h = it.second.cell_size
-            };
-            MinimapPixel pixel = it.second.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + it.second.recolor_id);
-            render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
-        }
-    }
-    // Minimap fog of war
-    for (int y = 0; y < state->match_state.map.height; y++) {
-        for (int x = 0; x < state->match_state.map.width; x++) {
-            int fog_value = match_shell_get_fog(state, ivec2(x, y));
-            #ifdef GOLD_DEBUG
-                if (state->debug_fog == DEBUG_FOG_DISABLED) {
-                    fog_value = 1;
-                }
-            #endif
-            MinimapPixel pixel;
-            if (fog_value > 0) {
-                pixel = MINIMAP_PIXEL_TRANSPARENT;
-            } else if (fog_value == 0) {
-                pixel = MINIMAP_PIXEL_OFFBLACK_TRANSPARENT;
-            } else {
-                pixel = MINIMAP_PIXEL_OFFBLACK;
+        // Minimap entities
+        for (const Entity& entity : state->match_state.entities) {
+            if (!entity_is_selectable(entity) || !match_shell_is_entity_visible(state, entity)) {
+                continue;
             }
 
-            render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), pixel);
+            int entity_cell_size = entity_get_data(entity.type).cell_size;
+            Rect entity_rect = (Rect) {
+                .x = entity.cell.x, .y = entity.cell.y,
+                .w = entity_cell_size, .h = entity_cell_size
+            };
+            render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, match_shell_get_minimap_pixel_for_entity(state, entity));
         }
-    }
-    // Minimap alerts
-    for (const Alert& alert : state->alerts) {
-        if (alert.timer <= ALERT_LINGER_DURATION) {
-            continue;
-        }
+        // Minimap remembered entities
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (state->replay_mode && (state->replay_fog_index == 0 || state->replay_fog_index == 0)) {
+                break;
+            }
+            if (state->replay_mode && state->replay_fog_player_ids[state->replay_fog_index] != player_id) {
+                continue;
+            }
+            if (!state->replay_mode && player_id != network_get_player_id()) {
+                continue;
+            }
 
-        int alert_timer = alert.timer - ALERT_LINGER_DURATION;
-        int alert_rect_margin = 3 + (alert_timer <= 60 
-                                        ? 0
-                                        : ((alert_timer - 60) / 3));
-        Rect alert_rect = (Rect) {
-            .x = alert.cell.x - alert_rect_margin,
-            .y = alert.cell.y - alert_rect_margin,
-            .w = alert.cell_size + 1 + (alert_rect_margin * 2),
-            .h = alert.cell_size + 1 + (alert_rect_margin * 2),
+            for (auto it : state->match_state.remembered_entities[state->match_state.players[player_id].team]) {
+                Rect entity_rect = (Rect) {
+                    .x = it.second.cell.x, .y = it.second.cell.y,
+                    .w = it.second.cell_size, .h = it.second.cell_size
+                };
+                MinimapPixel pixel = it.second.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + it.second.recolor_id);
+                render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
+            }
+        }
+        // Minimap fog of war
+        for (int y = 0; y < state->match_state.map.height; y++) {
+            for (int x = 0; x < state->match_state.map.width; x++) {
+                int fog_value = match_shell_get_fog(state, ivec2(x, y));
+                #ifdef GOLD_DEBUG
+                    if (state->debug_fog == DEBUG_FOG_DISABLED) {
+                        fog_value = 1;
+                    }
+                #endif
+                MinimapPixel pixel;
+                if (fog_value > 0) {
+                    pixel = MINIMAP_PIXEL_TRANSPARENT;
+                } else if (fog_value == 0) {
+                    pixel = MINIMAP_PIXEL_OFFBLACK_TRANSPARENT;
+                } else {
+                    pixel = MINIMAP_PIXEL_OFFBLACK;
+                }
+
+                render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), pixel);
+            }
+        }
+        // Minimap alerts
+        for (const Alert& alert : state->alerts) {
+            if (alert.timer <= ALERT_LINGER_DURATION) {
+                continue;
+            }
+
+            int alert_timer = alert.timer - ALERT_LINGER_DURATION;
+            int alert_rect_margin = 3 + (alert_timer <= 60 
+                                            ? 0
+                                            : ((alert_timer - 60) / 3));
+            Rect alert_rect = (Rect) {
+                .x = alert.cell.x - alert_rect_margin,
+                .y = alert.cell.y - alert_rect_margin,
+                .w = alert.cell_size + 1 + (alert_rect_margin * 2),
+                .h = alert.cell_size + 1 + (alert_rect_margin * 2),
+            };
+            // We want this on the fog layer because the minimap rect might go into the fog
+            render_minimap_draw_rect(MINIMAP_LAYER_FOG, alert_rect, alert.pixel);
+        }
+        // Minimap camera rect
+        Rect camera_rect = (Rect) {
+            .x = state->camera_offset.x / TILE_SIZE,
+            .y = state->camera_offset.y / TILE_SIZE,
+            .w = (SCREEN_WIDTH / TILE_SIZE) - 1,
+            .h = ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / TILE_SIZE)
         };
-        // We want this on the fog layer because the minimap rect might go into the fog
-        render_minimap_draw_rect(MINIMAP_LAYER_FOG, alert_rect, alert.pixel);
+        render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
+        render_minimap_queue_render(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state->match_state.map.width, state->match_state.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
     }
-    // Minimap camera rect
-    Rect camera_rect = (Rect) {
-        .x = state->camera_offset.x / TILE_SIZE,
-        .y = state->camera_offset.y / TILE_SIZE,
-        .w = (SCREEN_WIDTH / TILE_SIZE) - 1,
-        .h = ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / TILE_SIZE)
-    };
-    render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
-    render_minimap_queue_render(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state->match_state.map.width, state->match_state.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
 
     ui_render(state->ui);
     if (state->replay_mode) {

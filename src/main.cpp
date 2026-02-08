@@ -274,8 +274,10 @@ int gold_main(int argc, char** argv) {
                         match_shell_handle_network_event(state.match_shell_state, event);
                         break;
                     }
+                #ifdef GOLD_DEBUG
                     case GAME_MODE_EDITOR:
                         break;
+                #endif
                 }
 
                 // Needed to free match load noise
@@ -434,6 +436,12 @@ int gold_main(int argc, char** argv) {
                     }
                 }
             }
+        #endif
+
+        #ifdef TRACY_ENABLE
+            char fps_text[128];
+            sprintf(fps_text, "Tracy Enabled | FPS: %u", fps);
+            render_text(FONT_HACK_WHITE, fps_text, ivec2(0, 0));
         #endif
 
         render_present_frame();

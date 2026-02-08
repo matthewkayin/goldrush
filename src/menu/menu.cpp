@@ -240,9 +240,14 @@ void menu_update(MenuState* state) {
         }
         state->parallax_timer = PARALLAX_TIMER_DURATION;
     }
-    int expected_wagon_x = (state->mode == MENU_MODE_LOBBY || state->mode == MENU_MODE_SKIRMISH_LOBBY) 
-        ? WAGON_X_LOBBY 
-        : WAGON_X_DEFAULT;
+    int expected_wagon_x; 
+    if (state->mode == MENU_MODE_LOBBY || state->mode == MENU_MODE_SKIRMISH_LOBBY) {
+        expected_wagon_x = WAGON_X_LOBBY;
+    } else if (state->mode == MENU_MODE_LOAD_MATCH_COUNTDOWN) {
+        expected_wagon_x = SCREEN_WIDTH;
+    } else {
+        expected_wagon_x = WAGON_X_DEFAULT;
+    }
     if (state->wagon_x < expected_wagon_x) {
         state->wagon_x++;
     } else if (state->wagon_x > expected_wagon_x) {

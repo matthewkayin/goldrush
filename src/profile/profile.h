@@ -2,6 +2,8 @@
 
 #include "defines.h"
 
+// Using Tracy 0.12.2
+
 #ifdef TRACY_ENABLE
 
 // Beetlejuice, beetlejuice, beetlejuice!
