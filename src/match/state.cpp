@@ -225,6 +225,22 @@ bool match_player_upgrade_is_available(const MatchState* state, uint8_t player_i
 
 void match_grant_player_upgrade(MatchState* state, uint8_t player_id, uint32_t upgrade) {
     state->players[player_id].upgrades |= upgrade;
+
+    // Grant detection to all detectives immediately, otherwise it will mess up the detection map
+    if (upgrade == UPGRADE_PRIVATE_EYE) {
+        const EntityData& entity_data = entity_get_data(ENTITY_DETECTIVE);
+        for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+            const Entity& entity = state->entities[entity_index];
+            if (entity.player_id != player_id || entity.type != ENTITY_DETECTIVE || entity.health == 0) {
+                continue;
+            }
+
+            // De-increment the detective's vision without detection
+            match_fog_update(state, state->players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, false, entity_data.cell_layer, false);
+            // Then re-increment it with detection
+            match_fog_update(state, state->players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, true, entity_data.cell_layer, true);
+        }
+    }
 }
 
 uint32_t match_get_miners_on_gold(const MatchState* state, EntityId goldmine_id, uint8_t player_id) {
@@ -3684,6 +3700,7 @@ void match_fog_update(MatchState* state, uint32_t player_team, ivec2 cell, int c
 
                     // Remember revealed entities
                     Cell map_cell = map_get_cell(state->map, CELL_LAYER_GROUND, line_cell);
+                    // landmines are not shown in remembered entities so don't add them to this list, maybe
                     if (map_cell.type == CELL_BUILDING || map_cell.type == CELL_GOLDMINE) {
                         Entity& entity = state->entities.get_by_id(map_cell.id);
                         if (entity_is_selectable(entity)) {
