@@ -12,8 +12,8 @@ static const int MAP_PLAYER_SPAWN_SIZE = 13;
 static const int MAP_PLAYER_SPAWN_MARGIN = 3;
 static const int MAP_STAIR_SPACING = 16;
 static const int MAP_ISLAND_UNASSIGNED = -1;
-static const int REGION_UNASSIGNED = -1;
-static const int REGION_CHUNK_SIZE = 32;
+static const uint8_t REGION_UNASSIGNED = UINT8_MAX;
+static const uint8_t MAP_REGIONS_NOT_CONNECTED = UINT8_MAX;
 static const uint32_t PATHFIND_ITERATION_MAX = 1999;
 
 struct PoissonAvoidValue {
@@ -34,21 +34,31 @@ std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskPa
 bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<PoissonAvoidValue>& avoid_values);
 
 void map_init(Map& map, MapType map_type, int width, int height) {
+    // TODO:
+    // memset(&map, 0, sizeof(map));
+
     map.type = map_type;
     map.width = width;
     map.height = height;
 
-    for (int layer = 0; layer < CELL_LAYER_COUNT; layer++) {
-        map.cells[layer] = std::vector<Cell>(map.width * map.height, (Cell) {
-            .type = CELL_EMPTY,
-            .id = ID_NULL
-        });
+    memset(map.tiles, 0, sizeof(map.tiles));
+    for (int index = 0; index < width * height; index++) {
+        map.tiles[index] = (Tile) {
+            .sprite = map_get_plain_ground_tile_sprite(map_type),
+            .frame = ivec2(0, 0),
+            .elevation = 0
+        };
     }
-    map.tiles = std::vector<Tile>(map.width * map.height, (Tile) {
-        .sprite = map_get_plain_ground_tile_sprite(map_type),
-        .frame = ivec2(0, 0),
-        .elevation = 0
-    });
+
+    memset(map.cells, 0, sizeof(map.cells));
+    for (int layer = 0; layer < CELL_LAYER_COUNT; layer++) {
+        for (int index = 0; index < width * height; index++) {
+            map.cells[layer][index] = (Cell) {
+                .type = CELL_EMPTY,
+                .id = ID_NULL
+            };
+        }
+    }
 
     log_info("Initialized map. Type %u Size %ux%u.", map_type, width, height);
 }
@@ -298,19 +308,21 @@ void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, 
 
     // Make sure that the map size is equally divisible by the region size
     // At the time of writing this, map sizes are 96, 128, and 160 and region size is 32
-    GOLD_ASSERT(map.width % REGION_CHUNK_SIZE == 0);
+    GOLD_ASSERT(map.width % MAP_REGION_CHUNK_SIZE == 0);
 
     map_init_regions(map);
 }
 
 void map_init_regions(Map& map) {
     // Create map regions
-    int region_count = 0;
-    map.regions = std::vector(map.width * map.height, REGION_UNASSIGNED);
-    for (int chunk_y = 0; chunk_y < map.height / REGION_CHUNK_SIZE; chunk_y++) {
-        for (int chunk_x = 0; chunk_x < map.width / REGION_CHUNK_SIZE; chunk_x++) {
-            for (int y = chunk_y * REGION_CHUNK_SIZE; y < (chunk_y + 1) * REGION_CHUNK_SIZE; y++) {
-                for (int x = chunk_x * REGION_CHUNK_SIZE; x < (chunk_x + 1) * REGION_CHUNK_SIZE; x++) {
+    map.region_count = 0;
+    for (int index = 0; index < map.width * map.height; index++) {
+        map.regions[index] = REGION_UNASSIGNED;
+    }
+    for (int chunk_y = 0; chunk_y < map.height / MAP_REGION_CHUNK_SIZE; chunk_y++) {
+        for (int chunk_x = 0; chunk_x < map.width / MAP_REGION_CHUNK_SIZE; chunk_x++) {
+            for (int y = chunk_y * MAP_REGION_CHUNK_SIZE; y < (chunk_y + 1) * MAP_REGION_CHUNK_SIZE; y++) {
+                for (int x = chunk_x * MAP_REGION_CHUNK_SIZE; x < (chunk_x + 1) * MAP_REGION_CHUNK_SIZE; x++) {
                     // Filter down to unblocked, unassigned cells
                     Cell map_cell = map_get_cell(map, CELL_LAYER_GROUND, ivec2(x, y));
                     if (map_cell.type == CELL_BLOCKED || map_cell.type == CELL_UNREACHABLE || map_cell.type == CELL_DECORATION ||
@@ -328,12 +340,12 @@ void map_init_regions(Map& map) {
                         ivec2 next = frontier.back();
                         frontier.pop_back();
 
-                        map.regions[next.x + (next.y * map.width)] = region_count;
+                        map.regions[next.x + (next.y * map.width)] = map.region_count;
 
                         for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
                             ivec2 child = next + DIRECTION_IVEC2[direction];
                             if (child.x < chunk_x || child.y < chunk_y ||
-                                    child.x >= (chunk_x + 1) * REGION_CHUNK_SIZE || child.y >= (chunk_y + 1) * REGION_CHUNK_SIZE) {
+                                    child.x >= (chunk_x + 1) * MAP_REGION_CHUNK_SIZE || child.y >= (chunk_y + 1) * MAP_REGION_CHUNK_SIZE) {
                                 continue;
                             }
 
@@ -350,15 +362,18 @@ void map_init_regions(Map& map) {
                         }
                     } // end while not frontier empty
 
-                    region_count++;
+                    map.region_count++;
                 }
             }
         }
     }
     
     // Create region connections
-    for (int region = 0; region < region_count; region++) {
-        map.region_connection_indices.push_back(std::unordered_map<int, int>());
+    map.region_connection_count = 0;
+    for (uint32_t region = 0; region < map.region_count; region++) {
+        for (uint32_t other_region = 0; other_region < map.region_count; other_region++) {
+            map.region_connection_indices[region][other_region] = MAP_REGIONS_NOT_CONNECTED;
+        }
     }
     for (int y = 0; y < map.height; y++) {
         for (int x = 0; x < map.width; x++) {
@@ -377,13 +392,16 @@ void map_init_regions(Map& map) {
                     continue;
                 }
 
-                if (map.region_connection_indices[region].find(neighbor_region) == map.region_connection_indices[region].end()) {
+                if (map.region_connection_indices[region][neighbor_region] == MAP_REGIONS_NOT_CONNECTED) {
                     MapRegionConnection new_connection;
-                    map.region_connections.push_back(new_connection);
-                    map.region_connection_indices[region][neighbor_region] = (int)map.region_connections.size() - 1;
+                    memset(&new_connection, 0, sizeof(new_connection));
+                    map.region_connections[map.region_connection_count] = new_connection;
+                    map.region_connection_count++;
                 }
-                int region_connection_index = map.region_connection_indices[region][neighbor_region];
-                map.region_connections[region_connection_index].cells.push_back(neighbor);
+                uint8_t region_connection_index = map.region_connection_indices[region][neighbor_region];
+                MapRegionConnection* connection = &map.region_connections[region_connection_index];
+                connection->cells[connection->cell_count] = neighbor;
+                connection->cell_count++;
             }
         }
     }
@@ -434,6 +452,18 @@ void map_init_regions(Map& map) {
             other_connection.cost_to_connection[connection_index] = path.size();
         }
     }
+
+    uint32_t max_connection_size = 0;
+    uint32_t max_cost_to_connection_size = 0;
+    uint32_t max_connection_cell_count = 0;
+    for (const MapRegionConnection& region_connection : map.region_connections) {
+        max_cost_to_connection_size = std::max(max_cost_to_connection_size, (uint32_t)region_connection.cost_to_connection.size());
+        for (auto it : region_connection.cost_to_connection) {
+            max_connection_size = std::max(max_connection_size, (uint32_t)it.second);
+        }
+        max_connection_cell_count = std::max(max_connection_cell_count, (uint32_t)region_connection.cells.size());
+    }
+    log_info("Map region count %i connection count %u max connection size %u max cost to connection size %u max connection cell count %u", region_count, map.region_connections.size(), max_connection_size, max_cost_to_connection_size, max_connection_cell_count);
 }
 
 void map_cleanup_noise(const Map& map, Noise* noise) {
@@ -779,11 +809,13 @@ void map_bake_tiles(Map& map, const Noise* noise, int* lcg_seed) {
 void map_bake_map_tiles_and_remove_artifacts(Map& map, Noise* noise, int* lcg_seed) {
     std::vector<ivec2> artifacts;
     do {
-        std::fill(map.tiles.begin(), map.tiles.end(), (Tile) {
-            .sprite = map_get_plain_ground_tile_sprite(map.type),
-            .frame = ivec2(0, 0),
-            .elevation = 0
-        });
+        for (int index = 0; index < map.width * map.height; index++) {
+            map.tiles[index] = (Tile) {
+                .sprite = map_get_plain_ground_tile_sprite(map.type),
+                .frame = ivec2(0, 0),
+                .elevation = 0
+            };
+        }
         for (ivec2 artifact : artifacts) {
             noise->map[artifact.x + (artifact.y * map.width)] = NOISE_VALUE_LOWGROUND;
         }

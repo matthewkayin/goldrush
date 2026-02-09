@@ -147,6 +147,12 @@ void desync_write_unordered_map(const std::unordered_map<T, U>& map) {
     }
 }
 
+uint32_t desync_compute_match_checksum(const MatchState& /*match_state*/, const Bot[MAX_PLAYERS] /*bots[MAX_PLAYERS]*/, uint32_t /*frame*/) {
+    return 0;
+}
+
+/*
+
 uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot bots[MAX_PLAYERS], uint32_t frame) {
     ZoneScoped;
 
@@ -332,6 +338,8 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot 
     // Return checksum
     return desync_checksum_compute_result(state.a, state.b);
 }
+
+*/
 
 uint32_t desync_get_checksum_frequency() {
 #ifdef GOLD_DEBUG

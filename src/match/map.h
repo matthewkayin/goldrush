@@ -8,6 +8,11 @@
 #include <vector>
 #include <unordered_map>
 
+#define MAP_REGION_MAX 128
+#define MAP_REGION_CONNECTION_MAX 256
+#define MAP_COST_TO_CONNECTION_MAX 16
+#define MAP_REGION_CHUNK_SIZE 32
+
 const uint32_t MAP_OPTION_IGNORE_UNITS = 1;
 const uint32_t MAP_OPTION_IGNORE_MINERS = 2;
 const uint32_t MAP_OPTION_AVOID_LANDMINES = 1 << 2;
@@ -71,21 +76,29 @@ struct MapPathNode {
     }
 };
 
+// The reason why the cells array has a size of MAP_REGION_CHUNK_SIZE
+// is because each chunk is CHUNK_SIZE x CHUNK_SIZE big, which means
+// the biggest possible connection is two totally flat regions side-by-side,
+// their cells on one of the four sides of the region square are all lined up,
+// so that's a connection that is MAP_REGION_CHUNK_SIZE big
 struct MapRegionConnection {
-    std::vector<ivec2> cells;
-    std::unordered_map<int, int> cost_to_connection;
+    uint32_t cell_count;
+    ivec2 cells[MAP_REGION_CHUNK_SIZE];
 };
 
 struct Map {
     MapType type;
     int width;
     int height;
-    std::vector<Tile> tiles;
-    std::vector<Cell> cells[CELL_LAYER_COUNT];
+    Tile tiles[MAX_MAP_SIZE * MAX_MAP_SIZE];
+    Cell cells[CELL_LAYER_COUNT][MAX_MAP_SIZE * MAX_MAP_SIZE];
 
-    std::vector<int> regions;
-    std::vector<std::unordered_map<int, int>> region_connection_indices;
-    std::vector<MapRegionConnection> region_connections;
+    uint32_t region_count;
+    uint8_t regions[MAX_MAP_SIZE * MAX_MAP_SIZE];
+    uint8_t region_connection_indices[MAP_REGION_MAX][MAP_REGION_MAX];
+    uint32_t region_connection_count;
+    MapRegionConnection region_connections[MAP_REGION_CONNECTION_MAX];
+    uint8_t region_connection_to_connection_cost[MAP_REGION_CONNECTION_MAX][MAP_REGION_CONNECTION_MAX];
 };
 
 void map_init(Map& map, MapType map_type, int width, int height);
