@@ -59,7 +59,7 @@ STATIC_ASSERT(sizeof(int) == sizeof(int32_t));
 #define WINDOWED_HEIGHT 720
 #define UPDATES_PER_SECOND 60
 #define MAX_PLAYERS 4
-#define MAX_MAP_SIZE 160
+#define MAP_SIZE_MAX 160
 #define PLAYER_NONE MAX_PLAYERS
 #define TILE_SIZE 16
 #define MAX_USERNAME_LENGTH 32

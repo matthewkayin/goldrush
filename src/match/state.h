@@ -324,8 +324,8 @@ struct FogReveal {
 struct MatchState {
     int lcg_seed;
     Map map;
-    std::vector<int> fog[MAX_PLAYERS];
-    std::vector<int> detection[MAX_PLAYERS];
+    int fog[MAX_PLAYERS][MAP_SIZE_MAX * MAP_SIZE_MAX];
+    int detection[MAX_PLAYERS][MAP_SIZE_MAX * MAP_SIZE_MAX];
     std::unordered_map<EntityId, RememberedEntity> remembered_entities[MAX_PLAYERS];
     bool is_fog_dirty;
 

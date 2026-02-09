@@ -44,7 +44,7 @@ int match_setting_get_map_size(MapSize value) {
         case MAP_SIZE_MEDIUM:
             return 128;
         case MAP_SIZE_LARGE:
-            return MAX_MAP_SIZE;
+            return MAP_SIZE_MAX;
         case MAP_SIZE_COUNT: {
             GOLD_ASSERT(false);
             return 0;

@@ -90,11 +90,11 @@ struct Map {
     MapType type;
     int width;
     int height;
-    Tile tiles[MAX_MAP_SIZE * MAX_MAP_SIZE];
-    Cell cells[CELL_LAYER_COUNT][MAX_MAP_SIZE * MAX_MAP_SIZE];
+    Tile tiles[MAP_SIZE_MAX * MAP_SIZE_MAX];
+    Cell cells[CELL_LAYER_COUNT][MAP_SIZE_MAX * MAP_SIZE_MAX];
 
     uint32_t region_count;
-    uint8_t regions[MAX_MAP_SIZE * MAX_MAP_SIZE];
+    uint8_t regions[MAP_SIZE_MAX * MAP_SIZE_MAX];
     uint8_t region_connection_indices[MAP_REGION_MAX][MAP_REGION_MAX];
     uint32_t region_connection_count;
     MapRegionConnection region_connections[MAP_REGION_CONNECTION_MAX];

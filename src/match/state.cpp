@@ -44,8 +44,10 @@ MatchState* match_base_init(int32_t lcg_seed, int map_width, int map_height, Mat
 
     // Init fog and detection for each team
     for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
-        state->fog[team] = std::vector<int>((size_t)(map_width * map_height), FOG_HIDDEN);
-        state->detection[team] = std::vector<int>((size_t)(map_width * map_height), 0);
+        for (int index = 0; index < map_width * map_height; index++) {
+            state->fog[team][index] = FOG_HIDDEN;
+            state->detection[team][index] = 0;
+        }
     }
 
     return state;
