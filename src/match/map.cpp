@@ -14,6 +14,7 @@ static const int MAP_STAIR_SPACING = 16;
 static const int MAP_ISLAND_UNASSIGNED = -1;
 static const uint8_t REGION_UNASSIGNED = UINT8_MAX;
 static const uint8_t MAP_REGIONS_NOT_CONNECTED = UINT8_MAX;
+static const uint8_t MAP_REGION_CONNECTIONS_NOT_CONNECTED = UINT8_MAX;
 static const uint32_t PATHFIND_ITERATION_MAX = 1999;
 
 struct PoissonAvoidValue {
@@ -396,6 +397,7 @@ void map_init_regions(Map& map) {
                     MapRegionConnection new_connection;
                     memset(&new_connection, 0, sizeof(new_connection));
                     map.region_connections[map.region_connection_count] = new_connection;
+                    map.region_connection_indices[region][neighbor_region] = (uint8_t)map.region_connection_count;
                     map.region_connection_count++;
                 }
                 uint8_t region_connection_index = map.region_connection_indices[region][neighbor_region];
@@ -407,63 +409,59 @@ void map_init_regions(Map& map) {
     }
 
     // Calculate the center of each region connection
-    std::vector<ivec2> region_connection_centers;
-    for (MapRegionConnection& region_connection : map.region_connections) {
+    ivec2 region_connection_centers[MAP_REGION_CONNECTION_MAX];
+    for (uint32_t region_connection_index = 0; region_connection_index < map.region_connection_count; region_connection_index++) {
+        const MapRegionConnection* region_connection = &map.region_connections[region_connection_index];
+
         // Caclulate the average of the cells in the connection
         ivec2 connection_average = ivec2(0, 0);
-        for (ivec2 cell : region_connection.cells) {
-            connection_average += cell;
+        for (uint32_t cell_index = 0; cell_index < region_connection->cell_count; cell_index++) {
+            connection_average += region_connection->cells[cell_index];
         }
-        connection_average = connection_average / region_connection.cells.size();
+        connection_average = connection_average / region_connection->cell_count;
 
         // Choose the center, which is a cell among the connection that is closest to the average
         ivec2 connection_center = ivec2(-1, -1);
-        for (ivec2 cell : region_connection.cells) {
+        for (uint32_t cell_index = 0; cell_index < region_connection->cell_count; cell_index++) {
             if (connection_center.x == -1 || 
-                    ivec2::manhattan_distance(cell, connection_average) <
-                    ivec2::manhattan_distance(cell, connection_center)) {
-                connection_center = cell;
+                    ivec2::manhattan_distance(region_connection->cells[cell_index], connection_average) <
+                    ivec2::manhattan_distance(connection_center, connection_average)) {
+                connection_center = region_connection->cells[cell_index];
             }
         }
-        region_connection_centers.push_back(connection_center);
+        region_connection_centers[region_connection_index] = connection_center;
     }
 
     // Calculate costs between region connections
-    for (int connection_index = 0; connection_index < (int)map.region_connections.size(); connection_index++) {
-        MapRegionConnection& connection = map.region_connections[connection_index];
+    for (uint32_t connection_index = 0; connection_index < map.region_connection_count; connection_index++) {
+        for (uint32_t other_index = 0; other_index < map.region_connection_count; other_index++) {
+            map.region_connection_to_connection_cost[connection_index][other_index] = MAP_REGION_CONNECTIONS_NOT_CONNECTED;
+        }
+    }
+    for (uint32_t region_connection_index = 0; region_connection_index < map.region_connection_count; region_connection_index++) {
+        const MapRegionConnection* region_connection = &map.region_connections[region_connection_index];
 
         // Determine the region that this connection resides in
         // (this is the region that the connection leads to)
-        int connection_region = map_get_region(map, connection.cells[0]);
+        int connection_region = map_get_region(map, region_connection->cells[0]);
 
-        for (auto it : map.region_connection_indices[connection_region]) {
-            int other_connection_index = it.second;
-            MapRegionConnection& other_connection = map.region_connections[other_connection_index];
+        for (uint32_t other_region = 0; other_region < map.region_count; other_region++) {
+            uint8_t other_connection_index = map.region_connection_indices[connection_region][other_region];
+            if (other_connection_index == MAP_REGIONS_NOT_CONNECTED) {
+                continue;
+            }
 
             // If we have already computed this path one way, don't re-compute it
-            if (connection.cost_to_connection.find(other_connection_index) != connection.cost_to_connection.end()) {
+            if (map.region_connection_to_connection_cost[region_connection_index][other_connection_index] != MAP_REGION_CONNECTIONS_NOT_CONNECTED) {
                 continue;
             }
 
             std::vector<ivec2> path;
-            map_pathfind(map, CELL_LAYER_GROUND, region_connection_centers[connection_index], region_connection_centers[other_connection_index], 1, &path, MAP_OPTION_NO_REGION_PATH);
-
-            connection.cost_to_connection[other_connection_index] = path.size();
-            other_connection.cost_to_connection[connection_index] = path.size();
+            map_pathfind(map, CELL_LAYER_GROUND, region_connection_centers[region_connection_index], region_connection_centers[other_connection_index], 1, &path, MAP_OPTION_NO_REGION_PATH);
+            map.region_connection_to_connection_cost[region_connection_index][other_connection_index] = (uint8_t)path.size();
+            map.region_connection_to_connection_cost[other_connection_index][region_connection_index] = (uint8_t)path.size();
         }
     }
-
-    uint32_t max_connection_size = 0;
-    uint32_t max_cost_to_connection_size = 0;
-    uint32_t max_connection_cell_count = 0;
-    for (const MapRegionConnection& region_connection : map.region_connections) {
-        max_cost_to_connection_size = std::max(max_cost_to_connection_size, (uint32_t)region_connection.cost_to_connection.size());
-        for (auto it : region_connection.cost_to_connection) {
-            max_connection_size = std::max(max_connection_size, (uint32_t)it.second);
-        }
-        max_connection_cell_count = std::max(max_connection_cell_count, (uint32_t)region_connection.cells.size());
-    }
-    log_info("Map region count %i connection count %u max connection size %u max cost to connection size %u max connection cell count %u", region_count, map.region_connections.size(), max_connection_size, max_cost_to_connection_size, max_connection_cell_count);
 }
 
 void map_cleanup_noise(const Map& map, Noise* noise) {
@@ -1835,16 +1833,12 @@ ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, in
     return exit_cell;
 }
 
-int map_get_region(const Map& map, ivec2 cell) {
+uint8_t map_get_region(const Map& map, ivec2 cell) {
     return map.regions[cell.x + (cell.y * map.width)];
 }
 
-int map_get_region_count(const Map& map) {
-    return map.region_connection_indices.size();
-}
-
-int map_are_regions_connected(const Map& map, int region_a, int region_b) {
-    return map.region_connection_indices[region_a].find(region_b) != map.region_connection_indices[region_a].end();
+bool map_are_regions_connected(const Map& map, uint8_t region_a, uint8_t region_b) {
+    return map.region_connection_indices[region_a][region_b] != MAP_REGIONS_NOT_CONNECTED;
 }
 
 ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
@@ -1958,7 +1952,7 @@ std::vector<int> map_get_region_path(const Map& map, ivec2 from, ivec2 to) {
 
     std::vector<MapRegionPathNode> frontier;
     std::vector<MapRegionPathNode> explored;
-    std::vector<bool> is_region_explored(map_get_region_count(map), false);
+    std::vector<bool> is_region_explored(map.region_count, false);
     
     frontier.push_back((MapRegionPathNode) {
         .parent = -1,
@@ -2013,26 +2007,33 @@ std::vector<int> map_get_region_path(const Map& map, ivec2 from, ivec2 to) {
                 frontier.push_back(child);
             }
         }
-        for (int connected_region = 0; connected_region < map_get_region_count(map); connected_region++) {
-            if (!map_are_regions_connected(map, map_get_region(map, smallest.cell), connected_region)) {
-                continue;
-            }
+        for (uint8_t connected_region = 0; connected_region < (uint8_t)map.region_count; connected_region++) {
+            // Skip this region if it is already explored
             if (is_region_explored[connected_region]) {
                 continue;
             }
 
-            int connection_index = map.region_connection_indices[map_get_region(map, smallest.cell)].at(connected_region);
-            const MapRegionConnection& connection = map.region_connections[connection_index];
-            ivec2 nearest_cell = connection.cells[0];
-            for (int index = 1; index < (int)connection.cells.size(); index++) {
-                if (ivec2::manhattan_distance(connection.cells[index], smallest.cell) < 
+            // Skip this region if it is not connected to the smallest node's region
+            uint8_t connection_index = map.region_connection_indices[map_get_region(map, smallest.cell)][connected_region];
+            if (connection_index == MAP_REGIONS_NOT_CONNECTED) {
+                continue;
+            }
+
+            const MapRegionConnection* connection = &map.region_connections[connection_index];
+
+            // Determine the cell in the connection closest to the smallest node's cell
+            ivec2 nearest_cell = connection->cells[0];
+            for (uint32_t cell_index = 1; cell_index < connection->cell_count; cell_index++) {
+                if (ivec2::manhattan_distance(connection->cells[cell_index], smallest.cell) < 
                         ivec2::manhattan_distance(nearest_cell, smallest.cell)) {
-                    nearest_cell = connection.cells[index];
+                    nearest_cell = connection->cells[cell_index];
                 }
             }
-            int connection_cost = smallest.connection_index == -1
+
+            // Determine the connection cost
+            uint8_t connection_cost = smallest.connection_index == -1
                 ? ivec2::manhattan_distance(smallest.cell, nearest_cell)
-                : map.region_connections[smallest.connection_index].cost_to_connection.at(connection_index);
+                : map.region_connection_to_connection_cost[smallest.connection_index][connection_index];
 
             MapRegionPathNode child = (MapRegionPathNode) {
                 .parent = (int)explored.size() - 1,
@@ -2075,8 +2076,8 @@ ivec2 map_get_region_connection_cell_closest_to_cell(const Map& map, ivec2 cell,
     int from_region = map_get_region(map, cell);
 
     GOLD_ASSERT(map_are_regions_connected(map, from_region, to_region));
-    int connection_index = map.region_connection_indices[from_region].at(to_region);
-    GOLD_ASSERT(!map.region_connections[connection_index].cells.empty());
+    uint8_t connection_index = map.region_connection_indices[from_region][to_region];
+    GOLD_ASSERT(map.region_connections[connection_index].cell_count != 0);
     ivec2 nearest_connection_cell = ivec2(-1, -1);
     for (ivec2 connection_cell : map.region_connections[connection_index].cells) {
         if (nearest_connection_cell.x == -1 ||

@@ -353,7 +353,7 @@ int gold_main(int argc, char** argv) {
                     if (state.match_shell_state->mode == MATCH_SHELL_MODE_LEAVE_MATCH) {
                     #ifdef GOLD_DEBUG
                         if (state.launch_mode == LAUNCH_MODE_EDITOR) {
-                            delete state.match_shell_state;
+                            match_shell_free(state.match_shell_state);
                             editor_end_playtest();
                             state.mode = GAME_MODE_EDITOR;
                             break;
@@ -362,7 +362,7 @@ int gold_main(int argc, char** argv) {
 
                         sound_stop_all();
                         state.menu_state = menu_init();
-                        delete state.match_shell_state;
+                        match_shell_free(state.match_shell_state);
                         state.mode = GAME_MODE_MENU;
                     }
                     break;
@@ -382,7 +382,7 @@ int gold_main(int argc, char** argv) {
                         }
                         if (state.match_shell_state->mode != MATCH_SHELL_MODE_LEAVE_MATCH) {
                             for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
-                                if (!state.match_shell_state->match_state.players[player_id].active) {
+                                if (!state.match_shell_state->match_state->players[player_id].active) {
                                     continue;
                                 }
                                 network_add_bot();
@@ -432,8 +432,8 @@ int gold_main(int argc, char** argv) {
 
                 if (state.mode == GAME_MODE_MATCH && !match_shell_is_mouse_in_ui()) {
                     ivec2 cell = (input_get_mouse_position() + state.match_shell_state->camera_offset) / TILE_SIZE;
-                    Tile tile = map_get_tile(state.match_shell_state->match_state.map, cell);
-                    sprintf(debug_text, "Cell <%i, %i> Elevation %u Tile <%i, %i> Region %i Minimap Pixel %u", cell.x, cell.y, tile.elevation, tile.frame.x, tile.frame.y, map_get_region(state.match_shell_state->match_state.map, cell), match_shell_get_minimap_pixel_for_cell(state.match_shell_state, cell));
+                    Tile tile = map_get_tile(state.match_shell_state->match_state->map, cell);
+                    sprintf(debug_text, "Cell <%i, %i> Elevation %u Tile <%i, %i> Region %i Minimap Pixel %u", cell.x, cell.y, tile.elevation, tile.frame.x, tile.frame.y, map_get_region(state.match_shell_state->match_state->map, cell), match_shell_get_minimap_pixel_for_cell(state.match_shell_state, cell));
                     render_text(FONT_HACK_WHITE, debug_text, ivec2(0, render_y));
                     render_y += 10;
 
@@ -444,9 +444,9 @@ int gold_main(int argc, char** argv) {
                         .h = TILE_SIZE
                     }, RENDER_COLOR_WHITE);
 
-                    Cell map_cell = map_get_cell(state.match_shell_state->match_state.map, CELL_LAYER_GROUND, cell);
+                    Cell map_cell = map_get_cell(state.match_shell_state->match_state->map, CELL_LAYER_GROUND, cell);
                     if (map_cell.type == CELL_UNIT || map_cell.type == CELL_BUILDING || map_cell.type == CELL_MINER || map_cell.type == CELL_GOLDMINE) {
-                        const Entity& entity = state.match_shell_state->match_state.entities.get_by_id(map_cell.id);
+                        const Entity& entity = state.match_shell_state->match_state->entities.get_by_id(map_cell.id);
                         ivec2 target_cell = entity_is_target_invalid(state.match_shell_state->match_state, entity) ? ivec2(-1, -1) : entity_get_target_cell(state.match_shell_state->match_state, entity);
                         sprintf(debug_text, "Entity %u %s mode %u target %u cell <%i, %i> is mining %i goldmine id %u pathfind attempts %u", map_cell.id, entity_get_data(entity.type).name, entity.mode, entity.target.type, target_cell.x, target_cell.y, (int)entity_is_mining(state.match_shell_state->match_state, entity), entity.goldmine_id, entity.pathfind_attempts);
                         render_text(FONT_HACK_WHITE, debug_text, ivec2(0, render_y));
@@ -484,7 +484,7 @@ int gold_main(int argc, char** argv) {
         delete state.menu_state;
     }
     if (state.mode == GAME_MODE_MATCH) {
-        delete state.match_shell_state;
+        match_shell_free(state.match_shell_state);
     }
 
     options_save();
@@ -677,7 +677,7 @@ void game_test_update() {
                 state.match_shell_state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT) {
             match_shell_leave_match(state.match_shell_state, false);
         } else if (state.match_shell_state->match_timer % TURN_DURATION == 0 && 
-                state.match_shell_state->match_state.players[network_get_player_id()].active &&
+                state.match_shell_state->match_state->players[network_get_player_id()].active &&
                 state.match_shell_state->input_queue.empty()) {
             uint32_t turn_number = state.match_shell_state->match_timer / TURN_DURATION;
             MatchInput input = turn_number % TURN_OFFSET == 0

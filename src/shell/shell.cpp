@@ -203,7 +203,7 @@ MatchShellState* match_shell_base_init() {
 
 void match_shell_init_input_queues(MatchShellState* state) {
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (!state->match_state.players[player_id].active) {
+        if (!state->match_state->players[player_id].active) {
             continue;
         }
 
@@ -248,7 +248,7 @@ MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
     match_shell_init_input_queues(state);
 
     // Init camera
-    for (const Entity& entity : state->match_state.entities) {
+    for (const Entity& entity : state->match_state->entities) {
         if (entity.type == ENTITY_MINER && entity.player_id == network_get_player_id()) {
             match_shell_center_camera_on_cell(state, entity.cell);
             break;
@@ -321,16 +321,16 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
     state->match_state = match_base_init(lcg_seed, scenario->map.width, scenario->map.height, players);
 
     // Init map
-    state->match_state.map = scenario->map;
-    map_calculate_unreachable_cells(state->match_state.map);
-    map_init_regions(state->match_state.map);
+    state->match_state->map = scenario->map;
+    map_calculate_unreachable_cells(state->match_state->map);
+    map_init_regions(state->match_state->map);
 
     // Clear any cells that are of type unit, 
     // they will be populated by the actual entities IDs
     for (uint32_t layer = 0; layer < CELL_LAYER_COUNT; layer++) {
         for (int index = 0; index < scenario->map.width * scenario->map.height; index++) {
-            if (state->match_state.map.cells[layer][index].type == CELL_UNIT) {
-                state->match_state.map.cells[layer][index] = (Cell) {
+            if (state->match_state->map.cells[layer][index].type == CELL_UNIT) {
+                state->match_state->map.cells[layer][index] = (Cell) {
                     .type = CELL_EMPTY,
                     .id = ID_NULL
                 };
@@ -349,7 +349,7 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
 
         EntityId entity_id = entity_create(state->match_state, entity.type, entity.cell, entity.player_id);
         if (entity_is_building(entity.type)) {
-            Entity& building = state->match_state.entities.get_by_id(entity_id);
+            Entity& building = state->match_state->entities.get_by_id(entity_id);
             building.mode = MODE_BUILDING_FINISHED;
             building.health = entity_get_data(building.type).max_health;
         }
@@ -381,7 +381,7 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
 
                 // Since we added entities from the scenario in-order,
                 // the entity index in scenario should match the entity index in the match state
-                squad_entity_list.push_back(state->match_state.entities.get_id_of(entity_index));
+                squad_entity_list.push_back(state->match_state->entities.get_id_of(entity_index));
                 squad_average_position += scenario->entities[entity_index].cell;
             }
 
@@ -408,7 +408,7 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
     // Player spawn
     match_shell_center_camera_on_cell(state, scenario->player_spawn);
 
-    state->match_state.is_fog_dirty = false;
+    state->match_state->is_fog_dirty = false;
 
     // Script
     if (!match_shell_script_init(state, scenario, script_path)) {
@@ -426,7 +426,7 @@ static int match_shell_load_replay_checkpoints(void* state_ptr) {
         // Match update
         match_shell_replay_begin_turn(state, state->replay_loading_match_state, state->replay_loading_match_timer);
         match_update(state->replay_loading_match_state);
-        state->replay_loading_match_state.events.clear();
+        state->replay_loading_match_state->events.clear();
 
         // Increment timer and save replay checkpoint
         SDL_LockMutex(state->replay_loading_mutex);
@@ -492,15 +492,15 @@ MatchShellState* replay_shell_init(const char* replay_path) {
     state->replay_fog_player_ids.push_back(PLAYER_NONE);
     state->replay_fog_texts.push_back("Everyone");
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (!state->match_state.players[player_id].active) {
+        if (!state->match_state->players[player_id].active) {
             continue;
         }
         state->replay_fog_player_ids.push_back(player_id);
-        state->replay_fog_texts.push_back(state->match_state.players[player_id].name);
+        state->replay_fog_texts.push_back(state->match_state->players[player_id].name);
     }
 
     // Init camera
-    for (const Entity& entity : state->match_state.entities) {
+    for (const Entity& entity : state->match_state->entities) {
         if (entity.type == ENTITY_MINER && entity.player_id == 0) {
             match_shell_center_camera_on_cell(state, entity.cell);
             break;
@@ -508,6 +508,11 @@ MatchShellState* replay_shell_init(const char* replay_path) {
     }
 
     return state;
+}
+
+void match_shell_free(MatchShellState* state) {
+    match_free(state->match_state);
+    delete state;
 }
 
 // NETWORK EVENT
@@ -789,8 +794,8 @@ void match_shell_update(MatchShellState* state) {
             std::clamp(input_get_mouse_position().x - MINIMAP_RECT.x, 0, MINIMAP_RECT.w),
             std::clamp(input_get_mouse_position().y - MINIMAP_RECT.y, 0, MINIMAP_RECT.h));
         ivec2 map_pos = ivec2(
-            (state->match_state.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
-            (state->match_state.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+            (state->match_state->map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+            (state->match_state->map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
         match_shell_center_camera_on_cell(state, map_pos / TILE_SIZE);
     }
 
@@ -817,7 +822,7 @@ void match_shell_update(MatchShellState* state) {
         EntityId miner_id = idle_miners[miner_to_select_index];
         std::vector<EntityId> miner_selection = { miner_id };
         match_shell_set_selection(state, miner_selection);
-        match_shell_center_camera_on_cell(state, state->match_state.entities.get_by_id(miner_id).cell);
+        match_shell_center_camera_on_cell(state, state->match_state->entities.get_by_id(miner_id).cell);
     }
 
     // Begin selecting
@@ -866,20 +871,20 @@ void match_shell_update(MatchShellState* state) {
         if (selection.size() == 1) {
             if ((input_is_action_pressed(INPUT_ACTION_CTRL) ||
                     (state->double_click_timer != 0 && state->selection.size() == 1 && state->selection[0] == selection[0])) &&
-                    state->match_state.entities.get_by_id(selection[0]).player_id == network_get_player_id()) {
-                EntityType selected_type = state->match_state.entities.get_by_id(selection[0]).type;
+                    state->match_state->entities.get_by_id(selection[0]).player_id == network_get_player_id()) {
+                EntityType selected_type = state->match_state->entities.get_by_id(selection[0]).type;
                 selection.clear();
 
-                for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
-                    if (state->match_state.entities[entity_index].type != selected_type || state->match_state.entities[entity_index].player_id != network_get_player_id()) {
+                for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+                    if (state->match_state->entities[entity_index].type != selected_type || state->match_state->entities[entity_index].player_id != network_get_player_id()) {
                         continue;
                     }
 
-                    Rect entity_rect = entity_get_rect(state->match_state.entities[entity_index]);
+                    Rect entity_rect = entity_get_rect(state->match_state->entities[entity_index]);
                     entity_rect.x -= state->camera_offset.x;
                     entity_rect.y -= state->camera_offset.y;
                     if (SCREEN_RECT.intersects(entity_rect)) {
-                        selection.push_back(state->match_state.entities.get_id_of(entity_index));
+                        selection.push_back(state->match_state->entities.get_id_of(entity_index));
                     }
                 }
             } else if (state->double_click_timer == 0 && !input_is_action_pressed(INPUT_ACTION_CTRL)) {
@@ -893,13 +898,13 @@ void match_shell_update(MatchShellState* state) {
 
     // Update displayed gold amounts
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (!state->match_state.players[player_id].active) {
+        if (!state->match_state->players[player_id].active) {
             continue;
         } 
-        state->displayed_gold_amounts[player_id] = match_shell_update_displayed_gold_amount(state->displayed_gold_amounts[player_id], state->match_state.players[player_id].gold);
+        state->displayed_gold_amounts[player_id] = match_shell_update_displayed_gold_amount(state->displayed_gold_amounts[player_id], state->match_state->players[player_id].gold);
         if (state->scenario_global_objective_counter.type == GLOBAL_OBJECTIVE_COUNTER_GOLD) {
             state->scenario_global_objective_counter.gold.values[player_id] = std::min(
-                match_shell_update_displayed_gold_amount(state->scenario_global_objective_counter.gold.values[player_id], state->match_state.players[player_id].gold_mined_total),
+                match_shell_update_displayed_gold_amount(state->scenario_global_objective_counter.gold.values[player_id], state->match_state->players[player_id].gold_mined_total),
                 state->scenario_global_objective_counter.gold.max_value);
         }
     }
@@ -947,7 +952,7 @@ void match_shell_update(MatchShellState* state) {
         // Bot inputs
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             // Filter down to active, bot players
-            if (!(state->match_state.players[player_id].active && 
+            if (!(state->match_state->players[player_id].active && 
                     network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT)) {
                 continue;
             }
@@ -968,7 +973,7 @@ void match_shell_update(MatchShellState* state) {
                     match_shell_add_chat_message(state, match_shell_get_player_font(player_id), prefix, "gg", CHAT_MESSAGE_DURATION);
                     match_shell_handle_player_disconnect(state, player_id);
                     // handle_player_disconnect should have set the bot to inactive for us
-                    GOLD_ASSERT(!state->match_state.players[player_id].active);
+                    GOLD_ASSERT(!state->match_state->players[player_id].active);
                 }
             }
         }
@@ -976,7 +981,7 @@ void match_shell_update(MatchShellState* state) {
         // Check that all inputs have been received
         bool all_inputs_received = true;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (!state->match_state.players[player_id].active) {
+            if (!state->match_state->players[player_id].active) {
                 continue;
             }
 
@@ -997,7 +1002,7 @@ void match_shell_update(MatchShellState* state) {
         // All inputs received. Begin next turn
         // Handle input
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (!state->match_state.players[player_id].active) {
+            if (!state->match_state->players[player_id].active) {
                 replay_file_write_inputs(state->replay_file, player_id, NULL);
                 continue;
             }
@@ -1018,7 +1023,7 @@ void match_shell_update(MatchShellState* state) {
         }
 
         // Flush input
-        if (state->match_state.players[network_get_player_id()].active) {
+        if (state->match_state->players[network_get_player_id()].active) {
             // Always send at least one input per turn
             if (state->input_queue.empty()) {
                 state->input_queue.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
@@ -1074,7 +1079,7 @@ void match_shell_update(MatchShellState* state) {
     }
 
     // Match events
-    for (const MatchEvent& event : state->match_state.events) {
+    for (const MatchEvent& event : state->match_state->events) {
         switch (event.type) {
             case MATCH_EVENT_SOUND: {
                 if (state->sound_cooldown_timers[event.sound.sound] != 0) {
@@ -1091,10 +1096,10 @@ void match_shell_update(MatchShellState* state) {
                 break;
             }
             case MATCH_EVENT_ALERT: {
-                if (state->replay_mode || !state->match_state.players[network_get_player_id()].active) {
+                if (state->replay_mode || !state->match_state->players[network_get_player_id()].active) {
                     break;
                 }
-                if ((event.alert.type == MATCH_ALERT_TYPE_ATTACK && state->match_state.players[event.alert.player_id].team != state->match_state.players[network_get_player_id()].team) ||
+                if ((event.alert.type == MATCH_ALERT_TYPE_ATTACK && state->match_state->players[event.alert.player_id].team != state->match_state->players[network_get_player_id()].team) ||
                     (event.alert.type != MATCH_ALERT_TYPE_ATTACK && event.alert.player_id != network_get_player_id())) {
                     break;
                 }
@@ -1154,7 +1159,7 @@ void match_shell_update(MatchShellState* state) {
                 } else if (event.alert.type == MATCH_ALERT_TYPE_MINE_COLLAPSE || event.alert.type == MATCH_ALERT_TYPE_MINE_RUNNING_LOW) {
                     pixel = MINIMAP_PIXEL_GOLD;
                 } else {
-                    pixel = (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state->match_state.players[network_get_player_id()].recolor_id);
+                    pixel = (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state->match_state->players[network_get_player_id()].recolor_id);
                 }
 
                 state->alerts.push_back((Alert) {
@@ -1173,7 +1178,7 @@ void match_shell_update(MatchShellState* state) {
                 break;
             }
             case MATCH_EVENT_SELECTION_HANDOFF: {
-                if (state->replay_mode || !state->match_state.players[network_get_player_id()].active) {
+                if (state->replay_mode || !state->match_state->players[network_get_player_id()].active) {
                     break;
                 }
                 if (event.selection_handoff.player_id != network_get_player_id()) {
@@ -1192,7 +1197,7 @@ void match_shell_update(MatchShellState* state) {
                 break;
             }
             case MATCH_EVENT_STATUS: {
-                if (state->replay_mode || !state->match_state.players[network_get_player_id()].active) {
+                if (state->replay_mode || !state->match_state->players[network_get_player_id()].active) {
                     break;
                 }
                 if (network_get_player_id() == event.status.player_id) {
@@ -1201,7 +1206,7 @@ void match_shell_update(MatchShellState* state) {
                 break;
             }
             case MATCH_EVENT_RESEARCH_COMPLETE: {
-                if (state->replay_mode || !state->match_state.players[network_get_player_id()].active) {
+                if (state->replay_mode || !state->match_state->players[network_get_player_id()].active) {
                     break;
                 }
                 if (event.research_complete.player_id != network_get_player_id()) {
@@ -1215,7 +1220,7 @@ void match_shell_update(MatchShellState* state) {
             }
             case MATCH_EVENT_PLAYER_DEFEATED: {
                 char defeat_message[128];
-                sprintf(defeat_message, "%s has been defeated.", state->match_state.players[event.player_defeated.player_id].name);
+                sprintf(defeat_message, "%s has been defeated.", state->match_state->players[event.player_defeated.player_id].name);
                 match_shell_add_chat_message(state, FONT_HACK_WHITE, "", defeat_message, CHAT_MESSAGE_DURATION);
 
                 if (!state->replay_mode && 
@@ -1237,7 +1242,7 @@ void match_shell_update(MatchShellState* state) {
             }
         }
     }
-    state->match_state.events.clear();
+    state->match_state->events.clear();
 
     // Scenario script
     if (state->scenario_lua_state != NULL) {
@@ -1299,7 +1304,7 @@ void match_shell_update(MatchShellState* state) {
     {
         uint32_t selection_index = 0;
         while (selection_index < state->selection.size()) {
-            Entity& selected_entity = state->match_state.entities.get_by_id(state->selection[selection_index]);
+            Entity& selected_entity = state->match_state->entities.get_by_id(state->selection[selection_index]);
             if (!match_shell_can_keep_selecting_entity(state, selected_entity)) {
                 state->selection.erase(state->selection.begin() + selection_index);
             } else {
@@ -1335,7 +1340,7 @@ void match_shell_update(MatchShellState* state) {
         } else if (state->mode == MATCH_SHELL_MODE_BUILDING_PLACE || match_shell_is_targeting(state)) {
             state->hotkey_group[5] = INPUT_HOTKEY_CANCEL;
         } else if (!state->selection.empty()) {
-            Entity& first_entity = state->match_state.entities.get_by_id(state->selection[0]);
+            Entity& first_entity = state->match_state->entities.get_by_id(state->selection[0]);
             if (first_entity.player_id == network_get_player_id() && first_entity.mode == MODE_BUILDING_IN_PROGRESS && state->selection.size() == 1) {
                 state->hotkey_group[5] = INPUT_HOTKEY_CANCEL;
             } else if (first_entity.player_id == network_get_player_id()) {
@@ -1345,7 +1350,7 @@ void match_shell_update(MatchShellState* state) {
                     is_selection_uniform = false;
                 }
                 for (uint32_t selection_index = 1; selection_index < state->selection.size(); selection_index++) {
-                    const Entity& entity = state->match_state.entities.get_by_id(state->selection[selection_index]);
+                    const Entity& entity = state->match_state->entities.get_by_id(state->selection[selection_index]);
                     if (!entity.garrisoned_units.empty()) {
                         has_garrisoned_units = true;
                     }
@@ -1472,7 +1477,7 @@ void match_shell_handle_input(MatchShellState* state) {
         return;
     }
 
-    const bool spectator_mode = state->replay_mode || !state->match_state.players[network_get_player_id()].active;
+    const bool spectator_mode = state->replay_mode || !state->match_state->players[network_get_player_id()].active;
 
     // Begin chat
     if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && !input_is_text_input_active() && !state->replay_mode) {
@@ -1496,7 +1501,7 @@ void match_shell_handle_input(MatchShellState* state) {
                     state->debug_fog = DEBUG_FOG_BOT_VISION;
                 } else if (state->chat_message == "/gold") {
                     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                        state->match_state.players[player_id].gold += 5000;
+                        state->match_state->players[player_id].gold += 5000;
                     }
                 }  else if (state->chat_message == "/regions") {
                     state->debug_show_region_lines = !state->debug_show_region_lines;
@@ -1556,7 +1561,7 @@ void match_shell_handle_input(MatchShellState* state) {
                             } else if (state->mode == MATCH_SHELL_MODE_BUILDING_PLACE) {
                                 state->mode = MATCH_SHELL_MODE_NONE;
                             } else if (state->selection.size() == 1) { 
-                                const Entity& entity = state->match_state.entities.get_by_id(state->selection[0]);
+                                const Entity& entity = state->match_state->entities.get_by_id(state->selection[0]);
                                 if (entity.mode == MODE_BUILDING_IN_PROGRESS) {
                                     state->input_queue.push_back((MatchInput) {
                                         .type = MATCH_INPUT_BUILD_CANCEL,
@@ -1590,7 +1595,7 @@ void match_shell_handle_input(MatchShellState* state) {
                             break;
                         }
                         case INPUT_HOTKEY_UNLOAD: {
-                            if (entity_is_unit(state->match_state.entities.get_by_id(state->selection[0]).type)) {
+                            if (entity_is_unit(state->match_state->entities.get_by_id(state->selection[0]).type)) {
                                 state->mode = MATCH_SHELL_MODE_TARGET_UNLOAD;
                             } else {
                                 MatchInput input;
@@ -1610,7 +1615,7 @@ void match_shell_handle_input(MatchShellState* state) {
                             break;
                         }
                         case INPUT_HOTKEY_CAMO: {
-                            bool activate = !entity_check_flag(state->match_state.entities.get_by_id(state->selection[0]), ENTITY_FLAG_INVISIBLE);
+                            bool activate = !entity_check_flag(state->match_state->entities.get_by_id(state->selection[0]), ENTITY_FLAG_INVISIBLE);
                             if (activate && !match_shell_selection_has_enough_energy(state, state->selection, CAMO_ENERGY_COST)) {
                                 match_shell_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
                                 break;
@@ -1630,7 +1635,7 @@ void match_shell_handle_input(MatchShellState* state) {
                     bool costs_energy = (building_data.building_data.options & BUILDING_COSTS_ENERGY) == BUILDING_COSTS_ENERGY;
                     if (costs_energy && !match_shell_selection_has_enough_energy(state, state->selection, building_data.gold_cost)) {
                         match_shell_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
-                    } else if (!costs_energy && state->match_state.players[network_get_player_id()].gold < entity_get_data(hotkey_info.entity_type).gold_cost) {
+                    } else if (!costs_energy && state->match_state->players[network_get_player_id()].gold < entity_get_data(hotkey_info.entity_type).gold_cost) {
                         match_shell_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
                     } else {
                         state->mode = MATCH_SHELL_MODE_BUILDING_PLACE;
@@ -1651,7 +1656,7 @@ void match_shell_handle_input(MatchShellState* state) {
                     // Check to make sure at least one building queue has room
                     bool are_building_queues_full = true;
                     for (EntityId building_id : state->selection) {
-                        const Entity& building = state->match_state.entities.get_by_id(building_id);
+                        const Entity& building = state->match_state->entities.get_by_id(building_id);
                         if (building.queue.size() < BUILDING_QUEUE_MAX) {
                             are_building_queues_full = false;
                         }
@@ -1659,7 +1664,7 @@ void match_shell_handle_input(MatchShellState* state) {
 
                     if (are_building_queues_full) {
                         match_shell_show_status(state, MATCH_UI_STATUS_BUILDING_QUEUE_FULL);
-                    } else if (state->match_state.players[network_get_player_id()].gold < building_queue_item_cost(item)) {
+                    } else if (state->match_state->players[network_get_player_id()].gold < building_queue_item_cost(item)) {
                         match_shell_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
                     } else {
                         if (match_shell_is_in_hotkey_submenu(state)) {
@@ -1706,7 +1711,7 @@ void match_shell_handle_input(MatchShellState* state) {
             !spectator_mode &&
             match_shell_is_camera_free(state) &&
             !match_shell_is_selecting(state)) {
-        const Entity& building = state->match_state.entities.get_by_id(state->selection[0]);
+        const Entity& building = state->match_state->entities.get_by_id(state->selection[0]);
         const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
         for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
             Rect icon_rect = (Rect) {
@@ -1732,12 +1737,12 @@ void match_shell_handle_input(MatchShellState* state) {
     // Garrisoned unit click
     if (state->selection.size() == 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
             !spectator_mode) {
-        const Entity& carrier = state->match_state.entities.get_by_id(state->selection[0]);
+        const Entity& carrier = state->match_state->entities.get_by_id(state->selection[0]);
         if (carrier.type == ENTITY_GOLDMINE || carrier.player_id == network_get_player_id()) {
             const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
             int index = 0;
             for (EntityId entity_id : carrier.garrisoned_units) {
-                const Entity& garrisoned_unit = state->match_state.entities.get_by_id(entity_id);
+                const Entity& garrisoned_unit = state->match_state->entities.get_by_id(entity_id);
                 // We have to make this check here because goldmines might have both allied and enemy units in them
                 if (garrisoned_unit.player_id != network_get_player_id()) {
                     continue;
@@ -1793,7 +1798,7 @@ void match_shell_handle_input(MatchShellState* state) {
             (!match_shell_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position()))) {
         // Check to make sure that all buildings can rally
         for (EntityId id : state->selection) {
-            const Entity& entity = state->match_state.entities.get_by_id(id);
+            const Entity& entity = state->match_state->entities.get_by_id(id);
             if ((entity_get_data(entity.type).building_data.options & BUILDING_CAN_RALLY) != BUILDING_CAN_RALLY) {
                 return;
             }
@@ -1806,19 +1811,19 @@ void match_shell_handle_input(MatchShellState* state) {
         // Determine rally point
         if (match_shell_is_mouse_in_ui()) {
             ivec2 minimap_pos = input_get_mouse_position() - ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y);
-            input.rally.rally_point = ivec2((state->match_state.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
-                                            (state->match_state.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+            input.rally.rally_point = ivec2((state->match_state->map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+                                            (state->match_state->map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
         } else {
             input.rally.rally_point = input_get_mouse_position() + state->camera_offset;
         }
 
         // Check if rallied onto gold
-        Cell cell = map_get_cell(state->match_state.map, CELL_LAYER_GROUND, input.rally.rally_point / TILE_SIZE);
+        Cell cell = map_get_cell(state->match_state->map, CELL_LAYER_GROUND, input.rally.rally_point / TILE_SIZE);
         if (cell.type == CELL_GOLDMINE) {
             // If they rallied onto their gold, adjust their rally point and play an animation to clearly indicate that units will rally out to the mine
             // But only do this if the goldmine has been explored, otherwise we would reveal to players that there is a goldmine where they clicked
-            const Entity& goldmine = state->match_state.entities.get_by_id(cell.id);
-            if (match_is_cell_rect_explored(state->match_state, state->match_state.players[network_get_player_id()].team, goldmine.cell, entity_get_data(goldmine.type).cell_size)) {
+            const Entity& goldmine = state->match_state->entities.get_by_id(cell.id);
+            if (match_is_cell_rect_explored(state->match_state, state->match_state->players[network_get_player_id()].team, goldmine.cell, entity_get_data(goldmine.type).cell_size)) {
                 input.rally.rally_point = (goldmine.cell * TILE_SIZE) + ivec2(23, 16);
                 state->move_animation = animation_create(ANIMATION_UI_MOVE_ENTITY);
                 state->move_animation_entity_id = cell.id;
@@ -1874,7 +1879,7 @@ void match_shell_handle_input(MatchShellState* state) {
             int control_group_index = number_key_pressed;
             // Set control group
             if (input_is_action_pressed(INPUT_ACTION_CTRL)) {
-                if (state->selection.empty() || state->match_state.entities.get_by_id(state->selection[0]).player_id != network_get_player_id()) {
+                if (state->selection.empty() || state->match_state->entities.get_by_id(state->selection[0]).player_id != network_get_player_id()) {
                     return;
                 }
 
@@ -1885,7 +1890,7 @@ void match_shell_handle_input(MatchShellState* state) {
 
             // Append control group
             if (input_is_action_pressed(INPUT_ACTION_SHIFT)) {
-                if (state->selection.empty() || state->match_state.entities.get_by_id(state->selection[0]).player_id != network_get_player_id()) {
+                if (state->selection.empty() || state->match_state->entities.get_by_id(state->selection[0]).player_id != network_get_player_id()) {
                     return;
                 }
                 
@@ -1906,7 +1911,7 @@ void match_shell_handle_input(MatchShellState* state) {
                 std::vector<Rect> group_rects;
                 std::vector<uint32_t> group_rect_entity_counts;
                 for (uint32_t selection_index = 0; selection_index < state->selection.size(); selection_index++) {
-                    const Entity& entity = state->match_state.entities.get_by_id(state->selection[selection_index]);
+                    const Entity& entity = state->match_state->entities.get_by_id(state->selection[selection_index]);
 
                     const int entity_cell_size = entity_get_data(entity.type).cell_size;
                     Rect entity_rect = (Rect) {
@@ -1966,7 +1971,7 @@ void match_shell_handle_input(MatchShellState* state) {
                 // Snap to the group rect's center
                 Rect group_rect = group_rects[most_populated_group_rect_index];
                 ivec2 group_center = ivec2(group_rect.x + (group_rect.w / 2), group_rect.y + (group_rect.h / 2));
-                map_clamp_cell(state->match_state.map, group_center);
+                map_clamp_cell(state->match_state->map, group_center);
                 match_shell_center_camera_on_cell(state, group_center);
                 return;
             }
@@ -2007,8 +2012,8 @@ void match_shell_order_move(MatchShellState* state) {
     ivec2 move_target;
     if (match_shell_is_mouse_in_ui()) {
         ivec2 minimap_pos = input_get_mouse_position() - ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y);
-        move_target = ivec2((state->match_state.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
-                            (state->match_state.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+        move_target = ivec2((state->match_state->map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+                            (state->match_state->map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
     } else {
         move_target = input_get_mouse_position() + state->camera_offset;
     }
@@ -2022,20 +2027,20 @@ void match_shell_order_move(MatchShellState* state) {
     bool input_move_target_is_balloon = false;
 
     // Checks if clicked on entity
-    uint8_t player_team = state->match_state.players[network_get_player_id()].team;
-    int fog_value = match_get_fog(state->match_state, state->match_state.players[network_get_player_id()].team, input.move.target_cell);
+    uint8_t player_team = state->match_state->players[network_get_player_id()].team;
+    int fog_value = match_get_fog(state->match_state, state->match_state->players[network_get_player_id()].team, input.move.target_cell);
     // If clicked on hidden fog or the minimap, then don't check for entity click
     if (fog_value != FOG_HIDDEN && !match_shell_is_mouse_in_ui()) {
-        for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
-            const Entity& entity = state->match_state.entities[entity_index];
+        for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+            const Entity& entity = state->match_state->entities[entity_index];
             // Can't select units under explored fog
             if (fog_value == FOG_EXPLORED && entity_is_unit(entity.type)) {
                 continue;
             }
             // Non-units *can* be selected under explored fog, but only if we have explored that the building exists
             if (fog_value == FOG_EXPLORED) {
-                auto it = state->match_state.remembered_entities[player_team].find(state->match_state.entities.get_id_of(entity_index));
-                if (it == state->match_state.remembered_entities[player_team].end()) {
+                auto it = state->match_state->remembered_entities[player_team].find(state->match_state->entities.get_id_of(entity_index));
+                if (it == state->match_state->remembered_entities[player_team].end()) {
                     continue;
                 }
             }
@@ -2044,19 +2049,19 @@ void match_shell_order_move(MatchShellState* state) {
                 continue;
             }
             // Don't target invisible units (unless we have detection)
-            if (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state->match_state.detection[player_team][input.move.target_cell.x + (input.move.target_cell.y * state->match_state.map.width)] == 0) {
+            if (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state->match_state->detection[player_team][input.move.target_cell.x + (input.move.target_cell.y * state->match_state->map.width)] == 0) {
                 continue;
             }
 
-            Rect entity_rect = entity_get_rect(state->match_state.entities[entity_index]);
+            Rect entity_rect = entity_get_rect(state->match_state->entities[entity_index]);
             if (entity_rect.has_point(move_target)) {
                 if (input.move.target_id == ID_NULL || 
-                        (state->match_state.entities[entity_index].type == ENTITY_BALLOON && !input_move_target_is_balloon)) {
-                    input.move.target_id = state->match_state.entities.get_id_of(entity_index);
-                    input_move_target_is_balloon = state->match_state.entities[entity_index].type == ENTITY_BALLOON;
+                        (state->match_state->entities[entity_index].type == ENTITY_BALLOON && !input_move_target_is_balloon)) {
+                    input.move.target_id = state->match_state->entities.get_id_of(entity_index);
+                    input_move_target_is_balloon = state->match_state->entities[entity_index].type == ENTITY_BALLOON;
                 }
                 if (fog_value == FOG_EXPLORED) {
-                    remembered_entity_id = state->match_state.entities.get_id_of(entity_index);
+                    remembered_entity_id = state->match_state->entities.get_id_of(entity_index);
                 }
             }
         }
@@ -2068,9 +2073,9 @@ void match_shell_order_move(MatchShellState* state) {
         input.type = MATCH_INPUT_MOVE_REPAIR;
     } else if (state->mode == MATCH_SHELL_MODE_TARGET_MOLOTOV) {
         input.type = MATCH_INPUT_MOVE_MOLOTOV;
-    } else if (input.move.target_id != ID_NULL && state->match_state.entities.get_by_id(input.move.target_id).type != ENTITY_GOLDMINE &&
+    } else if (input.move.target_id != ID_NULL && state->match_state->entities.get_by_id(input.move.target_id).type != ENTITY_GOLDMINE &&
                (state->mode == MATCH_SHELL_MODE_TARGET_ATTACK || 
-                state->match_state.players[state->match_state.entities.get_by_id(input.move.target_id).player_id].team != state->match_state.players[network_get_player_id()].team)) {
+                state->match_state->players[state->match_state->entities.get_by_id(input.move.target_id).player_id].team != state->match_state->players[network_get_player_id()].team)) {
         input.type = MATCH_INPUT_MOVE_ATTACK_ENTITY;
     } else if (input.move.target_id == ID_NULL && state->mode == MATCH_SHELL_MODE_TARGET_ATTACK) {
         input.type = MATCH_INPUT_MOVE_ATTACK_CELL;
@@ -2089,8 +2094,8 @@ void match_shell_order_move(MatchShellState* state) {
         if (input.move.target_id == ID_NULL) {
             is_repair_target_valid = false;
         } else {
-            const Entity& repair_target = state->match_state.entities.get_by_id(input.move.target_id);
-            if (state->match_state.players[repair_target.player_id].team != state->match_state.players[network_get_player_id()].team || 
+            const Entity& repair_target = state->match_state->entities.get_by_id(input.move.target_id);
+            if (state->match_state->players[repair_target.player_id].team != state->match_state->players[network_get_player_id()].team || 
                     !entity_is_building(repair_target.type)) {
                 is_repair_target_valid = false;
             }
@@ -2107,7 +2112,7 @@ void match_shell_order_move(MatchShellState* state) {
 
     // Play animation
     if (remembered_entity_id != ID_NULL) {
-        EntityType remembered_entity_type = state->match_state.remembered_entities[player_team][remembered_entity_id].type;
+        EntityType remembered_entity_type = state->match_state->remembered_entities[player_team][remembered_entity_id].type;
         state->move_animation = animation_create(remembered_entity_type == ENTITY_GOLDMINE
                                                         ? ANIMATION_UI_MOVE_ENTITY 
                                                         : ANIMATION_UI_MOVE_ATTACK_ENTITY);
@@ -2135,7 +2140,7 @@ std::vector<EntityId> match_shell_find_idle_miners(const MatchShellState* state)
     });
 }
 
-bool match_shell_does_player_meet_hotkey_requirements(const MatchState& state, InputAction hotkey) {
+bool match_shell_does_player_meet_hotkey_requirements(const MatchState* state, InputAction hotkey) {
     const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
 
     switch (hotkey_info.requirements.type) {
@@ -2143,7 +2148,7 @@ bool match_shell_does_player_meet_hotkey_requirements(const MatchState& state, I
             return true;
         }
         case HOTKEY_REQUIRES_BUILDING: {
-            for (const Entity& entity : state.entities) {
+            for (const Entity& entity : state->entities) {
                 if (entity.player_id == network_get_player_id() && entity.type == hotkey_info.requirements.building && entity.mode == MODE_BUILDING_FINISHED) {
                     return true;
                 }
@@ -2173,7 +2178,7 @@ bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyB
 uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type) {
     uint32_t count = 0;
 
-    for (const Entity& entity : state->match_state.entities) {
+    for (const Entity& entity : state->match_state->entities) {
         if (entity.type != entity_type ||
                 entity.player_id != player_id ||
                 entity.health == 0 ||
@@ -2240,8 +2245,8 @@ bool match_shell_is_targeting(const MatchShellState* state) {
 // CAMERA
 
 void match_shell_clamp_camera(MatchShellState* state) {
-    state->camera_offset.x = std::clamp(state->camera_offset.x, 0, (state->match_state.map.width * TILE_SIZE) - SCREEN_WIDTH);
-    state->camera_offset.y = std::clamp(state->camera_offset.y, 0, (state->match_state.map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
+    state->camera_offset.x = std::clamp(state->camera_offset.x, 0, (state->match_state->map.width * TILE_SIZE) - SCREEN_WIDTH);
+    state->camera_offset.y = std::clamp(state->camera_offset.y, 0, (state->match_state->map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
 }
 
 void match_shell_center_camera_on_cell(MatchShellState* state, ivec2 cell) {
@@ -2260,8 +2265,8 @@ std::vector<EntityId> match_shell_create_selection(const MatchShellState* state,
     std::vector<EntityId> selection;
 
     // Select player units
-    for (uint32_t index = 0; index < state->match_state.entities.size(); index++) {
-        const Entity& entity = state->match_state.entities[index];
+    for (uint32_t index = 0; index < state->match_state->entities.size(); index++) {
+        const Entity& entity = state->match_state->entities[index];
         // Select only selectable units
         if (!entity_is_unit(entity.type) || !entity_is_selectable(entity)) {
             continue;
@@ -2277,7 +2282,7 @@ std::vector<EntityId> match_shell_create_selection(const MatchShellState* state,
 
         Rect entity_rect = entity_get_rect(entity);
         if (entity_rect.intersects(select_rect)) {
-            selection.push_back(state->match_state.entities.get_id_of(index));
+            selection.push_back(state->match_state->entities.get_id_of(index));
         }
     }
     if (!selection.empty()) {
@@ -2285,8 +2290,8 @@ std::vector<EntityId> match_shell_create_selection(const MatchShellState* state,
     }
 
     // Select player buildings
-    for (uint32_t index = 0; index < state->match_state.entities.size(); index++) {
-        const Entity& entity = state->match_state.entities[index];
+    for (uint32_t index = 0; index < state->match_state->entities.size(); index++) {
+        const Entity& entity = state->match_state->entities[index];
         // Select only selectable buildings
         if (!entity_is_building(entity.type) || !entity_is_selectable(entity)) {
             continue;
@@ -2302,7 +2307,7 @@ std::vector<EntityId> match_shell_create_selection(const MatchShellState* state,
 
         Rect entity_rect = entity_get_rect(entity);
         if (entity_rect.intersects(select_rect)) {
-            selection.push_back(state->match_state.entities.get_id_of(index));
+            selection.push_back(state->match_state->entities.get_id_of(index));
         }
     }
     if (!selection.empty()) {
@@ -2311,8 +2316,8 @@ std::vector<EntityId> match_shell_create_selection(const MatchShellState* state,
 
     if (!state->replay_mode) {
         // Select enemy units
-        for (uint32_t index = 0; index < state->match_state.entities.size(); index++) {
-            const Entity& entity = state->match_state.entities[index];
+        for (uint32_t index = 0; index < state->match_state->entities.size(); index++) {
+            const Entity& entity = state->match_state->entities[index];
             if (entity.player_id == network_get_player_id() ||
                     !entity_is_unit(entity.type) ||
                     !entity_is_selectable(entity) ||
@@ -2322,14 +2327,14 @@ std::vector<EntityId> match_shell_create_selection(const MatchShellState* state,
 
             Rect entity_rect = entity_get_rect(entity);
             if (entity_rect.intersects(select_rect)) {
-                selection.push_back(state->match_state.entities.get_id_of(index));
+                selection.push_back(state->match_state->entities.get_id_of(index));
                 return selection;
             }
         }
 
         // Select enemy buildings
-        for (uint32_t index = 0; index < state->match_state.entities.size(); index++) {
-            const Entity& entity = state->match_state.entities[index];
+        for (uint32_t index = 0; index < state->match_state->entities.size(); index++) {
+            const Entity& entity = state->match_state->entities[index];
             if (entity.player_id == network_get_player_id() ||
                     entity_is_unit(entity.type) ||
                     !entity_is_selectable(entity) ||
@@ -2339,15 +2344,15 @@ std::vector<EntityId> match_shell_create_selection(const MatchShellState* state,
 
             Rect entity_rect = entity_get_rect(entity);
             if (entity_rect.intersects(select_rect)) {
-                selection.push_back(state->match_state.entities.get_id_of(index));
+                selection.push_back(state->match_state->entities.get_id_of(index));
                 return selection;
             }
         }
     }
 
     // Select gold mines
-    for (uint32_t index = 0; index < state->match_state.entities.size(); index++) {
-        const Entity& entity = state->match_state.entities[index];
+    for (uint32_t index = 0; index < state->match_state->entities.size(); index++) {
+        const Entity& entity = state->match_state->entities[index];
         if (entity.type != ENTITY_GOLDMINE ||
                 !match_shell_is_entity_visible(state, entity)) {
             continue;
@@ -2355,7 +2360,7 @@ std::vector<EntityId> match_shell_create_selection(const MatchShellState* state,
 
         Rect entity_rect = entity_get_rect(entity);
         if (entity_rect.intersects(select_rect)) {
-            selection.push_back(state->match_state.entities.get_id_of(index));
+            selection.push_back(state->match_state->entities.get_id_of(index));
             return selection;
         }
     }
@@ -2368,8 +2373,8 @@ void match_shell_set_selection(MatchShellState* state, std::vector<EntityId>& se
     state->selection = selection;
 
     for (uint32_t selection_index = 0; selection_index < state->selection.size(); selection_index++) {
-        uint32_t entity_index = state->match_state.entities.get_index_of(state->selection[selection_index]);
-        if (entity_index == INDEX_INVALID || !match_shell_is_entity_selectable(state, state->match_state.entities[entity_index])) {
+        uint32_t entity_index = state->match_state->entities.get_index_of(state->selection[selection_index]);
+        if (entity_index == INDEX_INVALID || !match_shell_is_entity_selectable(state, state->match_state->entities[entity_index])) {
             state->selection.erase(state->selection.begin() + selection_index);
             selection_index--;
             continue;
@@ -2388,7 +2393,7 @@ MatchShellSelectionType match_shell_get_selection_type(const MatchShellState* st
         return MATCH_SHELL_SELECTION_NONE;
     }
 
-    const Entity& entity = state->match_state.entities.get_by_id(selection[0]);
+    const Entity& entity = state->match_state->entities.get_by_id(selection[0]);
     if (entity_is_unit(entity.type)) {
         if (entity.player_id == network_get_player_id()) {
             return MATCH_SHELL_SELECTION_UNITS;
@@ -2408,7 +2413,7 @@ MatchShellSelectionType match_shell_get_selection_type(const MatchShellState* st
 
 bool match_shell_selection_has_enough_energy(const MatchShellState* state, const std::vector<EntityId>& selection, uint32_t cost) {
     for (EntityId id : selection) {
-        if (state->match_state.entities.get_by_id(id).energy >= cost) {
+        if (state->match_state->entities.get_by_id(id).energy >= cost) {
             return true;
             break;
         }
@@ -2483,7 +2488,7 @@ bool match_shell_is_cell_rect_revealed(const MatchShellState* state, ivec2 cell,
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if ((state->replay_fog_player_ids[state->replay_fog_index] == PLAYER_NONE ||
                     state->replay_fog_player_ids[state->replay_fog_index] == player_id) &&
-                    match_is_cell_rect_revealed(state->match_state, state->match_state.players[player_id].team, cell, cell_size)) {
+                    match_is_cell_rect_revealed(state->match_state, state->match_state->players[player_id].team, cell, cell_size)) {
                 return true;
             }
         }
@@ -2494,7 +2499,7 @@ bool match_shell_is_cell_rect_revealed(const MatchShellState* state, ivec2 cell,
             if (state->debug_fog == DEBUG_FOG_BOT_VISION) {
                 for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                     if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT &&
-                            match_is_cell_rect_revealed(state->match_state, state->match_state.players[player_id].team, cell, cell_size)) {
+                            match_is_cell_rect_revealed(state->match_state, state->match_state->players[player_id].team, cell, cell_size)) {
                         return true;
                     }
                 }
@@ -2502,7 +2507,7 @@ bool match_shell_is_cell_rect_revealed(const MatchShellState* state, ivec2 cell,
                 return true;
             }
         #endif
-        return match_is_cell_rect_revealed(state->match_state, state->match_state.players[network_get_player_id()].team, cell, cell_size);
+        return match_is_cell_rect_revealed(state->match_state, state->match_state->players[network_get_player_id()].team, cell, cell_size);
     }
 }
 
@@ -2515,7 +2520,7 @@ int match_shell_get_fog(const MatchShellState* state, ivec2 cell) {
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if (state->replay_fog_player_ids[state->replay_fog_index] == PLAYER_NONE ||
                     state->replay_fog_player_ids[state->replay_fog_index] == player_id) {
-                int player_fog_value = match_get_fog(state->match_state, state->match_state.players[player_id].team, cell);
+                int player_fog_value = match_get_fog(state->match_state, state->match_state->players[player_id].team, cell);
                 // If at least one player has revealed fog, then return a revealed fog value
                 if (player_fog_value > 0) {
                     return 1;
@@ -2535,7 +2540,7 @@ int match_shell_get_fog(const MatchShellState* state, ivec2 cell) {
                 int fog_value = FOG_HIDDEN;
                 for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                     if ((network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT || network_get_player_id() == player_id)) {
-                        int player_fog_value = match_get_fog(state->match_state, state->match_state.players[player_id].team, cell);
+                        int player_fog_value = match_get_fog(state->match_state, state->match_state->players[player_id].team, cell);
 
                         // If at least one player has revealed fog, then return a revealed fog value
                         if (player_fog_value > 0) {
@@ -2552,14 +2557,14 @@ int match_shell_get_fog(const MatchShellState* state, ivec2 cell) {
                 return 1;
             }
         #endif
-        return match_get_fog(state->match_state, state->match_state.players[network_get_player_id()].team, cell);
+        return match_get_fog(state->match_state, state->match_state->players[network_get_player_id()].team, cell);
     }
 }
 
 // CHAT
 
 void match_shell_get_player_prefix(const MatchShellState* state, uint8_t player_id, char* prefix) {
-    sprintf(prefix, "%s:", state->match_state.players[player_id].name);
+    sprintf(prefix, "%s:", state->match_state->players[player_id].name);
 }
 
 FontName match_shell_get_player_font(uint8_t player_id) {
@@ -2593,9 +2598,9 @@ void match_shell_handle_player_disconnect(MatchShellState* state, uint8_t player
     // Show the victory banner to other players when this player leaves,
     // but only if the player was still active. If they are not active, it means they've 
     // been defeated already, so don't show the victory banner for that player
-    if (state->match_state.players[player_id].active) {
-        state->match_state.players[player_id].active = false;
-        if (state->match_state.players[network_get_player_id()].active && !match_shell_is_at_least_one_opponent_in_match(state)) {
+    if (state->match_state->players[player_id].active) {
+        state->match_state->players[player_id].active = false;
+        if (state->match_state->players[network_get_player_id()].active && !match_shell_is_at_least_one_opponent_in_match(state)) {
             state->mode = MATCH_SHELL_MODE_MATCH_OVER_VICTORY;
         }
     }
@@ -2621,10 +2626,10 @@ ivec2 match_shell_get_building_cell(int building_size, ivec2 camera_offset) {
 bool match_shell_building_can_be_placed(const MatchShellState* state) {
     const EntityData& entity_data = entity_get_data(state->building_type);
     ivec2 building_cell = match_shell_get_building_cell(entity_data.cell_size, state->camera_offset);
-    ivec2 miner_cell = state->match_state.entities.get_by_id(match_get_nearest_builder(state->match_state, state->selection, building_cell)).cell;
+    ivec2 miner_cell = state->match_state->entities.get_by_id(match_get_nearest_builder(state->match_state, state->selection, building_cell)).cell;
 
     // Check that the building is in bounds
-    if (!map_is_cell_rect_in_bounds(state->match_state.map, building_cell, entity_data.cell_size)) {
+    if (!map_is_cell_rect_in_bounds(state->match_state->map, building_cell, entity_data.cell_size)) {
         return false;
     }
 
@@ -2635,7 +2640,7 @@ bool match_shell_building_can_be_placed(const MatchShellState* state) {
             .w = entity_data.cell_size, .h = entity_data.cell_size
         };
 
-        for (const Entity& entity : state->match_state.entities) {
+        for (const Entity& entity : state->match_state->entities) {
             if (entity.type == ENTITY_GOLDMINE) {
                 Rect goldmine_block_rect = entity_goldmine_get_block_building_rect(entity.cell);
                 if (building_rect.intersects(goldmine_block_rect)) {
@@ -2659,12 +2664,12 @@ bool match_shell_building_can_be_placed(const MatchShellState* state) {
 
 bool match_shell_is_building_place_cell_valid(const MatchShellState* state, ivec2 miner_cell, ivec2 cell) {
     // Check that no entities are occupying the building rect
-    Cell map_ground_cell = map_get_cell(state->match_state.map, CELL_LAYER_GROUND, cell);
+    Cell map_ground_cell = map_get_cell(state->match_state->map, CELL_LAYER_GROUND, cell);
     if (map_ground_cell.type == CELL_UNIT || map_ground_cell.type == CELL_MINER || map_ground_cell.type == CELL_BUILDING) {
         // If the entity is not visible to the player, then we will ignore the fact that it's blocking the building
         if (cell != miner_cell &&
-                (entity_is_visible_to_player(state->match_state, state->match_state.entities.get_by_id(map_ground_cell.id), network_get_player_id()) ||
-                (map_ground_cell.type == CELL_BUILDING && state->match_state.remembered_entities[network_get_player_id()].find(map_ground_cell.id) != state->match_state.remembered_entities[network_get_player_id()].end()))) {
+                (entity_is_visible_to_player(state->match_state, state->match_state->entities.get_by_id(map_ground_cell.id), network_get_player_id()) ||
+                (map_ground_cell.type == CELL_BUILDING && state->match_state->remembered_entities[network_get_player_id()].find(map_ground_cell.id) != state->match_state->remembered_entities[network_get_player_id()].end()))) {
             return false;
         }
     } else if (map_ground_cell.type != CELL_EMPTY) {
@@ -2672,19 +2677,19 @@ bool match_shell_is_building_place_cell_valid(const MatchShellState* state, ivec
     }
 
     // Check that we're not building on a ramp
-    if (map_is_tile_ramp(state->match_state.map, cell)) {
+    if (map_is_tile_ramp(state->match_state->map, cell)) {
         return false;
     } 
 
     // Check that we're not building on top of a landmine
-    Cell map_underground_cell = map_get_cell(state->match_state.map, CELL_LAYER_UNDERGROUND, cell);
+    Cell map_underground_cell = map_get_cell(state->match_state->map, CELL_LAYER_UNDERGROUND, cell);
     if (map_underground_cell.type == CELL_BUILDING && 
-            entity_is_visible_to_player(state->match_state, state->match_state.entities.get_by_id(map_underground_cell.id), network_get_player_id())) {
+            entity_is_visible_to_player(state->match_state, state->match_state->entities.get_by_id(map_underground_cell.id), network_get_player_id())) {
         return false;
     }
 
     // Check that we're not building on hidden fog
-    if (match_get_fog(state->match_state, state->match_state.players[network_get_player_id()].team, cell) == FOG_HIDDEN) {
+    if (match_get_fog(state->match_state, state->match_state->players[network_get_player_id()].team, cell) == FOG_HIDDEN) {
         return false;
     }
 
@@ -2743,11 +2748,11 @@ const char* match_shell_get_menu_header_text(const MatchShellState* state) {
 
 bool match_shell_is_fire_on_screen(const MatchShellState* state) {
     // Return true if any fire cells intersect the screen
-    for (const Fire& fire : state->match_state.fires) {
+    for (const Fire& fire : state->match_state->fires) {
         if (!match_shell_is_cell_rect_revealed(state, fire.cell, 1)) {
             continue;
         }
-        if (map_get_cell(state->match_state.map, CELL_LAYER_GROUND, fire.cell).type != CELL_EMPTY) {
+        if (map_get_cell(state->match_state->map, CELL_LAYER_GROUND, fire.cell).type != CELL_EMPTY) {
             continue;
         }
         Rect fire_rect = (Rect) {
@@ -2762,7 +2767,7 @@ bool match_shell_is_fire_on_screen(const MatchShellState* state) {
     }
 
     // Return true if any burning buildings intersect the screen
-    for (const Entity& entity : state->match_state.entities) {
+    for (const Entity& entity : state->match_state->entities) {
         if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
             continue;
         }
@@ -2791,7 +2796,7 @@ bool match_shell_is_fire_on_screen(const MatchShellState* state) {
 
 // REPLAY
 
-void match_shell_replay_begin_turn(MatchShellState* state, MatchState& match_state, uint32_t match_timer) {
+void match_shell_replay_begin_turn(MatchShellState* state, MatchState* match_state, uint32_t match_timer) {
     if (match_timer % TURN_DURATION == 0) {
         uint32_t turn_index = match_timer / TURN_DURATION;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -2818,7 +2823,7 @@ void match_shell_replay_scrub(MatchShellState* state, uint32_t position) {
     while (state->match_timer < position) {
         match_shell_replay_begin_turn(state, state->match_state, state->match_timer);
         match_update(state->match_state);
-        state->match_state.events.clear();
+        state->match_state->events.clear();
         state->match_timer++;
     }
 }
@@ -2831,10 +2836,10 @@ size_t match_shell_replay_end_of_tape(const MatchShellState* state) {
 
 bool match_shell_is_at_least_one_opponent_in_match(const MatchShellState* state) {
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (state->match_state.players[network_get_player_id()].team == state->match_state.players[player_id].team) {
+        if (state->match_state->players[network_get_player_id()].team == state->match_state->players[player_id].team) {
             continue;
         }
-        if (state->match_state.players[player_id].active) {
+        if (state->match_state->players[player_id].active) {
             return true;
         }
     }
@@ -2859,7 +2864,7 @@ bool match_shell_is_surrender_required_to_leave(const MatchShellState* state) {
     if (state->replay_mode) {
         return false;
     }
-    return state->match_state.players[network_get_player_id()].active && match_shell_is_at_least_one_opponent_in_match(state);
+    return state->match_state->players[network_get_player_id()].active && match_shell_is_at_least_one_opponent_in_match(state);
 }
 
 void match_shell_leave_match(MatchShellState* state, bool exit_program) {
@@ -2886,7 +2891,7 @@ void match_shell_leave_match(MatchShellState* state, bool exit_program) {
 
 bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t frame) {
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (!state->match_state.players[player_id].active) {
+        if (!state->match_state->players[player_id].active) {
             continue;
         }
         if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT) {
@@ -3000,8 +3005,8 @@ void match_shell_render(const MatchShellState* state) {
             // Render map
             for (int y = 0; y < max_visible_tiles.y; y++) {
                 for (int x = 0; x < max_visible_tiles.x; x++) {
-                    int map_index = (base_coords.x + x) + ((base_coords.y + y) * state->match_state.map.width);
-                    Tile tile = state->match_state.map.tiles[map_index];
+                    int map_index = (base_coords.x + x) + ((base_coords.y + y) * state->match_state->map.width);
+                    Tile tile = state->match_state->map.tiles[map_index];
 
                     ivec2 tile_params_position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
                     RenderSpriteParams tile_params = (RenderSpriteParams) {
@@ -3014,12 +3019,12 @@ void match_shell_render(const MatchShellState* state) {
                     };
 
                     bool should_render_on_ground_level = 
-                        map_is_tile_ground(state->match_state.map, base_coords + ivec2(x, y)) || 
-                        map_is_tile_ramp(state->match_state.map, base_coords + ivec2(x, y));
+                        map_is_tile_ground(state->match_state->map, base_coords + ivec2(x, y)) || 
+                        map_is_tile_ramp(state->match_state->map, base_coords + ivec2(x, y));
                     if (elevation == 0 && 
-                            !map_is_tile_ground(state->match_state.map, base_coords + ivec2(x, y)) &&
-                            !map_is_tile_water(state->match_state.map, base_coords + ivec2(x, y))) {
-                        render_sprite_frame(map_get_plain_ground_tile_sprite(state->match_state.map.type), ivec2(0, 0), base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
+                            !map_is_tile_ground(state->match_state->map, base_coords + ivec2(x, y)) &&
+                            !map_is_tile_water(state->match_state->map, base_coords + ivec2(x, y))) {
+                        render_sprite_frame(map_get_plain_ground_tile_sprite(state->match_state->map.type), ivec2(0, 0), base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
                     }
                     if ((should_render_on_ground_level && elevation == 0) || 
                             (!should_render_on_ground_level && elevation == tile.elevation)) {
@@ -3027,9 +3032,9 @@ void match_shell_render(const MatchShellState* state) {
                     } 
 
                     // Decorations
-                    Cell cell = state->match_state.map.cells[CELL_LAYER_GROUND][map_index];
+                    Cell cell = state->match_state->map.cells[CELL_LAYER_GROUND][map_index];
                     if (cell.type == CELL_DECORATION && tile.elevation == elevation) {
-                        SpriteName decoration_sprite = map_get_decoration_sprite(state->match_state.map.type);
+                        SpriteName decoration_sprite = map_get_decoration_sprite(state->match_state->map.type);
                         const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
                         const int decoration_extra_height = decoration_sprite_info.frame_height - TILE_SIZE;
                         ysort_params.push_back((RenderSpriteParams) {
@@ -3046,7 +3051,7 @@ void match_shell_render(const MatchShellState* state) {
                         if (state->debug_show_region_lines && elevation == tile.elevation) {
                             for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                                 ivec2 neighbor = base_coords + ivec2(x, y) + DIRECTION_IVEC2[direction];
-                                if (!map_is_cell_in_bounds(state->match_state.map, neighbor) || map_get_region(state->match_state.map, neighbor) == state->match_state.map.regions[map_index]) {
+                                if (!map_is_cell_in_bounds(state->match_state->map, neighbor) || map_get_region(state->match_state->map, neighbor) == state->match_state->map.regions[map_index]) {
                                     continue;
                                 }
                                 ivec2 tile_pos = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
@@ -3080,14 +3085,14 @@ void match_shell_render(const MatchShellState* state) {
             // For each cell layer
             for (int cell_layer = CELL_LAYER_UNDERGROUND; cell_layer < CELL_LAYER_GROUND + 1; cell_layer++) {
                 // Dead entities
-                for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
-                    const Entity& entity = state->match_state.entities[entity_index];
+                for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+                    const Entity& entity = state->match_state->entities[entity_index];
                     const EntityData& entity_data = entity_get_data(entity.type);
                     if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED)) {
                         continue;
                     }
                     if (entity_data.cell_layer != cell_layer || 
-                            entity_get_elevation(entity, state->match_state.map) != elevation) {
+                            entity_get_elevation(entity, state->match_state->map) != elevation) {
                         continue;
                     }
                     if (!match_shell_is_entity_visible(state, entity)) {
@@ -3100,10 +3105,10 @@ void match_shell_render(const MatchShellState* state) {
 
                 // Select rings and healthbars
                 for (EntityId id : state->selection) {
-                    const Entity& entity = state->match_state.entities.get_by_id(id);
+                    const Entity& entity = state->match_state->entities.get_by_id(id);
                     const EntityData& entity_data = entity_get_data(entity.type);
                     if (entity_data.cell_layer != cell_layer || 
-                            entity_get_elevation(entity, state->match_state.map) != elevation) {
+                            entity_get_elevation(entity, state->match_state->map) != elevation) {
                         continue;
                     }
                     if (entity_is_in_mine(state->match_state, entity)) {
@@ -3114,7 +3119,7 @@ void match_shell_render(const MatchShellState* state) {
 
                 // Move animation
                 if (animation_is_playing(state->move_animation) &&
-                        map_get_tile(state->match_state.map, state->move_animation_position / TILE_SIZE).elevation == elevation) {
+                        map_get_tile(state->match_state->map, state->move_animation_position / TILE_SIZE).elevation == elevation) {
                     if (state->move_animation.name == ANIMATION_UI_MOVE_CELL && cell_layer == CELL_LAYER_GROUND) {
                         ivec2 params_position = state->move_animation_position - state->camera_offset;
                         RenderSpriteParams params = (RenderSpriteParams) {
@@ -3126,21 +3131,21 @@ void match_shell_render(const MatchShellState* state) {
                             .recolor_id = 0
                         };
                         ivec2 ui_move_cell = state->move_animation_position / TILE_SIZE;
-                        if (match_get_fog(state->match_state, state->match_state.players[network_get_player_id()].team, ui_move_cell) > 0) {
+                        if (match_get_fog(state->match_state, state->match_state->players[network_get_player_id()].team, ui_move_cell) > 0) {
                             render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
                         } else {
                             above_fog_sprite_params.push_back(params);
                         }
                     } else if (state->move_animation.frame.x % 2 == 0) {
-                        uint32_t entity_index = state->match_state.entities.get_index_of(state->move_animation_entity_id);
+                        uint32_t entity_index = state->match_state->entities.get_index_of(state->move_animation_entity_id);
                         if (entity_index != INDEX_INVALID) {
-                            const Entity& entity = state->match_state.entities[entity_index];
+                            const Entity& entity = state->match_state->entities[entity_index];
                             if (entity_get_data(entity.type).cell_layer == cell_layer) {
                                 match_shell_render_entity_move_animation(state, entity, state->move_animation);
                             }
                         } else if (cell_layer == CELL_LAYER_GROUND) {
-                            auto it = state->match_state.remembered_entities[state->match_state.players[network_get_player_id()].team].find(state->move_animation_entity_id);
-                            if (it != state->match_state.remembered_entities[state->match_state.players[network_get_player_id()].team].end()) {
+                            auto it = state->match_state->remembered_entities[state->match_state->players[network_get_player_id()].team].find(state->move_animation_entity_id);
+                            if (it != state->match_state->remembered_entities[state->match_state->players[network_get_player_id()].team].end()) {
                                 ivec2 entity_center_position = (it->second.cell * TILE_SIZE) + ((ivec2(it->second.cell_size, it->second.cell_size) * TILE_SIZE) / 2);
 
                                 render_sprite_frame(match_shell_get_entity_select_ring(it->second.type, state->move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
@@ -3151,9 +3156,9 @@ void match_shell_render(const MatchShellState* state) {
 
                 // Highlight animation
                 if (animation_is_playing(state->highlight_animation) && state->highlight_animation.frame.x % 2 == 0) {
-                    uint32_t entity_index = state->match_state.entities.get_index_of(state->highlight_entity_id);
+                    uint32_t entity_index = state->match_state->entities.get_index_of(state->highlight_entity_id);
                     if (entity_index != INDEX_INVALID) {
-                        const Entity& entity = state->match_state.entities[entity_index];
+                        const Entity& entity = state->match_state->entities[entity_index];
                         if (entity_get_data(entity.type).cell_layer == cell_layer) {
                             match_shell_render_entity_move_animation(state, entity, state->highlight_animation);
                         }
@@ -3162,10 +3167,10 @@ void match_shell_render(const MatchShellState* state) {
 
                 // Underground entities
                 if (cell_layer == CELL_LAYER_UNDERGROUND) {
-                    for (const Entity& entity : state->match_state.entities) {
+                    for (const Entity& entity : state->match_state->entities) {
                         const EntityData& entity_data = entity_get_data(entity.type);
                         if (entity_data.cell_layer != CELL_LAYER_UNDERGROUND ||
-                                entity_get_elevation(entity, state->match_state.map) != elevation) {
+                                entity_get_elevation(entity, state->match_state->map) != elevation) {
                             continue;
                         }
                         if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
@@ -3184,7 +3189,7 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Fires
-    for (const Fire& fire : state->match_state.fires) {
+    for (const Fire& fire : state->match_state->fires) {
         if (match_shell_get_fire_cell_render(state, fire) == FIRE_CELL_RENDER_BELOW) {
             render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state->camera_offset, 0, 0);
         }
@@ -3194,8 +3199,8 @@ void match_shell_render(const MatchShellState* state) {
     {
         ZoneScopedN("entities");
 
-        for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
-            const Entity& entity = state->match_state.entities[entity_index];
+        for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+            const Entity& entity = state->match_state->entities[entity_index];
             const EntityData& entity_data = entity_get_data(entity.type);
             if (entity.mode == MODE_UNIT_DEATH_FADE || 
                     entity.mode == MODE_BUILDING_DESTROYED ||
@@ -3254,7 +3259,7 @@ void match_shell_render(const MatchShellState* state) {
                 continue;
             }
 
-            for (auto it : state->match_state.remembered_entities[state->match_state.players[player_id].team]) {
+            for (auto it : state->match_state->remembered_entities[state->match_state->players[player_id].team]) {
                 // Don't draw the remembered entity if we can see it, otherwise we will double draw them
                 if (match_shell_is_cell_rect_revealed(state, it.second.cell, it.second.cell_size)) {
                     continue;
@@ -3295,7 +3300,7 @@ void match_shell_render(const MatchShellState* state) {
             .position = params_position,
             .ysort_position = params_position.y,
             .options = 0,
-            .recolor_id = state->match_state.players[player_id].recolor_id
+            .recolor_id = state->match_state->players[player_id].recolor_id
         };
 
         ivec2 rally_cell = rally_point / TILE_SIZE;
@@ -3310,7 +3315,7 @@ void match_shell_render(const MatchShellState* state) {
     uint32_t selection_type = match_shell_get_selection_type(state, state->selection);
     if (selection_type == MATCH_SHELL_SELECTION_BUILDINGS || (state->replay_mode && selection_type == MATCH_SHELL_SELECTION_ENEMY_BUILDING)) {
         for (EntityId id : state->selection) {
-            const Entity& building = state->match_state.entities.get_by_id(id);
+            const Entity& building = state->match_state->entities.get_by_id(id);
             if (building.mode == MODE_BUILDING_DESTROYED || building.rally_point.x == -1) {
                 continue;
             }
@@ -3323,7 +3328,7 @@ void match_shell_render(const MatchShellState* state) {
     if (state->selection.size() == 1) {
         ZoneScopedN("queued entity targets");
 
-        const Entity& entity = state->match_state.entities.get_by_id(state->selection[0]);
+        const Entity& entity = state->match_state->entities.get_by_id(state->selection[0]);
         // Check if it's an allied unit
         if (entity_is_unit(entity.type) &&
                 (state->replay_mode || entity.player_id == network_get_player_id())) {
@@ -3357,7 +3362,7 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Balloon shadows
-    for (const Entity& entity : state->match_state.entities) {
+    for (const Entity& entity : state->match_state->entities) {
         if (entity.type == ENTITY_BALLOON && entity.mode != MODE_UNIT_DEATH_FADE &&
                 match_shell_is_entity_visible(state, entity)) {
             render_sprite_frame(SPRITE_UNIT_BALLOON_SHADOW, ivec2(0, 0), entity.position.to_ivec2() + ivec2(-5, 3) - state->camera_offset, 0, 0);
@@ -3365,7 +3370,7 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Building fires
-    for (const Entity& entity : state->match_state.entities) {
+    for (const Entity& entity : state->match_state->entities) {
         if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
             continue;
         }
@@ -3384,14 +3389,14 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Fires above units
-    for (const Fire& fire : state->match_state.fires) {
+    for (const Fire& fire : state->match_state->fires) {
         if (match_shell_get_fire_cell_render(state, fire) == FIRE_CELL_RENDER_ABOVE) {
             render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state->camera_offset, 0, 0);
         }
     }
 
     // Smith and workshop smoke animations
-    for (const Entity& entity : state->match_state.entities) {
+    for (const Entity& entity : state->match_state->entities) {
         if (!match_shell_is_entity_visible(state, entity)) {
             continue;
         }
@@ -3432,12 +3437,12 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Ground particles
-    for (const Particle& particle : state->match_state.particles[PARTICLE_LAYER_GROUND]) {
+    for (const Particle& particle : state->match_state->particles[PARTICLE_LAYER_GROUND]) {
         match_shell_render_particle(state, particle);
     }
 
     // Projectiles
-    for (const Projectile& projectile : state->match_state.projectiles) {
+    for (const Projectile& projectile : state->match_state->projectiles) {
         if (!match_shell_is_cell_rect_revealed(state, projectile.position.to_ivec2() / TILE_SIZE, 1)) {
             continue;
         }
@@ -3449,8 +3454,8 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Miners on gold counter
-    for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
-        const Entity& entity = state->match_state.entities[entity_index];
+    for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+        const Entity& entity = state->match_state->entities[entity_index];
         // Make sure the entity is actually a goldmine
         if (entity.type != ENTITY_GOLDMINE || entity.mode != MODE_GOLDMINE) {
             continue;
@@ -3475,7 +3480,7 @@ void match_shell_render(const MatchShellState* state) {
             }
 
             // Count how many miners are mining from this mine
-            EntityId entity_id = state->match_state.entities.get_id_of(entity_index);
+            EntityId entity_id = state->match_state->entities.get_id_of(entity_index);
             if (player_id == PLAYER_NONE) {
                 continue;
             }
@@ -3490,7 +3495,7 @@ void match_shell_render(const MatchShellState* state) {
             text_size.x += miner_icon_info.frame_width;
             ivec2 text_pos = ivec2(entity_rect.x + (entity_rect.w / 2) - (text_size.x / 2), entity_rect.y + 6) + ivec2(0, icon_y_offset);
             render_text(miner_count > MATCH_MAX_MINERS_ON_GOLD ? FONT_HACK_PLAYER1 : FONT_HACK_WHITE, counter_text, text_pos + ivec2(miner_icon_info.frame_width + 2, 0));
-            render_sprite_frame(SPRITE_UI_MINER_ICON, ivec2(0, 0), text_pos, RENDER_SPRITE_NO_CULL, state->match_state.players[player_id].recolor_id);
+            render_sprite_frame(SPRITE_UI_MINER_ICON, ivec2(0, 0), text_pos, RENDER_SPRITE_NO_CULL, state->match_state->players[player_id].recolor_id);
             icon_y_offset -= miner_icon_info.frame_height + 1;
         }
     }
@@ -3500,7 +3505,7 @@ void match_shell_render(const MatchShellState* state) {
         ZoneScopedN("sky");
         // Sky entities select rings
         for (EntityId entity_id : state->selection) {
-            const Entity& entity = state->match_state.entities.get_by_id(entity_id);
+            const Entity& entity = state->match_state->entities.get_by_id(entity_id);
             const EntityData& entity_data = entity_get_data(entity.type);
             if (entity_data.cell_layer != CELL_LAYER_SKY) {
                 continue;
@@ -3512,9 +3517,9 @@ void match_shell_render(const MatchShellState* state) {
         if (animation_is_playing(state->move_animation) && 
                 state->move_animation.name != ANIMATION_UI_MOVE_CELL &&
                 state->move_animation.frame.x % 2 == 0) {
-            uint32_t entity_index = state->match_state.entities.get_index_of(state->move_animation_entity_id);
+            uint32_t entity_index = state->match_state->entities.get_index_of(state->move_animation_entity_id);
             if (entity_index != INDEX_INVALID) {
-                const Entity& entity = state->match_state.entities[entity_index];
+                const Entity& entity = state->match_state->entities[entity_index];
                 if (entity_get_data(entity.type).cell_layer == CELL_LAYER_SKY) {
                     match_shell_render_entity_move_animation(state, entity, state->move_animation);
                 }
@@ -3523,7 +3528,7 @@ void match_shell_render(const MatchShellState* state) {
 
         // Sky entities
         ysort_params.clear();
-        for (const Entity& entity : state->match_state.entities) {
+        for (const Entity& entity : state->match_state->entities) {
             const EntityData& entity_data = entity_get_data(entity.type);
             if (entity.mode == MODE_UNIT_DEATH_FADE || 
                     entity.mode == MODE_BUILDING_DESTROYED ||
@@ -3563,7 +3568,7 @@ void match_shell_render(const MatchShellState* state) {
         }
 
         // Sky particles
-        for (const Particle& particle : state->match_state.particles[PARTICLE_LAYER_SKY]) {
+        for (const Particle& particle : state->match_state->particles[PARTICLE_LAYER_SKY]) {
             match_shell_render_particle(state, particle);
         }
     }
@@ -3586,7 +3591,7 @@ void match_shell_render(const MatchShellState* state) {
                     uint32_t neighbors = 0;
                     for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
                         ivec2 neighbor_cell = fog_cell + DIRECTION_IVEC2[direction];
-                        if (!map_is_cell_in_bounds(state->match_state.map, neighbor_cell)) {
+                        if (!map_is_cell_in_bounds(state->match_state->map, neighbor_cell)) {
                             neighbors += DIRECTION_MASK[direction];
                             continue;
                         }
@@ -3604,7 +3609,7 @@ void match_shell_render(const MatchShellState* state) {
                             (neighbors & DIRECTION_MASK[next_direction]) != DIRECTION_MASK[next_direction]) {
                             continue;
                         }
-                        if (!map_is_cell_in_bounds(state->match_state.map, neighbor_cell)) {
+                        if (!map_is_cell_in_bounds(state->match_state->map, neighbor_cell)) {
                             neighbors += DIRECTION_MASK[direction];
                             continue;
                         }
@@ -3642,10 +3647,10 @@ void match_shell_render(const MatchShellState* state) {
 
             // First draw the building
             ivec2 building_cell = match_shell_get_building_cell(building_data.cell_size, state->camera_offset);
-            render_sprite_frame(building_data.sprite, ivec2(3, 0), (building_cell * TILE_SIZE) - state->camera_offset, RENDER_SPRITE_NO_CULL, state->match_state.players[network_get_player_id()].recolor_id);
+            render_sprite_frame(building_data.sprite, ivec2(3, 0), (building_cell * TILE_SIZE) - state->camera_offset, RENDER_SPRITE_NO_CULL, state->match_state->players[network_get_player_id()].recolor_id);
 
             // Then draw the green / red squares
-            ivec2 miner_cell = state->match_state.entities.get_by_id(match_get_nearest_builder(state->match_state, state->selection, building_cell)).cell;
+            ivec2 miner_cell = state->match_state->entities.get_by_id(match_get_nearest_builder(state->match_state, state->selection, building_cell)).cell;
             for (int y = building_cell.y; y < building_cell.y + building_data.cell_size; y++) {
                 for (int x = building_cell.x; x < building_cell.x + building_data.cell_size; x++) {
                     ivec2 cell = ivec2(x, y);
@@ -3653,7 +3658,7 @@ void match_shell_render(const MatchShellState* state) {
                     
                     // Don't allow buildings too close to goldmines
                     if (state->building_type == ENTITY_HALL) {
-                        for (const Entity& goldmine : state->match_state.entities) {
+                        for (const Entity& goldmine : state->match_state->entities) {
                             if (goldmine.type == ENTITY_GOLDMINE && entity_goldmine_get_block_building_rect(goldmine.cell).has_point(cell)) {
                                 is_cell_red = true;
                                 break;
@@ -3676,7 +3681,7 @@ void match_shell_render(const MatchShellState* state) {
 
         // UI queued building placements
         for (EntityId entity_id : state->selection) {
-            const Entity& entity = state->match_state.entities.get_by_id(entity_id);
+            const Entity& entity = state->match_state->entities.get_by_id(entity_id);
             // If it's not an allied unit, then we can break out of this whole loop, since the rest of the selection won't be either
             if (!entity_is_unit(entity.type) || 
                     (!state->replay_mode && entity.player_id != network_get_player_id())) {
@@ -3756,12 +3761,12 @@ void match_shell_render(const MatchShellState* state) {
             entity_occurances[ENTITY_MINER] = 0;
 
             for (EntityId id : state->control_groups[control_group_index]) {
-                uint32_t entity_index = state->match_state.entities.get_index_of(id);
-                if (entity_index == INDEX_INVALID || state->match_state.entities[entity_index].health == 0) {
+                uint32_t entity_index = state->match_state->entities.get_index_of(id);
+                if (entity_index == INDEX_INVALID || state->match_state->entities[entity_index].health == 0) {
                     continue;
                 }
 
-                EntityType entity_type = state->match_state.entities[entity_index].type;
+                EntityType entity_type = state->match_state->entities[entity_index].type;
                 auto occurances_it = entity_occurances.find(entity_type);
                 if (occurances_it == entity_occurances.end()) {
                     entity_occurances[entity_type] = 1;
@@ -3874,7 +3879,7 @@ void match_shell_render(const MatchShellState* state) {
             if (idle_miner_rect.has_point(input_get_mouse_position())) {
                 // Determine if we actually have idle miners before rendering the tooltip
                 bool has_idle_miners = false;
-                for (const Entity& entity : state->match_state.entities) {
+                for (const Entity& entity : state->match_state->entities) {
                     if (entity.player_id == network_get_player_id() && entity_is_idle_miner(entity)) {
                         has_idle_miners = true;
                         break;
@@ -3893,7 +3898,7 @@ void match_shell_render(const MatchShellState* state) {
 
         // UI Selection list
         if (state->selection.size() == 1) {
-            const Entity& entity = state->match_state.entities.get_by_id(state->selection[0]);
+            const Entity& entity = state->match_state->entities.get_by_id(state->selection[0]);
             const EntityData& entity_data = entity_get_data(entity.type);
 
             // Entity name
@@ -4024,7 +4029,7 @@ void match_shell_render(const MatchShellState* state) {
             for (uint32_t selection_index = 0; selection_index < state->selection.size(); selection_index++) {
                 match_shell_render_entity_icon(
                     state, 
-                    state->match_state.entities.get_by_id(state->selection[selection_index]), 
+                    state->match_state->entities.get_by_id(state->selection[selection_index]), 
                     match_shell_get_selection_list_item_rect(selection_index));
             }
         }
@@ -4032,7 +4037,7 @@ void match_shell_render(const MatchShellState* state) {
 
         // UI Building queues
         if (state->selection.size() == 1) {
-            const Entity& building = state->match_state.entities.get_by_id(state->selection[0]);
+            const Entity& building = state->match_state->entities.get_by_id(state->selection[0]);
             if (entity_is_building(building.type) && 
                     !building.queue.empty() &&
                     (state->replay_mode || building.player_id == network_get_player_id())) {
@@ -4081,14 +4086,14 @@ void match_shell_render(const MatchShellState* state) {
 
         // UI Garrisoned units
         if (state->selection.size() == 1) {
-            const Entity& carrier = state->match_state.entities.get_by_id(state->selection[0]);
+            const Entity& carrier = state->match_state->entities.get_by_id(state->selection[0]);
             if (carrier.type == ENTITY_GOLDMINE || 
                     state->replay_mode ||
                     carrier.player_id == network_get_player_id()) {
                 const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
                 int index = 0;
                 for (EntityId entity_id : carrier.garrisoned_units) {
-                    const Entity& garrisoned_unit = state->match_state.entities.get_by_id(entity_id);
+                    const Entity& garrisoned_unit = state->match_state->entities.get_by_id(entity_id);
                     // We have to make this check here because goldmines might have both allied and enemy units in them
                     if (!state->replay_mode && garrisoned_unit.player_id != network_get_player_id()) {
                         continue;
@@ -4115,7 +4120,7 @@ void match_shell_render(const MatchShellState* state) {
                 continue;
             }
             // TODO: is there a bug in replay mode where players will stop rendering their gold after they get defeated?
-            if (state->replay_mode && !state->match_state.players[player_id].active) {
+            if (state->replay_mode && !state->match_state->players[player_id].active) {
                 continue;
             }
 
@@ -4156,9 +4161,9 @@ void match_shell_render(const MatchShellState* state) {
 
             // Player name
             if (state->replay_mode) {
-                render_x -= (render_get_text_size(FONT_HACK_WHITE, state->match_state.players[player_id].name).x + 16);
-                render_text(FONT_HACK_SHADOW, state->match_state.players[player_id].name, ivec2(render_x, resource_base_y + 3) + text_shadow_offset);
-                render_text((FontName)(FONT_HACK_PLAYER0 + state->match_state.players[player_id].recolor_id), state->match_state.players[player_id].name, ivec2(render_x, resource_base_y + 3));
+                render_x -= (render_get_text_size(FONT_HACK_WHITE, state->match_state->players[player_id].name).x + 16);
+                render_text(FONT_HACK_SHADOW, state->match_state->players[player_id].name, ivec2(render_x, resource_base_y + 3) + text_shadow_offset);
+                render_text((FontName)(FONT_HACK_PLAYER0 + state->match_state->players[player_id].recolor_id), state->match_state->players[player_id].name, ivec2(render_x, resource_base_y + 3));
             }
 
             resource_base_y += population_icon_sprite_info.frame_height;
@@ -4206,13 +4211,13 @@ void match_shell_render(const MatchShellState* state) {
                 objectives_text_pos += ivec2(4, 20);
 
                 for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                    if (!state->match_state.players[player_id].active) {
+                    if (!state->match_state->players[player_id].active) {
                         continue;
                     }
 
                     // Determine text
                     char text[64];
-                    sprintf(text, "%s: %u", state->match_state.players[player_id].name, state->scenario_global_objective_counter.gold.values[player_id]);
+                    sprintf(text, "%s: %u", state->match_state->players[player_id].name, state->scenario_global_objective_counter.gold.values[player_id]);
 
                     // Render text
                     ivec2 text_pos = objectives_text_pos + ivec2(checkbox_sprite_info.frame_width + 2, 1);
@@ -4261,13 +4266,13 @@ void match_shell_render(const MatchShellState* state) {
     // Minimap tiles
     {
         ZoneScopedN("minimap");
-        for (int y = 0; y < state->match_state.map.height; y++) {
-            for (int x = 0; x < state->match_state.map.width; x++) {
+        for (int y = 0; y < state->match_state->map.height; y++) {
+            for (int x = 0; x < state->match_state->map.width; x++) {
                 render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), match_shell_get_minimap_pixel_for_cell(state, ivec2(x, y)));
             }
         }
         // Minimap entities
-        for (const Entity& entity : state->match_state.entities) {
+        for (const Entity& entity : state->match_state->entities) {
             if (!entity_is_selectable(entity) || !match_shell_is_entity_visible(state, entity)) {
                 continue;
             }
@@ -4291,7 +4296,7 @@ void match_shell_render(const MatchShellState* state) {
                 continue;
             }
 
-            for (auto it : state->match_state.remembered_entities[state->match_state.players[player_id].team]) {
+            for (auto it : state->match_state->remembered_entities[state->match_state->players[player_id].team]) {
                 Rect entity_rect = (Rect) {
                     .x = it.second.cell.x, .y = it.second.cell.y,
                     .w = it.second.cell_size, .h = it.second.cell_size
@@ -4301,8 +4306,8 @@ void match_shell_render(const MatchShellState* state) {
             }
         }
         // Minimap fog of war
-        for (int y = 0; y < state->match_state.map.height; y++) {
-            for (int x = 0; x < state->match_state.map.width; x++) {
+        for (int y = 0; y < state->match_state->map.height; y++) {
+            for (int x = 0; x < state->match_state->map.width; x++) {
                 int fog_value = match_shell_get_fog(state, ivec2(x, y));
                 #ifdef GOLD_DEBUG
                     if (state->debug_fog == DEBUG_FOG_DISABLED) {
@@ -4348,7 +4353,7 @@ void match_shell_render(const MatchShellState* state) {
             .h = ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / TILE_SIZE)
         };
         render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
-        render_minimap_queue_render(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state->match_state.map.width, state->match_state.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
+        render_minimap_queue_render(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state->match_state->map.width, state->match_state->map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
     }
 
     ui_render(state->ui);
@@ -4358,7 +4363,7 @@ void match_shell_render(const MatchShellState* state) {
 }
 
 bool match_shell_use_yellow_rings(const MatchShellState* state) {
-    return state->match_state.map.type == MAP_TYPE_KLONDIKE;
+    return state->match_state->map.type == MAP_TYPE_KLONDIKE;
 }
 
 SpriteName match_shell_get_entity_select_ring(EntityType type, bool attacking) {
@@ -4441,7 +4446,7 @@ void match_shell_render_target_build(const MatchShellState* state, const Target&
         .w = building_data.cell_size * TILE_SIZE,
         .h = building_data.cell_size * TILE_SIZE
     };
-    render_sprite_frame(building_data.sprite, ivec2(3, 0), ivec2(building_rect.x, building_rect.y), 0, state->match_state.players[player_id].recolor_id);
+    render_sprite_frame(building_data.sprite, ivec2(3, 0), ivec2(building_rect.x, building_rect.y), 0, state->match_state->players[player_id].recolor_id);
     render_fill_rect(building_rect, RENDER_COLOR_GREEN_TRANSPARENT);
 }
 
@@ -4453,12 +4458,12 @@ RenderSpriteParams match_shell_create_entity_render_params(const MatchShellState
         .position = params_position,
         .ysort_position = params_position.y,
         .options = 0,
-        .recolor_id = entity.type == ENTITY_GOLDMINE || entity.mode == MODE_BUILDING_DESTROYED ? 0 : state->match_state.players[entity.player_id].recolor_id
+        .recolor_id = entity.type == ENTITY_GOLDMINE || entity.mode == MODE_BUILDING_DESTROYED ? 0 : state->match_state->players[entity.player_id].recolor_id
     };
     const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(state->match_state, entity));
     if (entity_is_unit(entity.type)) {
         if (entity.mode == MODE_UNIT_BUILD) {
-            const Entity& building = state->match_state.entities.get_by_id(entity.target.id);
+            const Entity& building = state->match_state->entities.get_by_id(entity.target.id);
             const EntityData& building_data = entity_get_data(building.type);
             int building_hframe = entity_get_animation_frame(building).x;
             params.position = building.position.to_ivec2() + 
@@ -4494,7 +4499,7 @@ void match_shell_render_entity_select_rings_and_healthbars(const MatchShellState
     // Render select ring
     bool use_red_select_ring = state->replay_mode || entity.type == ENTITY_GOLDMINE 
                                     ? false 
-                                    : state->match_state.players[entity.player_id].team != state->match_state.players[network_get_player_id()].team;
+                                    : state->match_state->players[entity.player_id].team != state->match_state->players[network_get_player_id()].team;
     SpriteName select_ring_sprite = match_shell_get_entity_select_ring(entity.type, use_red_select_ring);
     ivec2 entity_center_position = entity_is_unit(entity.type) 
             ? entity.position.to_ivec2()
@@ -4514,7 +4519,7 @@ void match_shell_render_entity_select_rings_and_healthbars(const MatchShellState
 
     // Render garrison bar
     if (entity_data.garrison_capacity != 0 && (entity.type == ENTITY_GOLDMINE || state->replay_mode || 
-            state->match_state.players[entity.player_id].team == state->match_state.players[network_get_player_id()].team)) {
+            state->match_state->players[entity.player_id].team == state->match_state->players[network_get_player_id()].team)) {
         match_shell_render_healthbar(RENDER_GARRISON_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.garrisoned_units.size(), (int)entity_data.garrison_capacity);
         healthbar_position.y += HEALTHBAR_HEIGHT + 1;
     } 
@@ -4570,7 +4575,7 @@ bool match_shell_should_render_hotkey_toggled(const MatchShellState* state, Inpu
         return false;
     }
 
-    const Entity& entity = state->match_state.entities.get_by_id(state->selection[0]);
+    const Entity& entity = state->match_state->entities.get_by_id(state->selection[0]);
     if (hotkey == INPUT_HOTKEY_CAMO && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE)) {
         return true;
     }
@@ -4753,12 +4758,12 @@ ivec2 match_shell_get_queued_target_position(const MatchShellState* state, const
         case TARGET_ENTITY:
         case TARGET_ATTACK_ENTITY:
         case TARGET_REPAIR: {
-            uint32_t target_index = state->match_state.entities.get_index_of(target.id);
+            uint32_t target_index = state->match_state->entities.get_index_of(target.id);
             if (target_index == INDEX_INVALID) {
                 return ivec2(-1, -1);
             }
 
-            const Entity& target_entity = state->match_state.entities[target_index];
+            const Entity& target_entity = state->match_state->entities[target_index];
             if (entity_is_unit(target_entity.type)) {
                 return target_entity.position.to_ivec2();
             }
@@ -4780,7 +4785,7 @@ FireCellRender match_shell_get_fire_cell_render(const MatchShellState* state, co
     if (!match_shell_is_cell_rect_revealed(state, fire.cell, 1)) {
         return FIRE_CELL_DO_NOT_RENDER;
     }
-    Cell map_fire_cell = map_get_cell(state->match_state.map, CELL_LAYER_GROUND, fire.cell);
+    Cell map_fire_cell = map_get_cell(state->match_state->map, CELL_LAYER_GROUND, fire.cell);
     if (map_fire_cell.type == CELL_EMPTY) {
         return FIRE_CELL_RENDER_BELOW;
     }
@@ -4794,7 +4799,7 @@ FireCellRender match_shell_get_fire_cell_render(const MatchShellState* state, co
         return FIRE_CELL_DO_NOT_RENDER;
     }
 
-    const Entity& unit = state->match_state.entities.get_by_id(map_fire_cell.id);
+    const Entity& unit = state->match_state->entities.get_by_id(map_fire_cell.id);
 
     if (unit.mode == MODE_UNIT_DEATH_FADE) {
         return FIRE_CELL_RENDER_ABOVE;
@@ -4810,7 +4815,7 @@ FireCellRender match_shell_get_fire_cell_render(const MatchShellState* state, co
 }
 
 MinimapPixel match_shell_get_minimap_pixel_for_cell(const MatchShellState* state, ivec2 cell) {
-    switch (map_get_tile(state->match_state.map, cell).sprite) {
+    switch (map_get_tile(state->match_state->map, cell).sprite) {
         case SPRITE_TILE_SAND1:
         case SPRITE_TILE_SAND2:
         case SPRITE_TILE_SAND3:
@@ -4835,5 +4840,5 @@ MinimapPixel match_shell_get_minimap_pixel_for_entity(const MatchShellState* sta
     if (entity_check_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER)) {
         return MINIMAP_PIXEL_WHITE;
     }
-    return (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state->match_state.players[entity.player_id].recolor_id);
+    return (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state->match_state->players[entity.player_id].recolor_id);
 }

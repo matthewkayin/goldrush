@@ -101,6 +101,8 @@ struct Map {
     uint8_t region_connection_to_connection_cost[MAP_REGION_CONNECTION_MAX][MAP_REGION_CONNECTION_MAX];
 };
 
+const size_t test = sizeof(Map);
+
 void map_init(Map& map, MapType map_type, int width, int height);
 void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
 void map_init_regions(Map& map);
@@ -148,9 +150,8 @@ ivec2 map_get_nearest_cell_around_rect(const Map& map, CellLayer layer, ivec2 st
 
 ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, int building_size, int unit_size, ivec2 rally_cell, uint32_t ignore, ivec2 ignore_cell = ivec2(-1, -1));
 
-int map_get_region(const Map& map, ivec2 cell);
-int map_get_region_count(const Map& map);
-int map_are_regions_connected(const Map& map, int region_a, int region_b);
+uint8_t map_get_region(const Map& map, ivec2 cell);
+bool map_are_regions_connected(const Map& map, uint8_t region_a, uint8_t region_b);
 
 void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t options, std::vector<ivec2>* ignore_cells = NULL);
 ivec2 map_get_ideal_mine_exit_path_rally_cell(const Map& map, ivec2 mine_cell, ivec2 hall_cell);
