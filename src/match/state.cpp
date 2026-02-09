@@ -30,7 +30,7 @@ static const fixed BLEED_SPEED_PERCENTAGE = fixed::from_int_and_raw_decimal(0, 1
 static const uint32_t MATCH_LOW_GOLD_THRESHOLD = 1000;
 
 MatchState* match_base_init(int32_t lcg_seed, int map_width, int map_height, MatchPlayer players[MAX_PLAYERS]) {
-    // TODO: malloc
+    // TODO: malloc and memset
     MatchState* state = new MatchState();
     #ifdef GOLD_RAND_SEED
         state->lcg_seed = GOLD_RAND_SEED;
@@ -39,6 +39,9 @@ MatchState* match_base_init(int32_t lcg_seed, int map_width, int map_height, Mat
     log_info("Set random seed to %i", lcg_seed);
 
     memcpy(state->players, players, sizeof(state->players));
+
+    memset(state->remembered_entity_count, 0, sizeof(state->remembered_entity_count));
+    memset(state->remembered_entities, 0, sizeof(state->remembered_entities));
 
     state->fire_cells = std::vector<int>((size_t)(map_width * map_height), 0);
 
@@ -822,13 +825,17 @@ void match_update(MatchState* state) {
     if (state->is_fog_dirty) {
         for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
             // Remove any remembered entities (but only if the players can see that they should be removed)
-            auto it = state->remembered_entities[team].begin();
-            while (it != state->remembered_entities[team].end()) {
-                if ((state->entities.get_index_of(it->first) == INDEX_INVALID || state->entities.get_by_id(it->first).health == 0) &&
-                        match_is_cell_rect_revealed(state, team, it->second.cell, it->second.cell_size)) {
-                    it = state->remembered_entities[team].erase(it);
+            uint8_t remembered_entity_index = 0;
+            while (remembered_entity_index < state->remembered_entity_count[team]) {
+                const RememberedEntity& remembered_entity = state->remembered_entities[team][remembered_entity_index];
+                uint32_t entity_index = state->entities.get_index_of(remembered_entity.entity_id);
+                if ((entity_index == INDEX_INVALID || state->entities[entity_index].health == 0) && 
+                        match_is_cell_rect_revealed(state, team, remembered_entity.cell, entity_get_data(remembered_entity.type).cell_size)) {
+                    // Remove remembered entity
+                    state->remembered_entities[team][remembered_entity_index] = state->remembered_entities[team][state->remembered_entity_count[team] - 1];
+                    state->remembered_entity_count[team]--;
                 } else {
-                    it++;
+                    remembered_entity_index++;
                 }
             }
         }
@@ -954,6 +961,26 @@ bool match_player_has_entities(const MatchState* state, uint8_t player_id) {
         if (entity.player_id == player_id &&
                 entity.type != ENTITY_LANDMINE &&
                 entity.health != 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+uint32_t match_team_find_remembered_entity_index(const MatchState* state, uint8_t team, EntityId entity_id) {
+    for (uint32_t index = 0; index < state->remembered_entity_count[team]; index++) {
+        if (state->remembered_entities[team][index].entity_id == entity_id) {
+            return index;
+        }
+    }
+
+    return MATCH_ENTITY_NOT_REMEMBERED;
+}
+
+bool match_team_remembers_entity(const MatchState* state, uint8_t team, EntityId entity_id) {
+    for (uint32_t index = 0; index < state->remembered_entity_count[team]; index++) {
+        if (state->remembered_entities[team][index].entity_id == entity_id) {
             return true;
         }
     }
@@ -3703,18 +3730,20 @@ void match_fog_update(MatchState* state, uint32_t player_team, ivec2 cell, int c
                     // landmines are not shown in remembered entities so don't add them to this list, maybe
                     if (map_cell.type == CELL_BUILDING || map_cell.type == CELL_GOLDMINE) {
                         Entity& entity = state->entities.get_by_id(map_cell.id);
-                        if (entity_is_selectable(entity)) {
+                        if (entity_is_selectable(entity) && entity.type != ENTITY_LANDMINE) {
                             ivec2 frame = entity_get_animation_frame(entity);
                             if (entity.type == ENTITY_GOLDMINE && frame.x == 1) {
                                 frame.x = 0;
                             }
-                            state->remembered_entities[player_team][map_cell.id] = (RememberedEntity) {
+                            GOLD_ASSERT(state->remembered_entity_count[player_team] < MATCH_MAX_REMEMBERED_ENTITIES);
+                            state->remembered_entities[player_team][state->remembered_entity_count[player_team]] = (RememberedEntity) {
+                                .entity_id = map_cell.id,
                                 .type = entity.type,
                                 .frame = frame,
                                 .cell = entity.cell,
-                                .cell_size = entity_get_data(entity.type).cell_size,
                                 .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLDMINE ? 0 : state->players[entity.player_id].recolor_id
                             };
+                            state->remembered_entity_count[player_team]++;
                         }
                     } // End if cell value < cell empty
                 } // End if !increment

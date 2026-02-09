@@ -363,6 +363,7 @@ void map_init_regions(Map& map) {
                         }
                     } // end while not frontier empty
 
+                    GOLD_ASSERT(map.region_count < MAP_REGION_MAX);
                     map.region_count++;
                 }
             }
@@ -396,12 +397,14 @@ void map_init_regions(Map& map) {
                 if (map.region_connection_indices[region][neighbor_region] == MAP_REGIONS_NOT_CONNECTED) {
                     MapRegionConnection new_connection;
                     memset(&new_connection, 0, sizeof(new_connection));
+                    GOLD_ASSERT(map.region_connection_count < MAP_REGION_CONNECTION_MAX);
                     map.region_connections[map.region_connection_count] = new_connection;
                     map.region_connection_indices[region][neighbor_region] = (uint8_t)map.region_connection_count;
                     map.region_connection_count++;
                 }
                 uint8_t region_connection_index = map.region_connection_indices[region][neighbor_region];
                 MapRegionConnection* connection = &map.region_connections[region_connection_index];
+                GOLD_ASSERT(connection->cell_count < MAP_REGION_CHUNK_SIZE);
                 connection->cells[connection->cell_count] = neighbor;
                 connection->cell_count++;
             }
@@ -458,6 +461,7 @@ void map_init_regions(Map& map) {
 
             std::vector<ivec2> path;
             map_pathfind(map, CELL_LAYER_GROUND, region_connection_centers[region_connection_index], region_connection_centers[other_connection_index], 1, &path, MAP_OPTION_NO_REGION_PATH);
+            GOLD_ASSERT(path.size() < MAP_REGION_CONNECTIONS_NOT_CONNECTED);
             map.region_connection_to_connection_cost[region_connection_index][other_connection_index] = (uint8_t)path.size();
             map.region_connection_to_connection_cost[other_connection_index][region_connection_index] = (uint8_t)path.size();
         }

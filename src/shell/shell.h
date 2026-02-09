@@ -333,6 +333,7 @@ void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t 
 
 // Render
 void match_shell_render(const MatchShellState* state);
+bool match_shell_should_render_remembered_entities_for_team(const MatchShellState* state, uint8_t team);
 bool match_shell_use_yellow_rings(const MatchShellState* state);
 SpriteName match_shell_get_entity_select_ring(EntityType type, bool attacking);
 SpriteName match_shell_hotkey_get_sprite(const MatchShellState* state, InputAction hotkey, bool show_toggled);

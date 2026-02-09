@@ -4161,7 +4161,7 @@ bool bot_has_scouted_entity(const MatchState* state, const Bot& bot, const Entit
     }
     // If for is only explored but they have seen the entity before, then they can see it
     if (match_is_cell_rect_explored(state, bot_team, entity.cell, entity_cell_size) &&
-            state->remembered_entities[bot_team].find(entity_id) != state->remembered_entities[bot_team].end()) {
+            match_team_remembers_entity(state, state->players[bot.player_id].team, entity_id)) {
         return true;
     }
     if (bot.is_entity_assumed_to_be_scouted.find(entity_id) != bot.is_entity_assumed_to_be_scouted.end()) {

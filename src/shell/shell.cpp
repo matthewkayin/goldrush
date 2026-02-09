@@ -2038,11 +2038,8 @@ void match_shell_order_move(MatchShellState* state) {
                 continue;
             }
             // Non-units *can* be selected under explored fog, but only if we have explored that the building exists
-            if (fog_value == FOG_EXPLORED) {
-                auto it = state->match_state->remembered_entities[player_team].find(state->match_state->entities.get_id_of(entity_index));
-                if (it == state->match_state->remembered_entities[player_team].end()) {
-                    continue;
-                }
+            if (fog_value == FOG_EXPLORED && !match_team_remembers_entity(state->match_state, player_team, state->match_state->entities.get_id_of(entity_index))) {
+                continue;
             }
             // Don't target unselectable units
             if (!entity_is_selectable(entity)) {
@@ -2667,9 +2664,10 @@ bool match_shell_is_building_place_cell_valid(const MatchShellState* state, ivec
     Cell map_ground_cell = map_get_cell(state->match_state->map, CELL_LAYER_GROUND, cell);
     if (map_ground_cell.type == CELL_UNIT || map_ground_cell.type == CELL_MINER || map_ground_cell.type == CELL_BUILDING) {
         // If the entity is not visible to the player, then we will ignore the fact that it's blocking the building
+        uint8_t player_team = state->match_state->players[network_get_player_id()].team;
         if (cell != miner_cell &&
                 (entity_is_visible_to_player(state->match_state, state->match_state->entities.get_by_id(map_ground_cell.id), network_get_player_id()) ||
-                (map_ground_cell.type == CELL_BUILDING && state->match_state->remembered_entities[network_get_player_id()].find(map_ground_cell.id) != state->match_state->remembered_entities[network_get_player_id()].end()))) {
+                (map_ground_cell.type == CELL_BUILDING && match_team_remembers_entity(state->match_state, player_team, map_ground_cell.id)))) {
             return false;
         }
     } else if (map_ground_cell.type != CELL_EMPTY) {
@@ -3144,11 +3142,14 @@ void match_shell_render(const MatchShellState* state) {
                                 match_shell_render_entity_move_animation(state, entity, state->move_animation);
                             }
                         } else if (cell_layer == CELL_LAYER_GROUND) {
-                            auto it = state->match_state->remembered_entities[state->match_state->players[network_get_player_id()].team].find(state->move_animation_entity_id);
-                            if (it != state->match_state->remembered_entities[state->match_state->players[network_get_player_id()].team].end()) {
-                                ivec2 entity_center_position = (it->second.cell * TILE_SIZE) + ((ivec2(it->second.cell_size, it->second.cell_size) * TILE_SIZE) / 2);
+                            uint8_t player_team = state->match_state->players[network_get_player_id()].team;
+                            uint32_t remembered_entity_index = match_team_find_remembered_entity_index(state->match_state, player_team, state->move_animation_entity_id);
+                            if (remembered_entity_index != MATCH_ENTITY_NOT_REMEMBERED) {
+                                const RememberedEntity& remembered_entity = state->match_state->remembered_entities[player_team][remembered_entity_index];
+                                const int cell_size = entity_get_data(remembered_entity.type).cell_size;
+                                ivec2 entity_center_position = (remembered_entity.cell * TILE_SIZE) + ((ivec2(cell_size, cell_size) * TILE_SIZE) / 2);
 
-                                render_sprite_frame(match_shell_get_entity_select_ring(it->second.type, state->move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
+                                render_sprite_frame(match_shell_get_entity_select_ring(remembered_entity.type, state->move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
                             }
                         }
                     }
@@ -3248,34 +3249,29 @@ void match_shell_render(const MatchShellState* state) {
         }
 
         // Remembered entities
-        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (state->replay_mode && (state->replay_fog_index == 0 || state->replay_fog_index == 1)) {
-                break;
-            }
-            if (state->replay_mode && state->replay_fog_player_ids[state->replay_fog_index] != player_id) {
-                continue;
-            }
-            if (!state->replay_mode && player_id != network_get_player_id()) {
+        for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
+            if (!match_shell_should_render_remembered_entities_for_team(state, team)) {
                 continue;
             }
 
-            for (auto it : state->match_state->remembered_entities[state->match_state->players[player_id].team]) {
+            for (uint32_t remembered_entity_index = 0; remembered_entity_index < state->match_state->remembered_entity_count[team]; remembered_entity_index++) {
+                const RememberedEntity& remembered_entity = state->match_state->remembered_entities[team][remembered_entity_index];
+                const EntityData& entity_data = entity_get_data(remembered_entity.type);
                 // Don't draw the remembered entity if we can see it, otherwise we will double draw them
-                if (match_shell_is_cell_rect_revealed(state, it.second.cell, it.second.cell_size)) {
+                if (match_shell_is_cell_rect_revealed(state, remembered_entity.cell, entity_data.cell_size)) {
                     continue;
                 }
 
-                const EntityData& entity_data = entity_get_data(it.second.type);
                 const SpriteInfo& sprite_info = render_get_sprite_info(entity_data.sprite);
 
-                ivec2 params_position = (it.second.cell * TILE_SIZE) - state->camera_offset;
+                ivec2 params_position = (remembered_entity.cell * TILE_SIZE) - state->camera_offset;
                 RenderSpriteParams params = (RenderSpriteParams) {
                     .sprite = entity_data.sprite,
-                    .frame = it.second.frame,
+                    .frame = remembered_entity.frame,
                     .position = params_position,
                     .ysort_position = params_position.y,
                     .options = RENDER_SPRITE_NO_CULL,
-                    .recolor_id = it.second.recolor_id
+                    .recolor_id = remembered_entity.recolor_id
                 };
 
                 Rect render_rect = (Rect) {
@@ -4285,23 +4281,19 @@ void match_shell_render(const MatchShellState* state) {
             render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, match_shell_get_minimap_pixel_for_entity(state, entity));
         }
         // Minimap remembered entities
-        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (state->replay_mode && (state->replay_fog_index == 0 || state->replay_fog_index == 0)) {
-                break;
-            }
-            if (state->replay_mode && state->replay_fog_player_ids[state->replay_fog_index] != player_id) {
-                continue;
-            }
-            if (!state->replay_mode && player_id != network_get_player_id()) {
+        for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
+            if (!match_shell_should_render_remembered_entities_for_team(state, team)) {
                 continue;
             }
 
-            for (auto it : state->match_state->remembered_entities[state->match_state->players[player_id].team]) {
+            for (uint32_t remembered_entity_index = 0; remembered_entity_index < state->match_state->remembered_entity_count[team]; remembered_entity_index++) {
+                const RememberedEntity& remembered_entity = state->match_state->remembered_entities[team][remembered_entity_index];
+                const EntityData& entity_data = entity_get_data(remembered_entity.type);
                 Rect entity_rect = (Rect) {
-                    .x = it.second.cell.x, .y = it.second.cell.y,
-                    .w = it.second.cell_size, .h = it.second.cell_size
+                    .x = remembered_entity.cell.x, .y = remembered_entity.cell.y,
+                    .w = entity_data.cell_size, .h = entity_data.cell_size
                 };
-                MinimapPixel pixel = it.second.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + it.second.recolor_id);
+                MinimapPixel pixel = remembered_entity.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + remembered_entity.recolor_id);
                 render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
             }
         }
@@ -4360,6 +4352,23 @@ void match_shell_render(const MatchShellState* state) {
     if (state->replay_mode) {
         ui_render(state->replay_ui);
     }
+}
+
+bool match_shell_should_render_remembered_entities_for_team(const MatchShellState* state, uint8_t team) {
+    // If using replay fog none or everyone, then there is no need to render remembered buildings because we can just see all entities normally
+    if (state->replay_mode && (state->replay_fog_index == REPLAY_FOG_NONE || state->replay_fog_index == REPLAY_FOG_EVERYONE)) {
+        return false;
+    }
+    // If we are in replay mode and looking at the fog for a specific player, then skip this team if it is not that player's team
+    if (state->replay_mode && state->match_state->players[state->replay_fog_player_ids[state->replay_fog_index]].team != team) {
+        return false;
+    }
+    // If we are not in replay mode, then skip this team if it is not the network player's team
+    if (!state->replay_mode && state->match_state->players[network_get_player_id()].team != team) {
+        return false;
+    }
+
+    return true;
 }
 
 bool match_shell_use_yellow_rings(const MatchShellState* state) {

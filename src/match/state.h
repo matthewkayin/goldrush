@@ -29,7 +29,8 @@
 #define MATCH_UI_STATUS_SMOKE_COOLDOWN "Smoke bomb is on cooldown."
 #define MATCH_UI_STATUS_NOT_ENOUGH_ENERGY "Not enough energy."
 
-#define MATCH_MAX_ENTITIES (400 * MAX_PLAYERS)
+#define MATCH_MAX_ENTITIES (200 * MAX_PLAYERS)
+#define MATCH_MAX_REMEMBERED_ENTITIES 64
 #define ENTITY_UNLOAD_ALL ID_NULL
 #define MATCH_MAX_MINERS_ON_GOLD 8
 #define MATCH_MAX_POPULATION 100U
@@ -61,6 +62,8 @@ const uint32_t ENTITY_BALLOON_DEATH_DURATION = 50;
 const uint32_t UNIT_TAKING_DAMAGE_FLICKER_DURATION = 10;
 const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
 const uint32_t UNIT_HEALTH_REGEN_DELAY = 600;
+
+const uint32_t MATCH_ENTITY_NOT_REMEMBERED = UINT32_MAX;
 
 enum EntityMode {
     MODE_UNIT_IDLE,
@@ -270,10 +273,10 @@ struct MatchEvent {
 };
 
 struct RememberedEntity {
+    EntityId entity_id;
     EntityType type;
     ivec2 frame;
     ivec2 cell;
-    int cell_size;
     int recolor_id;
 };
 
@@ -326,7 +329,8 @@ struct MatchState {
     Map map;
     int fog[MAX_PLAYERS][MAP_SIZE_MAX * MAP_SIZE_MAX];
     int detection[MAX_PLAYERS][MAP_SIZE_MAX * MAP_SIZE_MAX];
-    std::unordered_map<EntityId, RememberedEntity> remembered_entities[MAX_PLAYERS];
+    uint8_t remembered_entity_count[MAX_PLAYERS];
+    RememberedEntity remembered_entities[MAX_PLAYERS][MATCH_MAX_REMEMBERED_ENTITIES];
     bool is_fog_dirty;
 
     IdArray<Entity, MATCH_MAX_ENTITIES> entities;
@@ -366,6 +370,9 @@ EntityId match_get_nearest_builder(const MatchState* state, const std::vector<En
 bool match_is_target_invalid(const MatchState* state, const Target& target, uint8_t player_id);
 bool match_player_has_buildings(const MatchState* state, uint8_t player_id);
 bool match_player_has_entities(const MatchState* state, uint8_t player_id);
+
+uint32_t match_team_find_remembered_entity_index(const MatchState* state, uint8_t team, EntityId entity_id);
+bool match_team_remembers_entity(const MatchState* state, uint8_t team, EntityId entity_id);
 
 // Entity
 
