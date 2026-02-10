@@ -51,7 +51,13 @@ public:
         return ids[index];
     }
 
-    size_t size() const { return _size; }
+    size_t size() const { 
+        return _size; 
+    }
+
+    bool is_full() const {
+        return _size == capacity;
+    }
 
     EntityId push_back(const T& value) {
         GOLD_ASSERT(_size < capacity);

@@ -33,14 +33,6 @@ public:
     }
 
     void push(T value) {
-        // TODO:
-        // I think the _size element would be less memory, but do we need 32 target queue elements?
-
-        // also, you should make code that caps the player building count and sends a match event
-        // if they try to make too many
-
-        // also, when at max population, the status message should say max population instead of 
-        // build more houses
         GOLD_ASSERT(_size + 1 <= capacity);
         data[wrap_index(_size)] = value;
         _size++;

@@ -4083,9 +4083,12 @@ void match_shell_render(const MatchShellState* state) {
 
                 // Render building queue progress bar
                 if (building.timer == BUILDING_QUEUE_BLOCKED) {
-                    render_text(FONT_WESTERN8_GOLD, "Build more houses.", ivec2(BUILDING_QUEUE_PROGRESS_BAR_RECT.x + 1, BUILDING_QUEUE_PROGRESS_BAR_RECT.y - 12));
+                    const char* message = state->match_state->entities.is_full() || match_get_player_max_population(state->match_state, network_get_player_id()) == MATCH_MAX_POPULATION
+                        ? "Unit limit reached."
+                        : "Build more houses.";
+                    render_text(FONT_WESTERN8_GOLD, message, ivec2(BUILDING_QUEUE_PROGRESS_BAR_RECT.x + 2, BUILDING_QUEUE_PROGRESS_BAR_RECT.y - 14));
                 } else if (building.timer == BUILDING_QUEUE_EXIT_BLOCKED) {
-                    render_text(FONT_WESTERN8_GOLD, "Exit is blocked.", ivec2(BUILDING_QUEUE_PROGRESS_BAR_RECT.x + 1, BUILDING_QUEUE_PROGRESS_BAR_RECT.y - 12));
+                    render_text(FONT_WESTERN8_GOLD, "Exit is blocked.", ivec2(BUILDING_QUEUE_PROGRESS_BAR_RECT.x + 2, BUILDING_QUEUE_PROGRESS_BAR_RECT.y - 14));
                 } else {
                     int item_duration = (int)building_queue_item_duration(building.queue[0]);
                     Rect building_queue_progress_bar_subrect = BUILDING_QUEUE_PROGRESS_BAR_RECT;

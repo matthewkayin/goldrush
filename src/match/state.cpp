@@ -1000,6 +1000,11 @@ bool match_team_remembers_entity(const MatchState* state, uint8_t team, EntityId
 EntityId entity_create(MatchState* state, EntityType type, ivec2 cell, uint8_t player_id) {
     const EntityData& entity_data = entity_get_data(type);
 
+    if (state->entities.is_full()) {
+        log_warn("entity_create cannot create entity: entities is full");
+        return ID_NULL;
+    }
+
     Entity entity;
     entity.type = type;
     entity.mode = entity_is_unit(type) ? MODE_UNIT_IDLE : MODE_BUILDING_IN_PROGRESS;
@@ -1064,6 +1069,11 @@ EntityId entity_create(MatchState* state, EntityType type, ivec2 cell, uint8_t p
 }
 
 EntityId entity_goldmine_create(MatchState* state, ivec2 cell, uint32_t gold_left) {
+    if (state->entities.is_full()) {
+        log_warn("entity_create cannot create entity: entities is full");
+        return ID_NULL;
+    }
+
     Entity entity;
     entity.type = ENTITY_GOLDMINE;
     entity.mode = gold_left != 0 
@@ -1577,18 +1587,24 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                                 .type = CELL_EMPTY, .id = ID_NULL
                             });
                             match_fog_update(state, state->players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, false);
-                            entity.target.id = entity_create(state, entity.target.build.building_type, entity.target.build.building_cell, entity.player_id);
-                            entity.mode = MODE_UNIT_BUILD;
-                            entity.timer = UNIT_BUILD_TICK_DURATION;
+                            EntityId building_id = entity_create(state, entity.target.build.building_type, entity.target.build.building_cell, entity.player_id);
+                            if (building_id != ID_NULL) {
+                                entity.target.id = building_id;
+                                entity.mode = MODE_UNIT_BUILD;
+                                entity.timer = UNIT_BUILD_TICK_DURATION;
 
-                            state->events.push_back((MatchEvent) {
-                                .type = MATCH_EVENT_SELECTION_HANDOFF,
-                                .selection_handoff = (MatchEventSelectionHandoff) {
-                                    .player_id = entity.player_id,
-                                    .to_deselect = entity_id,
-                                    .to_select = entity.target.id
-                                }
-                            });
+                                state->events.push_back((MatchEvent) {
+                                    .type = MATCH_EVENT_SELECTION_HANDOFF,
+                                    .selection_handoff = (MatchEventSelectionHandoff) {
+                                        .player_id = entity.player_id,
+                                        .to_deselect = entity_id,
+                                        .to_select = entity.target.id
+                                    }
+                                });
+                            } else {
+                                entity.target = target_none();
+                                match_event_show_status(state, entity.player_id, "Cannot create building. Entity limit reached.");
+                            }
                         }
 
                         break;
@@ -3471,6 +3487,9 @@ void entity_building_dequeue(MatchState* state, Entity& building) {
 bool entity_building_is_supply_blocked(const MatchState* state, const Entity& building) {
     const BuildingQueueItem& item = building.queue[0];
     if (item.type == BUILDING_QUEUE_ITEM_UNIT) {
+        if (state->entities.is_full()) {
+            return true;
+        }
         uint32_t required_population = match_get_player_population(state, building.player_id) + entity_get_data(item.unit_type).unit_data.population_cost;
         if (match_get_player_max_population(state, building.player_id) < required_population) {
             return true;
