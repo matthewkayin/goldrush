@@ -8,6 +8,7 @@
 #include "container/id_array.h"
 #include "container/fixed_queue.h"
 #include "container/fixed_vector.h"
+#include "container/circular_vector.h"
 #include <vector>
 #include <unordered_map>
 #include <functional>
@@ -36,6 +37,9 @@
 #define ENTITY_UNLOAD_ALL ID_NULL
 #define MATCH_MAX_MINERS_ON_GOLD 8
 #define MATCH_MAX_POPULATION 100U
+#define MATCH_MAX_PARTICLES 256U
+#define MATCH_MAX_PROJECTILES 32U
+#define MATCH_MAX_FIRES 256U
 
 #define MOLOTOV_ENERGY_COST 40
 #define CAMO_ENERGY_COST 30
@@ -289,17 +293,17 @@ struct RememberedEntity {
 
 // Particles
 
+enum ParticleLayer {
+    PARTICLE_LAYER_GROUND,
+    PARTICLE_LAYER_SKY
+};
+
 struct Particle {
+    ParticleLayer layer;
     SpriteName sprite;
     Animation animation;
     int vframe;
     ivec2 position;
-};
-
-enum ParticleLayer {
-    PARTICLE_LAYER_GROUND,
-    PARTICLE_LAYER_SKY,
-    PARTICLE_LAYER_COUNT
 };
 
 struct Fire {
@@ -341,10 +345,10 @@ struct MatchState {
     bool is_fog_dirty;
 
     IdArray<Entity, MATCH_MAX_ENTITIES> entities;
-    std::vector<Particle> particles[PARTICLE_LAYER_COUNT];
-    std::vector<Projectile> projectiles;
-    std::vector<Fire> fires;
-    std::vector<int> fire_cells;
+    CircularVector<Particle, MATCH_MAX_PARTICLES> particles;
+    CircularVector<Projectile, MATCH_MAX_PROJECTILES> projectiles;
+    CircularVector<Fire, MATCH_MAX_FIRES> fires;
+    int fire_cells[MAP_SIZE_MAX * MAP_SIZE_MAX];
     std::vector<FogReveal> fog_reveals;
     MatchPlayer players[MAX_PLAYERS];
     std::vector<MatchEvent> events;

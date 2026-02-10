@@ -42,8 +42,7 @@ MatchState* match_base_init(int32_t lcg_seed, int map_width, int map_height, Mat
 
     memset(state->remembered_entity_count, 0, sizeof(state->remembered_entity_count));
     memset(state->remembered_entities, 0, sizeof(state->remembered_entities));
-
-    state->fire_cells = std::vector<int>((size_t)(map_width * map_height), 0);
+    memset(state->fire_cells, 0, sizeof(state->fire_cells));
 
     // Init fog and detection for each team
     for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
@@ -706,14 +705,14 @@ void match_update(MatchState* state) {
     }
 
     // Update particles
-    for (int particle_layer = 0; particle_layer < PARTICLE_LAYER_COUNT; particle_layer++) {
+    {
         uint32_t particle_index = 0;
-        while (particle_index < state->particles[particle_layer].size()) {
-            animation_update(state->particles[particle_layer][particle_index].animation);
+        while (particle_index < state->particles.size()) {
+            animation_update(state->particles[particle_index].animation);
 
             // On particle finish, remove particle
-            if (!animation_is_playing(state->particles[particle_layer][particle_index].animation)) {
-                state->particles[particle_layer].erase(state->particles[particle_layer].begin() + particle_index);
+            if (!animation_is_playing(state->particles[particle_index].animation)) {
+                state->particles.remove_at_unordered(particle_index);
             } else {
                 particle_index++;
             }
@@ -734,7 +733,7 @@ void match_update(MatchState* state) {
                         match_event_play_sound(state, SOUND_MOLOTOV_IMPACT, projectile.target.to_ivec2());
                     }
                 }
-                state->projectiles.erase(state->projectiles.begin() + projectile_index);
+                state->projectiles.remove_at_unordered(projectile_index);
             } else {
                 projectile.position += ((projectile.target - projectile.position) * PROJECTILE_MOLOTOV_SPEED / projectile.position.distance_to(projectile.target));
                 projectile_index++;
@@ -769,7 +768,7 @@ void match_update(MatchState* state) {
             // Time to live is 0, extinguish fire
             if (state->fires[fire_index].time_to_live == 0) {
                 state->fire_cells[(size_t)(state->fires[fire_index].cell.x + (state->fires[fire_index].cell.y * state->map.width))] = 0;
-                state->fires.erase(state->fires.begin() + fire_index);
+                state->fires.remove_at_unordered(fire_index);
             } else {
                 fire_index++;
             }
@@ -2026,7 +2025,8 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                         .type = CELL_EMPTY, .id = ID_NULL
                     });
                     entity_release_garrisoned_units_on_death(state, entity);
-                    state->particles[PARTICLE_LAYER_GROUND].push_back((Particle) {
+                    state->particles.push_back((Particle) {
+                        .layer = PARTICLE_LAYER_GROUND,
                         .sprite = SPRITE_PARTICLE_CANNON_EXPLOSION,
                         .animation = animation_create(ANIMATION_PARTICLE_CANNON_EXPLOSION),
                         .vframe = 0,
@@ -3068,7 +3068,8 @@ void entity_attack_target(MatchState* state, EntityId attacker_id) {
             }
         }
 
-        state->particles[PARTICLE_LAYER_GROUND].push_back((Particle) {
+        state->particles.push_back((Particle) {
+            .layer = PARTICLE_LAYER_GROUND,
             .sprite = SPRITE_PARTICLE_BUNKER_FIRE,
             .animation = animation_create(ANIMATION_PARTICLE_BUNKER_COWBOY),
             .vframe = 0,
@@ -3129,14 +3130,18 @@ void entity_attack_target(MatchState* state, EntityId attacker_id) {
 
     // Create particle effect
     if (attacker.type == ENTITY_CANNON) {
-        state->particles[PARTICLE_LAYER_GROUND].push_back((Particle) {
+        state->particles.push_back((Particle) {
+            .layer = PARTICLE_LAYER_GROUND,
             .sprite = SPRITE_PARTICLE_CANNON_EXPLOSION,
             .animation = animation_create(ANIMATION_PARTICLE_CANNON_EXPLOSION),
             .vframe = 0,
             .position = hit_position
         });
     } else if (attacker.type == ENTITY_COWBOY || (attacker.type == ENTITY_SOLDIER && !attack_with_bayonets) || attacker.type == ENTITY_DETECTIVE || attacker.type == ENTITY_JOCKEY) {
-        state->particles[defender_data.cell_layer == CELL_LAYER_SKY ? PARTICLE_LAYER_SKY : PARTICLE_LAYER_GROUND].push_back((Particle) {
+        state->particles.push_back((Particle) {
+            .layer = defender_data.cell_layer == CELL_LAYER_SKY
+                ? PARTICLE_LAYER_SKY
+                : PARTICLE_LAYER_GROUND,
             .sprite = SPRITE_PARTICLE_SPARKS,
             .animation = animation_create(ANIMATION_PARTICLE_SPARKS),
             .vframe = lcg_rand(&state->lcg_seed) % 3,
@@ -3337,7 +3342,8 @@ void entity_explode(MatchState* state, EntityId entity_id) {
     match_event_play_sound(state, SOUND_EXPLOSION, entity.position.to_ivec2());
 
     // Create particle
-    state->particles[PARTICLE_LAYER_GROUND].push_back((Particle) {
+    state->particles.push_back((Particle) {
+        .layer = PARTICLE_LAYER_GROUND,
         .sprite = SPRITE_PARTICLE_EXPLOSION,
         .animation = animation_create(ANIMATION_PARTICLE_EXPLOSION),
         .vframe = 0,

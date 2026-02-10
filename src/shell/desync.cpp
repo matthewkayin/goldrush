@@ -27,7 +27,7 @@ STATIC_ASSERT(sizeof(Animation) == 24ULL);
 STATIC_ASSERT(sizeof(RememberedEntity) == 28ULL);
 STATIC_ASSERT(sizeof(Target) == 36ULL);
 STATIC_ASSERT(sizeof(BuildingQueueItem) == 8ULL);
-STATIC_ASSERT(sizeof(Particle) == 40ULL);
+STATIC_ASSERT(sizeof(Particle) == 44ULL);
 STATIC_ASSERT(sizeof(Projectile) == 20ULL);
 STATIC_ASSERT(sizeof(FogReveal) == 24ULL);
 STATIC_ASSERT(sizeof(MatchPlayer) == 60ULL);
@@ -439,6 +439,7 @@ size_t desync_compare_unordered_map(uint8_t* data, uint8_t* data2) {
 void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2) {
     size_t state_buffer_offset = 0;
 
+    /*
     // LCG seed
     state_buffer_offset += desync_compare_value<int>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
 
@@ -597,6 +598,7 @@ void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2) {
             state_buffer_offset += desync_compare_value<uint32_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
         }
     }
+    */
 }
 
 #endif

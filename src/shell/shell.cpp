@@ -2752,7 +2752,8 @@ const char* match_shell_get_menu_header_text(const MatchShellState* state) {
 
 bool match_shell_is_fire_on_screen(const MatchShellState* state) {
     // Return true if any fire cells intersect the screen
-    for (const Fire& fire : state->match_state->fires) {
+    for (uint32_t fire_index = 0; fire_index < state->match_state->fires.size(); fire_index++) {
+        const Fire& fire = state->match_state->fires[fire_index];
         if (!match_shell_is_cell_rect_revealed(state, fire.cell, 1)) {
             continue;
         }
@@ -3198,7 +3199,8 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Fires
-    for (const Fire& fire : state->match_state->fires) {
+    for (uint32_t fire_index = 0; fire_index < state->match_state->fires.size(); fire_index++) {
+        const Fire& fire = state->match_state->fires[fire_index];
         if (match_shell_get_fire_cell_render(state, fire) == FIRE_CELL_RENDER_BELOW) {
             render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state->camera_offset, 0, 0);
         }
@@ -3396,7 +3398,8 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Fires above units
-    for (const Fire& fire : state->match_state->fires) {
+    for (uint32_t fire_index = 0; fire_index < state->match_state->fires.size(); fire_index++) {
+        const Fire& fire = state->match_state->fires[fire_index];
         if (match_shell_get_fire_cell_render(state, fire) == FIRE_CELL_RENDER_ABOVE) {
             render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state->camera_offset, 0, 0);
         }
@@ -3445,12 +3448,17 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Ground particles
-    for (const Particle& particle : state->match_state->particles[PARTICLE_LAYER_GROUND]) {
+    for (uint32_t particle_index = 0; particle_index < state->match_state->particles.size(); particle_index++) {
+        const Particle& particle = state->match_state->particles[particle_index];
+        if (particle.layer != PARTICLE_LAYER_GROUND) {
+            continue;
+        }
         match_shell_render_particle(state, particle);
     }
 
     // Projectiles
-    for (const Projectile& projectile : state->match_state->projectiles) {
+    for (uint32_t projectile_index = 0; projectile_index < state->match_state->projectiles.size(); projectile_index++) {
+        const Projectile& projectile = state->match_state->projectiles[projectile_index];
         if (!match_shell_is_cell_rect_revealed(state, projectile.position.to_ivec2() / TILE_SIZE, 1)) {
             continue;
         }
@@ -3577,7 +3585,11 @@ void match_shell_render(const MatchShellState* state) {
         }
 
         // Sky particles
-        for (const Particle& particle : state->match_state->particles[PARTICLE_LAYER_SKY]) {
+        for (uint32_t particle_index = 0; particle_index < state->match_state->particles.size(); particle_index++) {
+            const Particle& particle = state->match_state->particles[particle_index];
+            if (particle.layer != PARTICLE_LAYER_SKY) {
+                continue;
+            }
             match_shell_render_particle(state, particle);
         }
     }

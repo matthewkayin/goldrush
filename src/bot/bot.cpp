@@ -2634,7 +2634,8 @@ int bot_squad_get_molotov_cell_score(const MatchState* state, const Entity& pyro
             existing_molotov_cells.push_back(entity.target.cell);
         }
     }
-    for (const Projectile& projectile : state->projectiles) {
+    for (uint32_t projectile_index = 0; projectile_index < state->projectiles.size(); projectile_index++) {
+        const Projectile& projectile = state->projectiles[projectile_index];
         if (projectile.type == PROJECTILE_MOLOTOV) {
             existing_molotov_cells.push_back(projectile.target.to_ivec2() / TILE_SIZE);
         }
