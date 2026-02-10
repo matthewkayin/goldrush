@@ -6,6 +6,8 @@
 #include "core/animation.h"
 #include "core/input.h"
 #include "container/id_array.h"
+#include "container/fixed_queue.h"
+#include "container/fixed_vector.h"
 #include <vector>
 #include <unordered_map>
 #include <functional>
@@ -38,6 +40,10 @@
 #define MOLOTOV_ENERGY_COST 40
 #define CAMO_ENERGY_COST 30
 #define CAMO_ENERGY_PER_SECOND_COST 1
+
+#define GARRISONED_UNITS_MAX 4
+#define BUILDING_QUEUE_SIZE 5
+#define TARGET_QUEUE_CAPACITY 32
 
 const int FOG_HIDDEN = -1;
 const int FOG_EXPLORED = 0;
@@ -160,19 +166,20 @@ struct Entity {
     uint32_t health_regen_timer;
 
     Animation animation;
-    std::vector<EntityId> garrisoned_units;
+    FixedVector<EntityId, GARRISONED_UNITS_MAX> garrisoned_units;
     EntityId garrison_id;
 
     EntityId goldmine_id;
     uint32_t gold_held;
 
     Target target;
-    std::vector<Target> target_queue;
+    FixedQueue<Target, TARGET_QUEUE_CAPACITY> target_queue;
 
     std::vector<ivec2> path;
     uint32_t pathfind_attempts;
 
-    std::vector<BuildingQueueItem> queue;
+    // This is a FixedVector because players can remove items from the middle of a building queue
+    FixedVector<BuildingQueueItem, BUILDING_QUEUE_SIZE> queue;
     ivec2 rally_point;
 
     uint32_t cooldown_timer;

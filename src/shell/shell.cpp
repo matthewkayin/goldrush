@@ -248,7 +248,8 @@ MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
     match_shell_init_input_queues(state);
 
     // Init camera
-    for (const Entity& entity : state->match_state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+        const Entity& entity = state->match_state->entities[entity_index];
         if (entity.type == ENTITY_MINER && entity.player_id == network_get_player_id()) {
             match_shell_center_camera_on_cell(state, entity.cell);
             break;
@@ -500,7 +501,8 @@ MatchShellState* replay_shell_init(const char* replay_path) {
     }
 
     // Init camera
-    for (const Entity& entity : state->match_state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+        const Entity& entity = state->match_state->entities[entity_index];
         if (entity.type == ENTITY_MINER && entity.player_id == 0) {
             match_shell_center_camera_on_cell(state, entity.cell);
             break;
@@ -1741,7 +1743,8 @@ void match_shell_handle_input(MatchShellState* state) {
         if (carrier.type == ENTITY_GOLDMINE || carrier.player_id == network_get_player_id()) {
             const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
             int index = 0;
-            for (EntityId entity_id : carrier.garrisoned_units) {
+            for (uint32_t garrisoned_units_index = 0; garrisoned_units_index < carrier.garrisoned_units.size(); garrisoned_units_index++) {
+                EntityId entity_id = carrier.garrisoned_units[garrisoned_units_index];
                 const Entity& garrisoned_unit = state->match_state->entities.get_by_id(entity_id);
                 // We have to make this check here because goldmines might have both allied and enemy units in them
                 if (garrisoned_unit.player_id != network_get_player_id()) {
@@ -2145,7 +2148,8 @@ bool match_shell_does_player_meet_hotkey_requirements(const MatchState* state, I
             return true;
         }
         case HOTKEY_REQUIRES_BUILDING: {
-            for (const Entity& entity : state->entities) {
+            for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+                const Entity& entity = state->entities[entity_index];
                 if (entity.player_id == network_get_player_id() && entity.type == hotkey_info.requirements.building && entity.mode == MODE_BUILDING_FINISHED) {
                     return true;
                 }
@@ -2175,7 +2179,8 @@ bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyB
 uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type) {
     uint32_t count = 0;
 
-    for (const Entity& entity : state->match_state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+        const Entity& entity = state->match_state->entities[entity_index];
         if (entity.type != entity_type ||
                 entity.player_id != player_id ||
                 entity.health == 0 ||
@@ -2637,7 +2642,8 @@ bool match_shell_building_can_be_placed(const MatchShellState* state) {
             .w = entity_data.cell_size, .h = entity_data.cell_size
         };
 
-        for (const Entity& entity : state->match_state->entities) {
+        for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+            const Entity& entity = state->match_state->entities[entity_index];
             if (entity.type == ENTITY_GOLDMINE) {
                 Rect goldmine_block_rect = entity_goldmine_get_block_building_rect(entity.cell);
                 if (building_rect.intersects(goldmine_block_rect)) {
@@ -2765,7 +2771,8 @@ bool match_shell_is_fire_on_screen(const MatchShellState* state) {
     }
 
     // Return true if any burning buildings intersect the screen
-    for (const Entity& entity : state->match_state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+        const Entity& entity = state->match_state->entities[entity_index];
         if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
             continue;
         }
@@ -3168,7 +3175,8 @@ void match_shell_render(const MatchShellState* state) {
 
                 // Underground entities
                 if (cell_layer == CELL_LAYER_UNDERGROUND) {
-                    for (const Entity& entity : state->match_state->entities) {
+                    for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+                        const Entity& entity = state->match_state->entities[entity_index];
                         const EntityData& entity_data = entity_get_data(entity.type);
                         if (entity_data.cell_layer != CELL_LAYER_UNDERGROUND ||
                                 entity_get_elevation(entity, state->match_state->map) != elevation) {
@@ -3338,7 +3346,8 @@ void match_shell_render(const MatchShellState* state) {
             }
 
             // Render flag for queued targets
-            for (const Target& target : entity.target_queue) {
+            for (uint32_t target_queue_index = 0; target_queue_index < entity.target_queue.size(); target_queue_index++) {
+                const Target& target = entity.target_queue[target_queue_index];
                 ivec2 queued_target_position = match_shell_get_queued_target_position(state, target);
                 if (queued_target_position.x != -1) {
                     queue_render_rally_flag(queued_target_position, entity.player_id);
@@ -3358,7 +3367,8 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Balloon shadows
-    for (const Entity& entity : state->match_state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+        const Entity& entity = state->match_state->entities[entity_index];
         if (entity.type == ENTITY_BALLOON && entity.mode != MODE_UNIT_DEATH_FADE &&
                 match_shell_is_entity_visible(state, entity)) {
             render_sprite_frame(SPRITE_UNIT_BALLOON_SHADOW, ivec2(0, 0), entity.position.to_ivec2() + ivec2(-5, 3) - state->camera_offset, 0, 0);
@@ -3366,7 +3376,8 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Building fires
-    for (const Entity& entity : state->match_state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+        const Entity& entity = state->match_state->entities[entity_index];
         if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
             continue;
         }
@@ -3392,7 +3403,8 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Smith and workshop smoke animations
-    for (const Entity& entity : state->match_state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+        const Entity& entity = state->match_state->entities[entity_index];
         if (!match_shell_is_entity_visible(state, entity)) {
             continue;
         }
@@ -3524,7 +3536,8 @@ void match_shell_render(const MatchShellState* state) {
 
         // Sky entities
         ysort_params.clear();
-        for (const Entity& entity : state->match_state->entities) {
+        for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+            const Entity& entity = state->match_state->entities[entity_index];
             const EntityData& entity_data = entity_get_data(entity.type);
             if (entity.mode == MODE_UNIT_DEATH_FADE || 
                     entity.mode == MODE_BUILDING_DESTROYED ||
@@ -3654,7 +3667,8 @@ void match_shell_render(const MatchShellState* state) {
                     
                     // Don't allow buildings too close to goldmines
                     if (state->building_type == ENTITY_HALL) {
-                        for (const Entity& goldmine : state->match_state->entities) {
+                    for (uint32_t goldmine_index = 0; goldmine_index < state->match_state->entities.size(); goldmine_index++) {
+                        const Entity& goldmine = state->match_state->entities[goldmine_index];
                             if (goldmine.type == ENTITY_GOLDMINE && entity_goldmine_get_block_building_rect(goldmine.cell).has_point(cell)) {
                                 is_cell_red = true;
                                 break;
@@ -3687,7 +3701,8 @@ void match_shell_render(const MatchShellState* state) {
             if (entity.target.type == TARGET_BUILD && entity.target.id == ID_NULL) {
                 match_shell_render_target_build(state, entity.target, entity.player_id);
             }
-            for (const Target& target : entity.target_queue) {
+            for (uint32_t target_queue_index = 0; target_queue_index < entity.target_queue.size(); target_queue_index++) {
+                const Target& target = entity.target_queue[target_queue_index];
                 if (target.type == TARGET_BUILD) {
                     match_shell_render_target_build(state, target, entity.player_id);
                 } 
@@ -3875,7 +3890,8 @@ void match_shell_render(const MatchShellState* state) {
             if (idle_miner_rect.has_point(input_get_mouse_position())) {
                 // Determine if we actually have idle miners before rendering the tooltip
                 bool has_idle_miners = false;
-                for (const Entity& entity : state->match_state->entities) {
+                for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+                    const Entity& entity = state->match_state->entities[entity_index];
                     if (entity.player_id == network_get_player_id() && entity_is_idle_miner(entity)) {
                         has_idle_miners = true;
                         break;
@@ -4088,7 +4104,8 @@ void match_shell_render(const MatchShellState* state) {
                     carrier.player_id == network_get_player_id()) {
                 const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
                 int index = 0;
-                for (EntityId entity_id : carrier.garrisoned_units) {
+                for (uint32_t garrisoned_units_index = 0; garrisoned_units_index < carrier.garrisoned_units.size(); garrisoned_units_index++) {
+                    EntityId entity_id = carrier.garrisoned_units[garrisoned_units_index];
                     const Entity& garrisoned_unit = state->match_state->entities.get_by_id(entity_id);
                     // We have to make this check here because goldmines might have both allied and enemy units in them
                     if (!state->replay_mode && garrisoned_unit.player_id != network_get_player_id()) {
@@ -4268,7 +4285,8 @@ void match_shell_render(const MatchShellState* state) {
             }
         }
         // Minimap entities
-        for (const Entity& entity : state->match_state->entities) {
+        for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+            const Entity& entity = state->match_state->entities[entity_index];
             if (!entity_is_selectable(entity) || !match_shell_is_entity_visible(state, entity)) {
                 continue;
             }

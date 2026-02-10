@@ -3,15 +3,12 @@
 #include "defines.h"
 #include "core/asserts.h"
 #include <cstdint>
-#include <array>
 
 template <typename T, size_t capacity>
 class IdArray {
-    using iterator = typename std::array<T, capacity>::iterator;
-    using const_iterator = typename std::array<T, capacity>::const_iterator;
 
 private:
-    std::array<T, capacity> data;
+    T data[capacity];
     EntityId ids[capacity];
     uint16_t id_to_index[ID_MAX];
     uint32_t _size;
@@ -53,11 +50,6 @@ public:
     EntityId get_id_of(uint32_t index) const {
         return ids[index];
     }
-
-    iterator begin() { return data.begin(); }
-    const_iterator begin() const { return data.begin(); }
-    iterator end() { return data.end(); }
-    const_iterator end() const { return data.end(); }
 
     size_t size() const { return _size; }
 

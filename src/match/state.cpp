@@ -198,7 +198,8 @@ void match_free(MatchState* state) {
 
 uint32_t match_get_player_population(const MatchState* state, uint8_t player_id) {
     uint32_t population = 0;
-    for (const Entity& entity : state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+        const Entity& entity = state->entities[entity_index];
         if (entity.player_id == player_id && entity_is_unit(entity.type) && entity.health != 0) {
             population += entity_get_data(entity.type).unit_data.population_cost;
         }
@@ -209,7 +210,8 @@ uint32_t match_get_player_population(const MatchState* state, uint8_t player_id)
 
 uint32_t match_get_player_max_population(const MatchState* state, uint8_t player_id) {
     uint32_t max_population = 0;
-    for (const Entity& entity : state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+        const Entity& entity = state->entities[entity_index];
         if (entity.player_id == player_id && (entity.type == ENTITY_HALL || entity.type == ENTITY_HOUSE) && entity.mode == MODE_BUILDING_FINISHED) {
             max_population += 10;
         }
@@ -248,7 +250,8 @@ void match_grant_player_upgrade(MatchState* state, uint8_t player_id, uint32_t u
 
 uint32_t match_get_miners_on_gold(const MatchState* state, EntityId goldmine_id, uint8_t player_id) {
     uint32_t miner_count = 0;
-    for (const Entity& miner : state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+        const Entity& miner = state->entities[entity_index];
         if (miner.type == ENTITY_MINER && miner.player_id == player_id && miner.goldmine_id == goldmine_id) {
             miner_count++;
         }
@@ -352,8 +355,10 @@ void match_handle_input(MatchState* state, const MatchInput& input) {
                 if (!input.move.shift_command || (entity.target.type == TARGET_NONE && entity.target_queue.empty())) {
                     entity_clear_target_queue(state, entity);
                     entity_set_target(state, entity, target);
+                } else if (entity.target_queue.is_full()) {
+                    match_event_show_status(state, entity.player_id, "Command queue is full.");
                 } else {
-                    entity.target_queue.push_back(target);
+                    entity.target_queue.push(target);
                 }
             } // End for each unit in move input
             break;
@@ -386,7 +391,7 @@ void match_handle_input(MatchState* state, const MatchInput& input) {
                 entity_clear_target_queue(state, state->entities[thrower_index]);
                 entity_set_target(state, state->entities[thrower_index], target);
             } else {
-                state->entities[thrower_index].target_queue.push_back(target);
+                state->entities[thrower_index].target_queue.push(target);
             }
 
             break;
@@ -465,7 +470,7 @@ void match_handle_input(MatchState* state, const MatchInput& input) {
                 entity_clear_target_queue(state, lead_builder);
                 entity_set_target(state, lead_builder, build_target);
             } else {
-                lead_builder.target_queue.push_back(build_target);
+                lead_builder.target_queue.push(build_target);
             }
 
             // Assign the helpers' target
@@ -602,7 +607,7 @@ void match_handle_input(MatchState* state, const MatchInput& input) {
             if (index == 0) {
                 entity_building_dequeue(state, building);
             } else {
-                building.queue.erase(building.queue.begin() + index);
+                building.queue.remove_at_ordered(index);
             }
             break;
         }
@@ -809,8 +814,8 @@ void match_update(MatchState* state) {
                         }
                     }
                     GOLD_ASSERT(garrison_index != carrier.garrisoned_units.size());
-                    carrier.garrisoned_units.erase(carrier.garrisoned_units.begin() + garrison_index);
-                    state->entities[entity_index].garrison_id=  ID_NULL;
+                    carrier.garrisoned_units.remove_at_ordered(garrison_index);
+                    state->entities[entity_index].garrison_id = ID_NULL;
                 }
                 const EntityData& entity_data = entity_get_data(state->entities[entity_index].type);
                 log_info("Removing entity %s ID %u player id %u", entity_data.name, state->entities.get_id_of(entity_index), state->entities[entity_index].player_id);
@@ -944,7 +949,8 @@ bool match_is_target_invalid(const MatchState* state, const Target& target, uint
 }
 
 bool match_player_has_buildings(const MatchState* state, uint8_t player_id) {
-    for (const Entity& entity : state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+        const Entity& entity = state->entities[entity_index];
         if (entity.player_id == player_id && 
                 entity_is_building(entity.type) && 
                 entity.type != ENTITY_LANDMINE &&
@@ -957,7 +963,8 @@ bool match_player_has_buildings(const MatchState* state, uint8_t player_id) {
 }
 
 bool match_player_has_entities(const MatchState* state, uint8_t player_id) {
-    for (const Entity& entity : state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+        const Entity& entity = state->entities[entity_index];
         if (entity.player_id == player_id &&
                 entity.type != ENTITY_LANDMINE &&
                 entity.health != 0) {
@@ -1135,7 +1142,8 @@ void entity_update(MatchState* state, uint32_t entity_index) {
             entity.timer = BUILDING_FADE_DURATION;
 
             // Make sure that any building upgrades are marked as re-available
-            for (const BuildingQueueItem& item : entity.queue) {
+            for (uint32_t building_queue_index = 0; building_queue_index < entity.queue.size(); building_queue_index++) {
+                const BuildingQueueItem& item = entity.queue[building_queue_index];
                 if (item.type == BUILDING_QUEUE_ITEM_UPGRADE) {
                     state->players[entity.player_id].upgrades_in_progress &= ~item.upgrade;
                 }
@@ -1213,7 +1221,7 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                 // If unit is idle, check target queue
                 if (entity.target.type == TARGET_NONE && !entity.target_queue.empty()) {
                     entity_set_target(state, entity, entity.target_queue[0]);
-                    entity.target_queue.erase(entity.target_queue.begin());
+                    entity.target_queue.pop();
                 }
 
                 // If unit is idle, try to find a nearby target
@@ -1431,7 +1439,8 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                         // On step finished
                         // Check to see if we triggered a mine
                         if (entity_data.cell_layer == CELL_LAYER_GROUND) {
-                            for (Entity& mine : state->entities) {
+                            for (uint32_t mine_index = 0; mine_index < state->entities.size(); mine_index++) {
+                                Entity& mine = state->entities[mine_index];
                                 if (mine.type != ENTITY_LANDMINE || mine.health == 0 || mine.mode != MODE_BUILDING_FINISHED || 
                                         state->players[mine.player_id].team == state->players[entity.player_id].team ||
                                         std::abs(entity.cell.x - mine.cell.x) > 1 || std::abs(entity.cell.y - mine.cell.y) > 1) {
@@ -1894,7 +1903,7 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                         // Remove unit from mine
                         for (uint32_t index = 0; index < mine.garrisoned_units.size(); index++) {
                             if (mine.garrisoned_units[index] == entity_id) {
-                                mine.garrisoned_units.erase(mine.garrisoned_units.begin() + index);
+                                mine.garrisoned_units.remove_at_unordered(index);
                                 break;
                             }
                         }
@@ -2654,7 +2663,8 @@ void entity_set_target(MatchState* state, Entity& entity, Target target) {
 }
 
 void entity_clear_target_queue(MatchState* state, Entity& entity) {
-    for (const Target& target : entity.target_queue) {
+    for (uint32_t target_queue_index = 0; target_queue_index < entity.target_queue.size(); target_queue_index++) {
+        const Target& target = entity.target_queue[target_queue_index];
         if (target.type == TARGET_BUILD) {
             entity_refund_target_build(state, entity, target);
         }
@@ -3139,7 +3149,8 @@ void entity_attack_target(MatchState* state, EntityId attacker_id) {
         };
         const int splash_damage = attacker_data.unit_data.damage / 2;
 
-        for (Entity& entity : state->entities) {
+        for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+            Entity& entity = state->entities[entity_index];
             if (entity.type == ENTITY_GOLDMINE || !entity_is_selectable(entity)) {
                 continue;
             }
@@ -3178,8 +3189,9 @@ void entity_on_attack(MatchState* state, EntityId attacker_id, Entity& defender)
 
 uint32_t entity_get_garrisoned_occupancy(const MatchState* state, const Entity& entity) {
     uint32_t occupancy = 0;
-    for (EntityId id : entity.garrisoned_units) {
-        occupancy += entity_get_data(state->entities.get_by_id(id).type).garrison_size;
+    for (uint32_t garrisoned_units_index = 0; garrisoned_units_index < entity.garrisoned_units.size(); garrisoned_units_index++) {
+        EntityId entity_id = entity.garrisoned_units[garrisoned_units_index];
+        occupancy += entity_get_data(state->entities.get_by_id(entity_id).type).garrison_size;
     }
     return occupancy;
 }
@@ -3214,7 +3226,8 @@ void entity_unload_unit(MatchState* state, Entity& carrier, EntityId garrisoned_
             garrisoned_unit.goldmine_id = ID_NULL;
 
             // Remove the unit from the garrisoned units list
-            carrier.garrisoned_units.erase(carrier.garrisoned_units.begin() + index);
+            // Choosing to use remove_at_ordered for this so that it looks good in the UI, and because there's only 4 elements anyways
+            carrier.garrisoned_units.remove_at_ordered(index);
 
             match_event_play_sound(state, SOUND_GARRISON_OUT, carrier.position.to_ivec2());
         } else {
@@ -3225,7 +3238,8 @@ void entity_unload_unit(MatchState* state, Entity& carrier, EntityId garrisoned_
 
 void entity_release_garrisoned_units_on_death(MatchState* state, Entity& entity) {
     const EntityData& entity_data = entity_get_data(entity.type);
-    for (EntityId garrisoned_unit_id : entity.garrisoned_units) {
+    for (uint32_t garrisoned_units_index = 0; garrisoned_units_index < entity.garrisoned_units.size(); garrisoned_units_index++) {
+        EntityId garrisoned_unit_id = entity.garrisoned_units[garrisoned_units_index];
         Entity& garrisoned_unit = state->entities.get_by_id(garrisoned_unit_id);
         const EntityData& garrisoned_unit_data = entity_get_data(garrisoned_unit.type);
         // place garrisoned units inside former-self
@@ -3439,7 +3453,7 @@ void entity_building_enqueue(MatchState* state, Entity& building, BuildingQueueI
 void entity_building_dequeue(MatchState* state, Entity& building) {
     GOLD_ASSERT(!building.queue.empty());
 
-    building.queue.erase(building.queue.begin());
+    building.queue.remove_at_ordered(0);
     if (building.queue.empty()) {
         building.timer = 0;
     } else {

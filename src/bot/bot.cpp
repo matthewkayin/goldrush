@@ -357,7 +357,8 @@ bool bot_should_surrender(const MatchState* state, const Bot& bot, uint32_t matc
     }
 
     EntityCount entity_count;
-    for (const Entity& entity : state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+        const Entity& entity = state->entities[entity_index];
         if (entity.player_id == bot.player_id) {
             entity_count[entity.type]++;
         }
@@ -2627,7 +2628,8 @@ int bot_squad_get_molotov_cell_score(const MatchState* state, const Entity& pyro
 
     // Consider other existing or about to exist molotov fires
     std::vector<ivec2> existing_molotov_cells;
-    for (const Entity& entity : state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+        const Entity& entity = state->entities[entity_index];
         if (entity.target.type == TARGET_MOLOTOV) {
             existing_molotov_cells.push_back(entity.target.cell);
         }
@@ -3049,7 +3051,8 @@ MatchInput bot_squad_landmines_micro(const MatchState* state, Bot& bot, const Bo
     }
 
     // Determine landmine count at each base
-    for (const Entity& landmine : state->entities) {
+    for (uint32_t landmine_index = 0; landmine_index < state->entities.size(); landmine_index++) {
+        const Entity& landmine = state->entities[landmine_index];
         if (landmine.type != ENTITY_LANDMINE || landmine.player_id != bot.player_id) {
             continue;
         }
@@ -3691,7 +3694,8 @@ EntityType bot_get_building_which_researches(uint32_t upgrade) {
 EntityCount bot_count_in_progress_entities(const MatchState* state, const Bot& bot) {
     EntityCount count;
 
-    for (const Entity& entity : state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+        const Entity& entity = state->entities[entity_index];
         if (entity.player_id != bot.player_id || entity.health == 0) {
             continue;
         }
@@ -3701,8 +3705,8 @@ EntityCount bot_count_in_progress_entities(const MatchState* state, const Bot& b
         }
         if (entity.mode == MODE_BUILDING_FINISHED &&
                 !entity.queue.empty() &&
-                entity.queue.front().type == BUILDING_QUEUE_ITEM_UNIT) {
-            count[entity.queue.front().unit_type]++;
+                entity.queue[0].type == BUILDING_QUEUE_ITEM_UNIT) {
+            count[entity.queue[0].unit_type]++;
         }
     }
 
@@ -3756,7 +3760,8 @@ bool bot_is_entity_unreserved_army(const Bot& bot, const Entity& entity, EntityI
 EntityCount bot_count_available_production_buildings(const MatchState* state, const Bot& bot) {
     EntityCount count;
 
-    for (const Entity& entity : state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+        const Entity& entity = state->entities[entity_index];
         if (entity.player_id == bot.player_id &&
                 entity.mode == MODE_BUILDING_FINISHED &&
                 entity.queue.empty() &&
@@ -3783,7 +3788,8 @@ int bot_score_unreserved_army(const MatchState* state, const Bot& bot) {
 
 int bot_score_allied_army(const MatchState* state, const Bot& bot) {
     int score = 0;
-    for (const Entity& entity : state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+        const Entity& entity = state->entities[entity_index];
         if (!entity_is_unit(entity.type) || entity.health == 0) {
             continue;
         }
@@ -3798,7 +3804,8 @@ int bot_score_allied_army(const MatchState* state, const Bot& bot) {
 
 int bot_score_enemy_army(const MatchState* state, const Bot& bot) {
     int score = 0;
-    for (const Entity& entity : state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+        const Entity& entity = state->entities[entity_index];
         if (!entity_is_unit(entity.type) || entity.health == 0) {
             continue;
         }
@@ -3843,7 +3850,8 @@ EntityId bot_find_threatened_in_progress_building(const MatchState* state, const
 
         int nearby_ally_score = 0;
         int nearby_enemy_score = 0;
-        for (const Entity& entity : state->entities) {
+        for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
+            const Entity& entity = state->entities[entity_index];
             if (entity.health == 0 || 
                     ivec2::manhattan_distance(entity.cell, building.cell) > BOT_NEAR_DISTANCE ||
                     !entity_is_visible_to_player(state, entity, bot.player_id)) {

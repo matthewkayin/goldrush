@@ -1387,14 +1387,16 @@ static int script_player_get_full_bunker_count(lua_State* lua_state) {
     const MatchShellState* state = script_get_match_shell_state(lua_state);
 
     uint32_t count = 0;
-    for (const Entity& entity : state->match_state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+        const Entity& entity = state->match_state->entities[entity_index];
         if (entity.player_id != player_id ||
                 entity.type != ENTITY_BUNKER ||
                 entity.garrisoned_units.size() != 4) {
             continue;
         }
         bool is_all_cowboys = true;
-        for (EntityId garrisoned_unit_id : entity.garrisoned_units) {
+        for (uint32_t garrisoned_units_index = 0; garrisoned_units_index < entity.garrisoned_units.size(); garrisoned_units_index++) {
+            EntityId garrisoned_unit_id = entity.garrisoned_units[garrisoned_units_index];
             if (state->match_state->entities.get_by_id(garrisoned_unit_id).type != ENTITY_COWBOY) {
                 is_all_cowboys = false;
             }
@@ -1426,7 +1428,8 @@ static int script_player_has_entity_near_cell(lua_State* lua_state) {
     const MatchShellState* state = script_get_match_shell_state(lua_state);
 
     bool result = false;
-    for (const Entity& entity : state->match_state->entities) {
+    for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
+        const Entity& entity = state->match_state->entities[entity_index];
         if (entity.player_id == player_id && 
                 entity.health != 0 && 
                 ivec2::manhattan_distance(entity.cell, cell) < distance) {
