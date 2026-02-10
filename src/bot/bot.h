@@ -6,6 +6,7 @@
 #include "match/state.h"
 #include "core/match_setting.h"
 #include <unordered_map>
+#include <queue>
 
 const int BOT_SQUAD_ID_NULL = -1;
 

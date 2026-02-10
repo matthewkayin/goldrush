@@ -13,6 +13,7 @@
 #include "shell/hotkey.h"
 #include "scenario/scenario.h"
 #include <luajit/lua.hpp>
+#include <queue>
 
 #define MATCH_SHELL_CONTROL_GROUP_COUNT 10
 #define MATCH_SHELL_CONTROL_GROUP_NONE -1

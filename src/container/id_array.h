@@ -3,27 +3,26 @@
 #include "defines.h"
 #include "core/asserts.h"
 #include <cstdint>
-#include <vector>
-#include <queue>
-#include <unordered_map>
+#include <array>
 
 template <typename T, size_t capacity>
 class IdArray {
-    using iterator = typename std::vector<T>::iterator;
-    using const_iterator = typename std::vector<T>::const_iterator;
+    using iterator = typename std::array<T, capacity>::iterator;
+    using const_iterator = typename std::array<T, capacity>::const_iterator;
 
 private:
-    std::vector<T> data;
-    std::vector<EntityId> ids;
-    std::queue<EntityId> available_ids;
-    std::unordered_map<EntityId, uint32_t> id_to_index;
+    std::array<T, capacity> data;
+    EntityId ids[capacity];
+    uint16_t id_to_index[ID_MAX];
+    uint32_t _size;
+    EntityId next_id;
 public:
     IdArray() {
-        for (EntityId id = 0; id < ID_MAX; id++) {
-            available_ids.push(id);
+        for (uint32_t id = 0; id < ID_MAX; id++) {
+            id_to_index[id] = (uint16_t)INDEX_INVALID;
         }
-        data.reserve(capacity);
-        ids.reserve(capacity);
+        _size = 0;
+        next_id = 0;
     }
 
     T& operator[](uint32_t index) {
@@ -46,11 +45,10 @@ public:
     }
 
     uint32_t get_index_of(EntityId id) const {
-        auto index_it = id_to_index.find(id);
-        if (index_it == id_to_index.end()) {
+        if (id == ID_NULL) {
             return INDEX_INVALID;
         }
-        return index_it->second;
+        return id_to_index[id];
     }
     EntityId get_id_of(uint32_t index) const {
         return ids[index];
@@ -61,17 +59,18 @@ public:
     iterator end() { return data.end(); }
     const_iterator end() const { return data.end(); }
 
-    size_t size() const { return data.size(); }
+    size_t size() const { return _size; }
 
     EntityId push_back(const T& value) {
-        GOLD_ASSERT(!available_ids.empty());
-        GOLD_ASSERT(data.size() < capacity);
+        GOLD_ASSERT(_size < capacity);
 
-        EntityId id = available_ids.front();
-        available_ids.pop();
-        id_to_index[id] = (uint32_t)data.size();
-        ids.push_back(id);
-        data.push_back(value);
+        EntityId id = next_id;
+        GOLD_ASSERT(next_id < ID_MAX - 1);
+        next_id++;
+        id_to_index[id] = _size;
+        ids[_size] = id;
+        data[_size] = value;
+        _size++;
 
         return id;
     }
@@ -81,20 +80,16 @@ public:
         EntityId id = ids[index];
 
         // swap 
-        data[index] = data.back();
-        ids[index] = ids.back();
+        data[index] = data[_size - 1];
+        ids[index] = ids[_size - 1];
         id_to_index[ids[index]] = index;
 
         // and pop
-        data.pop_back();
-        ids.pop_back();
+        _size--;
 
         // remove the mapping for this id
         // this is done after so that if we end up "pop and swapping" with the last element, 
         // we still remove the mapping
-        id_to_index.erase(id);
-
-        // add the id back into the free list
-        available_ids.push(id);
+        id_to_index[id] = INDEX_INVALID;
     }
 };

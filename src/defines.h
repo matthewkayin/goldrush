@@ -68,6 +68,6 @@ STATIC_ASSERT(sizeof(int) == sizeof(int32_t));
 #define MATCH_SHELL_UI_HEIGHT 88
 
 typedef uint16_t EntityId;
-const EntityId ID_MAX = 4096;
-const EntityId ID_NULL = ID_MAX + 1;
-const uint32_t INDEX_INVALID = 65535;
+const EntityId ID_MAX = UINT16_MAX;
+const EntityId ID_NULL = ID_MAX;
+const uint32_t INDEX_INVALID = UINT16_MAX;
