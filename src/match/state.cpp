@@ -3735,15 +3735,19 @@ void match_fog_update(MatchState* state, uint32_t player_team, ivec2 cell, int c
                             if (entity.type == ENTITY_GOLDMINE && frame.x == 1) {
                                 frame.x = 0;
                             }
-                            GOLD_ASSERT(state->remembered_entity_count[player_team] < MATCH_MAX_REMEMBERED_ENTITIES);
-                            state->remembered_entities[player_team][state->remembered_entity_count[player_team]] = (RememberedEntity) {
+                            uint32_t remembered_entity_index = match_team_find_remembered_entity_index(state, player_team, map_cell.id);
+                            if (remembered_entity_index == MATCH_ENTITY_NOT_REMEMBERED) {
+                                GOLD_ASSERT(state->remembered_entity_count[player_team] < MATCH_MAX_REMEMBERED_ENTITIES);
+                                remembered_entity_index = state->remembered_entity_count[player_team];
+                                state->remembered_entity_count[player_team]++;
+                            }
+                            state->remembered_entities[player_team][remembered_entity_index] = (RememberedEntity) {
                                 .entity_id = map_cell.id,
                                 .type = entity.type,
                                 .frame = frame,
                                 .cell = entity.cell,
                                 .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLDMINE ? 0 : state->players[entity.player_id].recolor_id
                             };
-                            state->remembered_entity_count[player_team]++;
                         }
                     } // End if cell value < cell empty
                 } // End if !increment
