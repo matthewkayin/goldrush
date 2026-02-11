@@ -5,8 +5,11 @@
 #include "bot/entity_count.h"
 #include "match/state.h"
 #include "core/match_setting.h"
+#include "container/fixed_queue.h"
 #include <unordered_map>
 #include <queue>
+
+#define BOT_MAX_RESERVATION_REQUESTS 128
 
 const int BOT_SQUAD_ID_NULL = -1;
 
@@ -53,6 +56,11 @@ struct BotBaseInfo {
     int defense_score;
 };
 
+struct BotReservationRequest {
+    EntityId entity_id;
+    bool value;
+};
+
 struct BotRetreatMemory {
     std::vector<EntityId> enemy_list;
     int retreat_count;
@@ -63,8 +71,8 @@ struct Bot {
     BotConfig config;
     uint8_t player_id;
 
-    // Unit management
-    std::unordered_map<EntityId, bool> is_entity_reserved;
+    // Reservations
+    FixedQueue<BotReservationRequest, BOT_MAX_RESERVATION_REQUESTS> reservation_requests;
 
     // Production
     BotUnitComp unit_comp;
@@ -161,9 +169,9 @@ BotSquadType bot_squad_type_from_str(const char* str);
 
 int bot_add_squad(Bot& bot, BotAddSquadParams params);
 void bot_squad_dissolve(Bot& bot, BotSquad& squad);
-void bot_squad_remove_entity_by_id(Bot& bot, BotSquad& squad, EntityId entity_id);
+bool bot_squad_remove_entity_by_id(Bot& bot, BotSquad& squad, EntityId entity_id);
 MatchInput bot_squad_update(const MatchState* state, Bot& bot, BotSquad& squad, uint32_t match_timer);
-void bot_squad_remove_dead_units(const MatchState* state, Bot& bot, BotSquad& squad);
+void bot_squad_remove_dead_units(const MatchState* state, BotSquad& squad);
 bool bot_squad_is_entity_near_squad(const MatchState* state, const BotSquad& squad, const Entity& entity);
 std::vector<EntityId> bot_squad_get_nearby_enemy_list(const MatchState* state, const Bot& bot, const BotSquad& squad);
 bool bot_squad_should_retreat(const MatchState* state, const Bot& bot, const BotSquad& squad, int nearby_enemy_score);
@@ -204,14 +212,13 @@ void bot_update_base_info(const MatchState* state, Bot& bot);
 MatchInput bot_scout(const MatchState* state, Bot& bot, uint32_t match_timer);
 std::vector<EntityId> bot_determine_entities_to_scout(const MatchState* state, const Bot& bot);
 bool bot_is_entity_in_entities_to_scout_list(const Bot& bot, EntityId entity_id);
-void bot_release_scout(Bot& bot);
+bool bot_release_scout(const MatchState* state, Bot& bot);
 bool bot_should_scout(const Bot& bot, uint32_t match_timer);
 
 // Entity Reservation
 
-bool bot_is_entity_reserved(const Bot& bot, EntityId entity_id);
-void bot_reserve_entity(Bot& bot, EntityId entity_id, bool log = true);
-void bot_release_entity(Bot& bot, EntityId entity_id, bool log = true);
+bool bot_reserve_entity(Bot& bot, EntityId entity_id);
+bool bot_release_entity(Bot& bot, EntityId entity_id);
 
 // Entity Type Util
 
@@ -224,7 +231,7 @@ EntityType bot_get_building_which_researches(uint32_t upgrade);
 EntityCount bot_count_in_progress_entities(const MatchState* state, const Bot& bot);
 EntityCount bot_count_unreserved_entities(const MatchState* state, const Bot& bot);
 EntityCount bot_count_unreserved_army(const MatchState* state, const Bot& bot);
-bool bot_is_entity_unreserved_army(const Bot& bot, const Entity& entity, EntityId entity_id);
+bool bot_is_entity_unreserved_army(const Bot& bot, const Entity& entity);
 EntityCount bot_count_available_production_buildings(const MatchState* state, const Bot& bot);
 int bot_score_unreserved_army(const MatchState* state, const Bot& bot);
 int bot_score_allied_army(const MatchState* state, const Bot& bot);

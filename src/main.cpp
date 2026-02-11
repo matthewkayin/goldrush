@@ -680,9 +680,15 @@ void game_test_update() {
                 state.match_shell_state->match_state->players[network_get_player_id()].active &&
                 state.match_shell_state->input_queue.empty()) {
             uint32_t turn_number = state.match_shell_state->match_timer / TURN_DURATION;
-            MatchInput input = turn_number % TURN_OFFSET == 0
-                    ? bot_get_turn_input(state.match_shell_state->match_state, state.test_bot, state.match_shell_state->match_timer)
-                    : (MatchInput) { .type = MATCH_INPUT_NONE };
+            MatchInput input;
+            if (turn_number % TURN_OFFSET == 0) {
+                input = bot_get_turn_input(state.match_shell_state->match_state, state.test_bot, state.match_shell_state->match_timer);
+                while (!state.test_bot.reservation_requests.empty()) {
+                    BotReservationRequest request = state.test_bot.reservation_requests.front();
+                    state.test_bot.reservation_requests.pop();
+                    entity_set_flag(state.match_shell_state->match_state->entities.get_by_id(request.entity_id), ENTITY_FLAG_IS_RESERVED, request.value);
+                }
+            } 
             state.match_shell_state->input_queue.push_back(input);
 
             // Check for surrender

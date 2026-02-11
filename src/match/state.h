@@ -68,6 +68,7 @@ const uint32_t ENTITY_FLAG_INVISIBLE = 1 << 2;
 const uint32_t ENTITY_FLAG_CHARGED = 1 << 3;
 const uint32_t ENTITY_FLAG_ON_FIRE = 1 << 4;
 const uint32_t ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY = 1 << 5;
+const uint32_t ENTITY_FLAG_IS_RESERVED = 1 << 6;
 
 const int ENTITY_SKY_POSITION_Y_OFFSET = -16;
 const uint32_t ENTITY_BALLOON_DEATH_DURATION = 50;
