@@ -3231,13 +3231,13 @@ void match_shell_render(const MatchShellState* state) {
 
             if (entity.bleed_timer != 0) {
                 const SpriteInfo& bleed_sprite_info = render_get_sprite_info(SPRITE_PARTICLE_BLEED);
-                ivec2 bleed_params_position = ivec2(render_rect.x + (render_rect.w / 2) - bleed_sprite_info.frame_width, 
-                                                    render_rect.y + (render_rect.h / 2) - bleed_sprite_info.frame_height);
+                ivec2 bleed_params_position = ivec2(render_rect.x + (render_rect.w / 2) - (bleed_sprite_info.frame_width / 2), 
+                                                    render_rect.y + (render_rect.h / 2) - (bleed_sprite_info.frame_height / 2));
                 RenderSpriteParams bleed_params = (RenderSpriteParams) {
                     .sprite = SPRITE_PARTICLE_BLEED,
                     .frame = entity.bleed_animation.frame,
                     .position = bleed_params_position,
-                    .ysort_position = bleed_params_position.y,
+                    .ysort_position = params.ysort_position + 1,
                     .options = RENDER_SPRITE_NO_CULL,
                     .recolor_id = 0
                 };
