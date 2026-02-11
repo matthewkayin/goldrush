@@ -5,6 +5,7 @@
 #include "render/sprite.h"
 #include "math/gmath.h"
 #include "core/match_setting.h"
+#include "container/fixed_vector.h"
 #include <vector>
 #include <unordered_map>
 
@@ -12,6 +13,9 @@
 #define MAP_REGION_CONNECTION_MAX 256
 #define MAP_COST_TO_CONNECTION_MAX 16
 #define MAP_REGION_CHUNK_SIZE 32
+
+#define MAP_MAX_PATH_SIZE 64
+using MapPath = FixedVector<ivec2, MAP_MAX_PATH_SIZE>;
 
 const uint32_t MAP_OPTION_IGNORE_UNITS = 1;
 const uint32_t MAP_OPTION_IGNORE_MINERS = 2;
@@ -153,8 +157,8 @@ ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, in
 uint8_t map_get_region(const Map& map, ivec2 cell);
 bool map_are_regions_connected(const Map& map, uint8_t region_a, uint8_t region_b);
 
-void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t options, std::vector<ivec2>* ignore_cells = NULL);
+void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, uint32_t options, MapPath* ignore_cells, MapPath* path);
 ivec2 map_get_ideal_mine_exit_path_rally_cell(const Map& map, ivec2 mine_cell, ivec2 hall_cell);
-void map_get_ideal_mine_exit_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, std::vector<ivec2>* path);
+void map_get_ideal_mine_exit_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, MapPath* path);
 ivec2 map_get_ideal_mine_entrance_cell(const Map& map, ivec2 mine_cell, ivec2 hall_cell);
-void map_get_ideal_mine_entrance_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, std::vector<ivec2>* path);
+void map_get_ideal_mine_entrance_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, MapPath* path);

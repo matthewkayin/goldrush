@@ -1329,7 +1329,7 @@ void entity_update(MatchState* state, uint32_t entity_index) {
 
                 // Pathfind
                 {
-                    std::vector<ivec2> mine_exit_path;
+                    MapPath mine_exit_path;
                     entity_get_mining_path_to_avoid(state, entity, &mine_exit_path);
 
                     uint32_t pathfind_options = 0;
@@ -1340,7 +1340,7 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                     if (entity.target.type == TARGET_CELL && entity.pathfind_attempts == 0) {
                         pathfind_options |= MAP_OPTION_ALLOW_PATH_SQUIRRELING;
                     }
-                    map_pathfind(state->map, entity_data.cell_layer, entity.cell, entity_get_target_cell(state, entity), entity_data.cell_size, &entity.path, pathfind_options, &mine_exit_path);
+                    map_pathfind(state->map, entity_data.cell_layer, entity.cell, entity_get_target_cell(state, entity), entity_data.cell_size, pathfind_options, &mine_exit_path, &entity.path);
                 }
 
                 // Check path
@@ -1384,11 +1384,11 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                 while (movement_left.raw_value > 0) {
                     // If the unit is not moving between tiles, then pop the next cell off the path
                     if (entity.position == entity_get_target_position(entity) && !entity.path.empty()) {
-                        entity.direction = enum_from_ivec2_direction(entity.path[0] - entity.cell);
+                        entity.direction = enum_from_ivec2_direction(entity.path.back() - entity.cell);
 
                         // Miner - detect traffic jam and try to walk around entity
                         if (entity_is_mining(state, entity) &&
-                                map_is_cell_rect_occupied(state->map, entity_data.cell_layer, entity.path[0], entity_data.cell_size, entity.cell, 0) &&
+                                map_is_cell_rect_occupied(state->map, entity_data.cell_layer, entity.path.back(), entity_data.cell_size, entity.cell, 0) &&
                                 entity_is_blocker_walking_towards_entity(state, entity)) {
 
                             uint32_t target_index = state->entities.get_index_of(entity.target.id);
@@ -1399,9 +1399,9 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                                 ivec2 target_cell = map_get_nearest_cell_around_rect(state->map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, target.cell, target_size, 0);
 
                                 // Pathfind without ignoring miners to see if we can walk around
-                                std::vector<ivec2> mine_exit_path;
+                                MapPath mine_exit_path;
                                 entity_get_mining_path_to_avoid(state, entity, &mine_exit_path);
-                                map_pathfind(state->map, entity_data.cell_layer, entity.cell, target_cell, entity_data.cell_size, &entity.path, MAP_OPTION_NO_REGION_PATH, &mine_exit_path);
+                                map_pathfind(state->map, entity_data.cell_layer, entity.cell, target_cell, entity_data.cell_size, MAP_OPTION_NO_REGION_PATH, &mine_exit_path, &entity.path);
 
                                 // If no path was generated, then just consider ourselves blocked
                                 if (entity.path.empty()) {
@@ -1411,12 +1411,12 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                                 }
 
                                 // Otherwise, orient towards the new path and try to keep walking
-                                // The code below this block should double-check that path[0] is not blocked
-                                entity.direction = enum_from_ivec2_direction(entity.path[0] - entity.cell);
+                                // The code below this block should double-check that path.back() is not blocked
+                                entity.direction = enum_from_ivec2_direction(entity.path.back() - entity.cell);
                             }
                         }
 
-                        if (map_is_cell_rect_occupied(state->map, entity_data.cell_layer, entity.path[0], entity_data.cell_size, entity.cell, 0)) {
+                        if (map_is_cell_rect_occupied(state->map, entity_data.cell_layer, entity.path.back(), entity_data.cell_size, entity.cell, 0)) {
                             path_is_blocked = true;
                             // breaks out of while movement left
                             break;
@@ -1429,13 +1429,13 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                             });
                         }
                         match_fog_update(state, state->players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, false);
-                        entity.cell = entity.path[0];
+                        entity.cell = entity.path.back();
                         map_set_cell_rect(state->map, entity_data.cell_layer, entity.cell, entity_data.cell_size, (Cell) {
                             .type = entity_is_mining(state, entity) ? CELL_MINER : CELL_UNIT,
                             .id = entity_id
                         });
                         match_fog_update(state, state->players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, true);
-                        entity.path.erase(entity.path.begin());
+                        entity.path.pop_back();
                     }
 
                     // Step unit along movement
@@ -1488,7 +1488,7 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                         if (!entity.path.empty() && entity.path.size() < 8 &&
                                 (entity.target.type == TARGET_ENTITY || entity.target.type == TARGET_ATTACK_ENTITY)) {
                             ivec2 target_cell = entity_get_target_cell(state, entity);
-                            if (ivec2::manhattan_distance(entity.path.back(), target_cell) > 8) {
+                            if (ivec2::manhattan_distance(entity.path[0], target_cell) > 8) {
                                 entity.mode = MODE_UNIT_IDLE;
                                 entity.path.clear();
                                 // break out of while movement left
@@ -2574,7 +2574,7 @@ bool entity_is_idle_miner(const Entity& entity) {
             entity_is_selectable(entity);
 }
 
-void entity_get_mining_path_to_avoid(const MatchState* state, const Entity& entity, std::vector<ivec2>* path) {
+void entity_get_mining_path_to_avoid(const MatchState* state, const Entity& entity, MapPath* path) {
     if (!entity_is_mining(state, entity)) {
         return;
     }
@@ -2605,7 +2605,7 @@ void entity_get_mining_path_to_avoid(const MatchState* state, const Entity& enti
 }
 
 bool entity_is_blocker_walking_towards_entity(const MatchState* state, const Entity& entity) {
-    Cell blocking_cell = map_get_cell(state->map, entity_get_data(entity.type).cell_layer, entity.path[0]);
+    Cell blocking_cell = map_get_cell(state->map, entity_get_data(entity.type).cell_layer, entity.path.back());
     if (blocking_cell.type != CELL_MINER) {
         return false;
     }

@@ -459,8 +459,8 @@ void map_init_regions(Map& map) {
                 continue;
             }
 
-            std::vector<ivec2> path;
-            map_pathfind(map, CELL_LAYER_GROUND, region_connection_centers[region_connection_index], region_connection_centers[other_connection_index], 1, &path, MAP_OPTION_NO_REGION_PATH);
+            MapPath path;
+            map_pathfind(map, CELL_LAYER_GROUND, region_connection_centers[region_connection_index], region_connection_centers[other_connection_index], 1, MAP_OPTION_NO_REGION_PATH, NULL, &path);
             GOLD_ASSERT(path.size() < MAP_REGION_CONNECTIONS_NOT_CONNECTED);
             map.region_connection_to_connection_cost[region_connection_index][other_connection_index] = (uint8_t)path.size();
             map.region_connection_to_connection_cost[other_connection_index][region_connection_index] = (uint8_t)path.size();
@@ -1679,14 +1679,15 @@ bool map_is_player_town_hall_cell_valid(const Map& map, ivec2 mine_cell, ivec2 c
     }
 
     // Check mine exit path
-    std::vector<ivec2> mine_exit_path;
+    MapPath mine_exit_path;
     map_get_ideal_mine_exit_path(map, mine_cell, cell, &mine_exit_path);
 
     if (mine_exit_path.empty()) {
         return false;
     }
 
-    for (ivec2 path_cell : mine_exit_path) {
+    for (uint32_t path_index = 0; path_index < mine_exit_path.size(); path_index++) {
+        ivec2 path_cell = mine_exit_path[path_index];
         for (int y = path_cell.y - 1; y < path_cell.y + 2; y++) {
             for (int x = path_cell.x - 1; x < path_cell.x + 2; x++) {
                 if (!map_is_cell_in_bounds(map, ivec2(x, y))) {
@@ -1845,7 +1846,7 @@ bool map_are_regions_connected(const Map& map, uint8_t region_a, uint8_t region_
     return map.region_connection_indices[region_a][region_b] != MAP_REGIONS_NOT_CONNECTED;
 }
 
-ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
+ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, uint32_t ignore, MapPath* ignore_cells) {
     ZoneScoped;
 
     if (from == to) {
@@ -1857,7 +1858,8 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
     std::vector<int> explored_indices = std::vector<int>(map.width * map.height, -1);
 
     if (ignore_cells != NULL) {
-        for (ivec2 cell : *ignore_cells) {
+        for (uint32_t ignore_cell_index = 0; ignore_cell_index < ignore_cells->size(); ignore_cell_index++) {
+            ivec2 cell = (*ignore_cells)[ignore_cell_index];
             explored_indices[cell.x + (cell.y * map.width)] = 1;
         }
     }
@@ -1944,6 +1946,25 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
     return to;
 }
 
+ivec2 map_get_region_connection_cell_closest_to_cell(const Map& map, ivec2 cell, ivec2 to, int to_region) {
+    int from_region = map_get_region(map, cell);
+
+    GOLD_ASSERT(map_are_regions_connected(map, from_region, to_region));
+    uint8_t connection_index = map.region_connection_indices[from_region][to_region];
+    const MapRegionConnection& connection = map.region_connections[connection_index];
+
+    GOLD_ASSERT(connection.cell_count != 0);
+    ivec2 nearest_connection_cell = connection.cells[0];
+    for (uint32_t cell_index = 1; cell_index < connection.cell_count; cell_index++) {
+        if (ivec2::manhattan_distance(connection.cells[cell_index], cell) + ivec2::manhattan_distance(connection.cells[cell_index], to) <
+                ivec2::manhattan_distance(nearest_connection_cell, cell) + ivec2::manhattan_distance(nearest_connection_cell, to)) {
+            nearest_connection_cell = connection.cells[cell_index];
+        }
+    }
+
+    return nearest_connection_cell;
+}
+
 std::vector<int> map_get_region_path(const Map& map, ivec2 from, ivec2 to) {
     ZoneScoped;
 
@@ -2023,16 +2044,8 @@ std::vector<int> map_get_region_path(const Map& map, ivec2 from, ivec2 to) {
                 continue;
             }
 
-            const MapRegionConnection* connection = &map.region_connections[connection_index];
-
             // Determine the cell in the connection closest to the smallest node's cell
-            ivec2 nearest_cell = connection->cells[0];
-            for (uint32_t cell_index = 1; cell_index < connection->cell_count; cell_index++) {
-                if (ivec2::manhattan_distance(connection->cells[cell_index], smallest.cell) < 
-                        ivec2::manhattan_distance(nearest_cell, smallest.cell)) {
-                    nearest_cell = connection->cells[cell_index];
-                }
-            }
+            ivec2 nearest_cell = map_get_region_connection_cell_closest_to_cell(map, smallest.cell, to, connected_region);
 
             // Determine the connection cost
             uint8_t connection_cost = smallest.connection_index == -1
@@ -2076,48 +2089,29 @@ std::vector<int> map_get_region_path(const Map& map, ivec2 from, ivec2 to) {
     return path;
 }
 
-ivec2 map_get_region_connection_cell_closest_to_cell(const Map& map, ivec2 cell, int to_region) {
-    int from_region = map_get_region(map, cell);
-
-    GOLD_ASSERT(map_are_regions_connected(map, from_region, to_region));
-    uint8_t connection_index = map.region_connection_indices[from_region][to_region];
-    GOLD_ASSERT(map.region_connections[connection_index].cell_count != 0);
-    ivec2 nearest_connection_cell = ivec2(-1, -1);
-    for (ivec2 connection_cell : map.region_connections[connection_index].cells) {
-        if (nearest_connection_cell.x == -1 ||
-                ivec2::manhattan_distance(connection_cell, cell) <
-                ivec2::manhattan_distance(nearest_connection_cell, cell)) {
-            nearest_connection_cell = connection_cell;
-        }
-    }
-
-    return nearest_connection_cell;
-}
-
-void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
+void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, uint32_t options, MapPath* ignore_cells, MapPath* path) {
     ZoneScoped;
 
     static const int EXPLORED_INDEX_NOT_EXPLORED = -1;
     static const int EXPLORED_INDEX_IGNORE_CELL = -2;
 
-    path->clear();
-
     // Don't bother pathing to the unit's cell
     if (from == to) {
+        path->clear();
         return;
     }
 
     // If pathing into unwalkable territory, correct target
     ivec2 original_to = to;
-    to = map_pathfind_correct_target(map, layer, from, to, ignore, ignore_cells);
-    bool allow_squirreling = (ignore & MAP_OPTION_ALLOW_PATH_SQUIRRELING) == MAP_OPTION_ALLOW_PATH_SQUIRRELING;
+    to = map_pathfind_correct_target(map, layer, from, to, options, ignore_cells);
+    bool allow_squirreling = (options & MAP_OPTION_ALLOW_PATH_SQUIRRELING) == MAP_OPTION_ALLOW_PATH_SQUIRRELING;
     if (to != original_to && ivec2::manhattan_distance(from, to) < 3 &&
             map_get_cell(map, layer, original_to).type == CELL_UNIT && !allow_squirreling) {
         return;
     }
 
     // Find an alternate cell for large units
-    if (cell_size > 1 && map_is_cell_rect_occupied(map, layer, to, cell_size, from, ignore)) {
+    if (cell_size > 1 && map_is_cell_rect_occupied(map, layer, to, cell_size, from, options)) {
         ivec2 nearest_alternative;
         int nearest_alternative_distance = -1;
         for (int x = 0; x < cell_size; x++) {
@@ -2128,7 +2122,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
 
                 ivec2 alternative = to - ivec2(x, y);
                 if (map_is_cell_rect_in_bounds(map, alternative, cell_size) &&
-                    !map_is_cell_rect_occupied(map, layer, alternative, cell_size, from, ignore)) {
+                    !map_is_cell_rect_occupied(map, layer, alternative, cell_size, from, options)) {
                     if (nearest_alternative_distance == -1 || ivec2::manhattan_distance(from, alternative) < nearest_alternative_distance) {
                         nearest_alternative = alternative;
                         nearest_alternative_distance = ivec2::manhattan_distance(from, alternative);
@@ -2147,24 +2141,25 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
     std::vector<int> explored_indices = std::vector<int>(map.width * map.height, EXPLORED_INDEX_NOT_EXPLORED);
     uint32_t closest_explored = 0;
     bool found_path = false;
-    bool avoid_landmines = (ignore & MAP_OPTION_AVOID_LANDMINES) == MAP_OPTION_AVOID_LANDMINES;
+    bool avoid_landmines = (options & MAP_OPTION_AVOID_LANDMINES) == MAP_OPTION_AVOID_LANDMINES;
     MapPathNode path_end;
 
     // Fill the ignore cells into explored indices array so that we can do a constant time lookup to see if a cell should be ignored
     if (ignore_cells != NULL) {
-        for (ivec2 ignore_cell : *ignore_cells) {
+        for (uint32_t ignore_cell_index = 0; ignore_cell_index < ignore_cells->size(); ignore_cell_index++) {
+            ivec2 ignore_cell = (*ignore_cells)[ignore_cell_index];
             explored_indices[ignore_cell.x + (ignore_cell.y * map.width)] = EXPLORED_INDEX_IGNORE_CELL;
         }
     }
 
     std::vector<int> region_path; 
     ivec2 heuristic_cell; 
-    bool no_region_path = (ignore & MAP_OPTION_NO_REGION_PATH) == MAP_OPTION_NO_REGION_PATH;
+    bool no_region_path = (options & MAP_OPTION_NO_REGION_PATH) == MAP_OPTION_NO_REGION_PATH;
     if (no_region_path || layer == CELL_LAYER_SKY || map_get_region(map, from) == map_get_region(map, to)) {
         heuristic_cell = to;
     } else {
         region_path = map_get_region_path(map, from, to);
-        heuristic_cell = map_get_region_connection_cell_closest_to_cell(map, from, region_path.back());
+        heuristic_cell = map_get_region_connection_cell_closest_to_cell(map, from, to, region_path.back());
     }
 
     frontier.push_back((MapPathNode) {
@@ -2199,7 +2194,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
             region_path.pop_back();
             heuristic_cell = region_path.back() == map_get_region(map, to) 
                 ? to 
-                : map_get_region_connection_cell_closest_to_cell(map, smallest.cell, region_path.back());
+                : map_get_region_connection_cell_closest_to_cell(map, smallest.cell, to, region_path.back());
 
             // Clear the frontier once we get to a new region.
             // This helps ensure path completion on long, roundabout paths
@@ -2247,7 +2242,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
             }
 
             // Skip occupied cells (unless the child is the goal. this avoids worst-case pathing)
-            if (map_is_cell_rect_occupied(map, layer, child.cell, cell_size, from, ignore) &&
+            if (map_is_cell_rect_occupied(map, layer, child.cell, cell_size, from, options) &&
                 !(child.cell == to && ivec2::manhattan_distance(smallest.cell, child.cell) == 1)) {
                 continue;
             }
@@ -2311,11 +2306,27 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
 
     // Backtrack to build the path
     MapPathNode current = found_path ? path_end : explored[closest_explored];
+    std::vector<ivec2> full_path;
+    full_path.reserve(current.cost + 1);
     while (current.parent != -1) {
-        path->push_back(current.cell);
+        full_path.push_back(current.cell);
         current = explored[current.parent];
     }
-    std::reverse(path->begin(), path->end());
+
+    // Since the full_path was formed by backtracking, it is in reverse order
+    // we want to keep it in reverse order because pop_back() is fast
+    // but the full_path might be larger than path->capacity(), so we take a 
+    // tail subslice of the full_path
+
+    const uint32_t full_path_start_index = 
+        full_path.size() > path->capacity()
+            ? full_path.size() - path->capacity()
+            : 0;
+
+    path->clear();
+    for (uint32_t full_path_index = full_path_start_index; full_path_index < full_path.size(); full_path_index++) {
+        path->push_back(full_path[full_path_index]);
+    }
 }
 
 // This returns the hall cell that exiting miners walk toward
@@ -2323,20 +2334,22 @@ ivec2 map_get_ideal_mine_exit_path_rally_cell(const Map& map, ivec2 mine_cell, i
     return map_get_nearest_cell_around_rect(map, CELL_LAYER_GROUND, mine_cell + ivec2(1, 1), 1, hall_cell, 4, MAP_OPTION_IGNORE_MINERS);
 }
 
-void map_get_ideal_mine_exit_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, std::vector<ivec2>* path) {
+void map_get_ideal_mine_exit_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, MapPath* path) {
     ZoneScoped;
 
     ivec2 rally_cell = map_get_ideal_mine_exit_path_rally_cell(map, mine_cell, hall_cell);
     ivec2 mine_exit_cell = map_get_exit_cell(map, CELL_LAYER_GROUND, mine_cell, 3, 1, rally_cell, MAP_OPTION_IGNORE_MINERS);
 
-    path->clear();
     if (mine_exit_cell.x == -1) {
         log_warn("map_get_ideal_mine_exit_path: no exit cell found when pathing from from <%i, %i> to <%i, %i>", mine_cell.x, mine_cell.y, hall_cell.x, hall_cell.y);
+        path->clear();
         return;
     }
 
-    map_pathfind(map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, path, MAP_OPTION_IGNORE_MINERS | MAP_OPTION_NO_REGION_PATH, NULL);
-    path->push_back(mine_exit_cell);
+    map_pathfind(map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, MAP_OPTION_IGNORE_MINERS | MAP_OPTION_NO_REGION_PATH, NULL, path);
+    if (path->size() < path->capacity()) {
+        path->push_back(mine_exit_cell);
+    }
 }
 
 ivec2 map_get_ideal_mine_entrance_cell(const Map& map, ivec2 mine_cell, ivec2 hall_cell) {
@@ -2345,13 +2358,14 @@ ivec2 map_get_ideal_mine_entrance_cell(const Map& map, ivec2 mine_cell, ivec2 ha
     return map_get_nearest_cell_around_rect(map, CELL_LAYER_GROUND, start_cell, 1, mine_cell, 3, MAP_OPTION_IGNORE_MINERS, mine_exit_cell);
 }
 
-void map_get_ideal_mine_entrance_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, std::vector<ivec2>* path) {
+void map_get_ideal_mine_entrance_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, MapPath* path) {
     ZoneScoped;
 
-    std::vector<ivec2> mine_exit_path;
+    MapPath mine_exit_path;
     map_get_ideal_mine_exit_path(map, mine_cell, hall_cell, &mine_exit_path);
 
     if (mine_exit_path.empty()) {
+        path->clear();
         return;
     }
 
@@ -2359,5 +2373,5 @@ void map_get_ideal_mine_entrance_path(const Map& map, ivec2 mine_cell, ivec2 hal
     ivec2 mine_exit_cell = map_get_exit_cell(map, CELL_LAYER_GROUND, mine_cell, 3, 1, start_cell, MAP_OPTION_IGNORE_MINERS);
     ivec2 mine_entrance_cell = map_get_nearest_cell_around_rect(map, CELL_LAYER_GROUND, start_cell, 1, mine_cell, 3, MAP_OPTION_IGNORE_MINERS, mine_exit_cell);
 
-    map_pathfind(map, CELL_LAYER_GROUND, start_cell, mine_entrance_cell, 1, path, MAP_OPTION_IGNORE_MINERS | MAP_OPTION_NO_REGION_PATH, &mine_exit_path);
+    map_pathfind(map, CELL_LAYER_GROUND, start_cell, mine_entrance_cell, 1, MAP_OPTION_IGNORE_MINERS | MAP_OPTION_NO_REGION_PATH, &mine_exit_path, path);
 }

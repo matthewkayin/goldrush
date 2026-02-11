@@ -1435,7 +1435,7 @@ ivec2 bot_find_hall_location(const MatchState* state, const Bot& bot) {
                 }
             }
 
-            std::vector<ivec2> path;
+            MapPath path;
             map_get_ideal_mine_exit_path(state->map, goldmine.cell, hall_cell, &path);
             hall_score += path.size();
             hall_score += Rect::euclidean_distance_squared_between(hall_rect, goldmine_rect);
@@ -1559,13 +1559,13 @@ ivec2 bot_find_bunker_location(const MatchState* state, const Bot& bot, uint32_t
     }
 
     const Entity& nearest_enemy_building = state->entities.get_by_id(nearest_enemy_building_id);
-    std::vector<ivec2> path;
     ivec2 path_start_cell = map_get_exit_cell(state->map, CELL_LAYER_GROUND, nearby_hall_cell, entity_get_data(ENTITY_HALL).cell_size, 1, nearest_enemy_building.cell, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS);
     ivec2 path_end_cell = map_get_nearest_cell_around_rect(state->map, CELL_LAYER_GROUND, path_start_cell, 1, nearest_enemy_building.cell, entity_get_data(nearest_enemy_building.type).cell_size, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS);
     if (path_start_cell.x == -1 || path_end_cell.x == -1) {
         return bot_find_building_location(state, nearby_hall_cell, entity_get_data(ENTITY_BUNKER).cell_size);
     }
-    map_pathfind(state->map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS);
+    MapPath path;
+    map_pathfind(state->map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS, NULL, &path);
 
     if (path.empty()) {
         return bot_find_building_location(state, nearby_hall_cell, entity_get_data(ENTITY_BUNKER).cell_size);
@@ -1574,12 +1574,12 @@ ivec2 bot_find_bunker_location(const MatchState* state, const Bot& bot, uint32_t
     ivec2 search_start_cell = path_start_cell;
     uint32_t path_index = 0;
     while (path_index < path.size() &&
-            ivec2::manhattan_distance(path[path_index], path_start_cell) < 17 &&
-            map_get_tile(state->map, path[path_index]).elevation == map_get_tile(state->map, path_start_cell).elevation) {
+            ivec2::manhattan_distance(path.get_from_top(path_index), path_start_cell) < 17 &&
+            map_get_tile(state->map, path.get_from_top(path_index)).elevation == map_get_tile(state->map, path_start_cell).elevation) {
         path_index++;
     }
     if (path_index > 1 && path_index < path.size() && path_index < path.size()) {
-        search_start_cell = path[path_index - 1];
+        search_start_cell = path.get_from_top(path_index - 1);
     }
 
     return bot_find_building_location(state, search_start_cell, entity_get_data(ENTITY_BUNKER).cell_size);
@@ -2495,15 +2495,15 @@ MatchInput bot_squad_move_carrier_toward_en_route_infantry(const MatchState* sta
     }
 
     // Long pathing might be a performance issue here
-    std::vector<ivec2> path_to_infantry_center;
-    map_pathfind(state->map, CELL_LAYER_GROUND, carrier.cell, en_route_infantry_center, 2, &path_to_infantry_center, MAP_OPTION_IGNORE_UNITS, NULL);
+    MapPath path_to_infantry_center;
+    map_pathfind(state->map, CELL_LAYER_GROUND, carrier.cell, en_route_infantry_center, 2, MAP_OPTION_IGNORE_UNITS, NULL, &path_to_infantry_center);
 
     // If the path is small, then don't bother moving
     if (path_to_infantry_center.size() < BOT_NEAR_DISTANCE) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
-    ivec2 path_midpoint = path_to_infantry_center[path_to_infantry_center.size() / 2];
+    ivec2 path_midpoint = path_to_infantry_center.get_from_top(path_to_infantry_center.size() / 2);
 
     // If the carrier is already walking close to the path midpoint, then don't bother moving
     if (ivec2::manhattan_distance(carrier_cell, path_midpoint) < BOT_NEAR_DISTANCE) {
@@ -3007,17 +3007,17 @@ ivec2 bot_squad_get_defend_target_cell(const MatchState* state, const Bot& bot, 
     }
     ivec2 nearest_enemy_base_cell = state->entities.get_by_id(bot.goldmine_ids[nearest_enemy_base_goldmine_id_index]).cell;
 
-    std::vector<ivec2> path;
     ivec2 path_start_cell = map_get_exit_cell(state->map, CELL_LAYER_GROUND, least_defended_base_cell, 3, 1, nearest_enemy_base_cell, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS);
     ivec2 path_end_cell = map_get_nearest_cell_around_rect(state->map, CELL_LAYER_GROUND, path_start_cell, 1, nearest_enemy_base_cell, 3, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS);
-    map_pathfind(state->map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS);
+    MapPath path;
+    map_pathfind(state->map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS, NULL, &path);
 
     if (path.empty()) {
         log_warn("BOT %u squad_get_defend_target_cell, path empty.", bot.player_id);
         return ivec2(-1, -1);
     }
 
-    return path[std::min((int)path.size() - 1, 7)];
+    return path.get_from_top(std::min(path.size() - 1U, 7U));
 }
 
 MatchInput bot_squad_landmines_micro(const MatchState* state, Bot& bot, const BotSquad& squad, uint32_t match_timer) {
@@ -3122,8 +3122,8 @@ MatchInput bot_squad_landmines_micro(const MatchState* state, Bot& bot, const Bo
     const Entity& nearest_enemy_base_goldmine = state->entities.get_by_id(bot.goldmine_ids[nearest_enemy_base_goldmine_id_index]);
     ivec2 path_start_cell = map_get_exit_cell(state->map, CELL_LAYER_GROUND, nearest_base_goldmine.cell, 3, 1, nearest_enemy_base_goldmine.cell, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS);
     ivec2 path_end_cell = map_get_nearest_cell_around_rect(state->map, CELL_LAYER_GROUND, path_start_cell, 1, nearest_enemy_base_goldmine.cell, 4, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS);
-    std::vector<ivec2> path;
-    map_pathfind(state->map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_OPTION_AVOID_LANDMINES);
+    MapPath path;
+    map_pathfind(state->map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, MAP_OPTION_AVOID_LANDMINES, NULL, &path);
 
     if (path.size() < BOT_NEAR_DISTANCE) {
         bot.next_landmine_time = match_timer + (UPDATES_PER_SECOND * 60U);
@@ -3131,7 +3131,7 @@ MatchInput bot_squad_landmines_micro(const MatchState* state, Bot& bot, const Bo
     }
 
     // Check if landmine cell is safe
-    ivec2 landmine_cell = path[BOT_NEAR_DISTANCE - 1];
+    ivec2 landmine_cell = path.get_from_top(BOT_NEAR_DISTANCE - 1);
     EntityId nearby_enemy_id = match_find_entity(state, [&state, &bot, &landmine_cell](const Entity& entity, EntityId /*entity_id*/) {
         return state->players[entity.player_id].team != state->players[bot.player_id].team &&
             entity_is_selectable(entity) && 
@@ -4268,8 +4268,8 @@ MatchInput bot_unit_flee(const MatchState* state, const Bot& bot, EntityId entit
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
-    std::vector<ivec2> path_from_hall;
-    map_pathfind(state->map, CELL_LAYER_GROUND, target_cell, entity.cell, entity_size, &path_from_hall, MAP_OPTION_IGNORE_UNITS);
+    MapPath path_from_hall;
+    map_pathfind(state->map, CELL_LAYER_GROUND, target_cell, entity.cell, entity_size, MAP_OPTION_IGNORE_UNITS, NULL, &path_from_hall);
 
     if (path_from_hall.empty()) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
@@ -4278,7 +4278,7 @@ MatchInput bot_unit_flee(const MatchState* state, const Bot& bot, EntityId entit
     MatchInput input;
     input.type = MATCH_INPUT_MOVE_CELL;
     input.move.shift_command = 0;
-    input.move.target_cell = path_from_hall[std::min((int)path_from_hall.size() - 1, FLEE_DISTANCE)];
+    input.move.target_cell = path_from_hall.get_from_top(std::min(path_from_hall.size() - 1U, (uint32_t)FLEE_DISTANCE));
     input.move.target_id = ID_NULL;
     input.move.entity_ids[0] = entity_id;
     input.move.entity_count = 1;

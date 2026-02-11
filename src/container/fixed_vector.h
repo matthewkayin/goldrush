@@ -3,10 +3,10 @@
 #include "core/asserts.h"
 #include <cstdint>
 
-template <typename T, uint32_t capacity>
+template <typename T, uint32_t _capacity>
 class FixedVector {
 private:
-    T data[capacity];
+    T data[_capacity];
     uint32_t _size;
 public:
     FixedVector() {
@@ -22,12 +22,26 @@ public:
         return data[index];
     }
 
+    const T& back() const {
+        GOLD_ASSERT(_size != 0);
+        return data[_size - 1];
+    }
+
+    const T& get_from_top(uint32_t index) {
+        GOLD_ASSERT(index < _size);
+        return data[_size - 1 - index];
+    }
+
     uint32_t size() const {
         return _size;
     }
 
+    uint32_t capacity() const {
+        return _capacity;
+    }
+
     void push_back(T value) {
-        GOLD_ASSERT(_size < capacity);
+        GOLD_ASSERT(_size < _capacity);
         data[_size] = value;
         _size++;
     }
@@ -61,5 +75,9 @@ public:
 
     bool empty() const {
         return _size == 0;
+    }
+
+    bool is_full() const {
+        return _size == _capacity;
     }
 };
