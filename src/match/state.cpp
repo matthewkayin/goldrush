@@ -782,7 +782,7 @@ void match_update(MatchState* state) {
             state->fog_reveals[index].timer--;
             if (state->fog_reveals[index].timer == 0) {
                 match_fog_update(state, state->fog_reveals[index].team, state->fog_reveals[index].cell, state->fog_reveals[index].cell_size, state->fog_reveals[index].sight, false, CELL_LAYER_GROUND, false);
-                state->fog_reveals.erase(state->fog_reveals.begin() + index);
+                state->fog_reveals.remove_at_unordered(index);
             } else {
                 index++;
             }
@@ -1199,7 +1199,7 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                 (!entity_is_building(entity.type) && 
                     !match_player_has_entities(state, entity.player_id)))) {
             state->players[entity.player_id].active = false;
-            state->events.push_back((MatchEvent) {
+            state->events.push((MatchEvent) {
                 .type = MATCH_EVENT_PLAYER_DEFEATED,
                 .player_defeated = (MatchEventPlayerDefeated) {
                     .player_id = entity.player_id
@@ -1592,7 +1592,7 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                                 entity.mode = MODE_UNIT_BUILD;
                                 entity.timer = UNIT_BUILD_TICK_DURATION;
 
-                                state->events.push_back((MatchEvent) {
+                                state->events.push((MatchEvent) {
                                     .type = MATCH_EVENT_SELECTION_HANDOFF,
                                     .selection_handoff = (MatchEventSelectionHandoff) {
                                         .player_id = entity.player_id,
@@ -2113,7 +2113,7 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                         match_grant_player_upgrade(state, entity.player_id, entity.queue[0].upgrade);
 
                         // Show status
-                        state->events.push_back((MatchEvent) {
+                        state->events.push((MatchEvent) {
                             .type = MATCH_EVENT_RESEARCH_COMPLETE,
                             .research_complete = (MatchEventResearchComplete) {
                                 .upgrade = entity.queue[0].upgrade,
@@ -3617,7 +3617,7 @@ uint32_t building_queue_population_cost(const BuildingQueueItem& item) {
 // EVENTS
 
 void match_event_play_sound(MatchState* state, SoundName sound, ivec2 position) {
-    state->events.push_back((MatchEvent) {
+    state->events.push((MatchEvent) {
         .type = MATCH_EVENT_SOUND,
         .sound = (MatchEventSound) {
             .position = position,
@@ -3627,7 +3627,7 @@ void match_event_play_sound(MatchState* state, SoundName sound, ivec2 position) 
 }
 
 void match_event_alert(MatchState* state, MatchAlertType type, uint8_t player_id, ivec2 cell, int cell_size) {
-    state->events.push_back((MatchEvent) {
+    state->events.push((MatchEvent) {
         .type = MATCH_EVENT_ALERT,
         .alert = (MatchEventAlert) {
             .type = type,
@@ -3639,7 +3639,7 @@ void match_event_alert(MatchState* state, MatchAlertType type, uint8_t player_id
 }
 
 void match_event_show_status(MatchState* state, uint8_t player_id, const char* message) {
-    state->events.push_back((MatchEvent) {
+    state->events.push((MatchEvent) {
         .type = MATCH_EVENT_STATUS,
         .status = (MatchEventStatus) {
             .player_id = player_id,

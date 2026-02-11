@@ -40,6 +40,8 @@
 #define MATCH_MAX_PARTICLES 256U
 #define MATCH_MAX_PROJECTILES 32U
 #define MATCH_MAX_FIRES 256U
+#define MATCH_MAX_FOG_REVEALS 32U
+#define MATCH_MAX_EVENTS 32U
 
 #define MOLOTOV_ENERGY_COST 40
 #define CAMO_ENERGY_COST 30
@@ -349,9 +351,9 @@ struct MatchState {
     CircularVector<Projectile, MATCH_MAX_PROJECTILES> projectiles;
     CircularVector<Fire, MATCH_MAX_FIRES> fires;
     int fire_cells[MAP_SIZE_MAX * MAP_SIZE_MAX];
-    std::vector<FogReveal> fog_reveals;
+    CircularVector<FogReveal, MATCH_MAX_FOG_REVEALS> fog_reveals;
     MatchPlayer players[MAX_PLAYERS];
-    std::vector<MatchEvent> events;
+    FixedQueue<MatchEvent, MATCH_MAX_EVENTS> events;
 };
 
 struct MatchFindBestEntityParams {

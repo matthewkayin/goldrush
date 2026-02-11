@@ -28,6 +28,10 @@ public:
         return data[wrap_index(index)];
     }
 
+    const T& front() const {
+        return data[0];
+    }
+
     uint32_t size() const {
         return _size;
     }

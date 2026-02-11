@@ -1081,7 +1081,9 @@ void match_shell_update(MatchShellState* state) {
     }
 
     // Match events
-    for (const MatchEvent& event : state->match_state->events) {
+    while (!state->match_state->events.empty()) {
+        const MatchEvent event = state->match_state->events.front();
+        state->match_state->events.pop();
         switch (event.type) {
             case MATCH_EVENT_SOUND: {
                 if (state->sound_cooldown_timers[event.sound.sound] != 0) {
@@ -1244,7 +1246,6 @@ void match_shell_update(MatchShellState* state) {
             }
         }
     }
-    state->match_state->events.clear();
 
     // Scenario script
     if (state->scenario_lua_state != NULL) {
