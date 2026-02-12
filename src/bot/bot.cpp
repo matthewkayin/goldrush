@@ -1054,7 +1054,7 @@ MatchInput bot_saturate_bases(const MatchState* state, Bot& bot) {
                 state->players[bot.player_id].gold >= entity_get_data(ENTITY_MINER).gold_cost &&
                 hall.queue.empty()) {
             if (hall.rally_point.x == -1) {
-                bot.buildings_to_set_rally_points.push(hall_id);
+                bot_queue_set_building_rally_point(bot, hall_id);
             }
 
             MatchInput input;
@@ -1730,7 +1730,7 @@ MatchInput bot_train_unit(const MatchState* state, Bot& bot, EntityType unit_typ
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
-    bot.buildings_to_set_rally_points.push(building_id);
+    bot_queue_set_building_rally_point(bot, building_id);
 
     if (bot.config.macro_cycle_cooldown != 0) {
         bot.macro_cycle_count++;
@@ -3190,6 +3190,9 @@ MatchInput bot_squad_landmines_micro(const MatchState* state, Bot& bot, const Bo
 
 void bot_scout_gather_info(const MatchState* state, Bot& bot) {
     ZoneScoped;
+
+    // Prune entities to scout list
+    bot_prune_entities_assumed_to_be_scouted_list(state, bot);
     
     // Check for scout death
     if (bot.scout_id != ID_NULL) {
@@ -3455,8 +3458,7 @@ MatchInput bot_scout(const MatchState* state, Bot& bot, uint32_t match_timer) {
             if (entity_index == INDEX_INVALID || 
                     !entity_is_selectable(state->entities[entity_index]) ||
                     bot_has_scouted_entity(state, bot, state->entities[entity_index], entity_id)) {
-                bot.entities_to_scout[entities_to_scout_index] = bot.entities_to_scout.back();
-                bot.entities_to_scout.pop_back();
+                bot.entities_to_scout.remove_at_unordered(entities_to_scout_index);
             } else {
                 entities_to_scout_index++;
             }
@@ -3500,8 +3502,8 @@ MatchInput bot_scout(const MatchState* state, Bot& bot, uint32_t match_timer) {
                 },
                 .compare = match_compare_closest_manhattan_distance_to(attacker.cell)
             });
-            if (bot_is_entity_in_entities_to_scout_list(bot, hall_nearest_to_attacker_id)) {
-                bot.is_entity_assumed_to_be_scouted[hall_nearest_to_attacker_id] = true;
+            if (bot.entities_to_scout.contains(hall_nearest_to_attacker_id)) {
+                bot_assume_entity_is_scouted(bot, hall_nearest_to_attacker_id);
             }
 
             // Check if close to a goldmine
@@ -3512,8 +3514,8 @@ MatchInput bot_scout(const MatchState* state, Bot& bot, uint32_t match_timer) {
                 },
                 .compare = match_compare_closest_manhattan_distance_to(attacker.cell)
             });
-            if (bot_is_entity_in_entities_to_scout_list(bot, goldmine_nearest_to_attacker_id)) {
-                bot.is_entity_assumed_to_be_scouted[goldmine_nearest_to_attacker_id] = true;
+            if (bot.entities_to_scout.contains(goldmine_nearest_to_attacker_id)) {
+                bot_assume_entity_is_scouted(bot, goldmine_nearest_to_attacker_id);
             }
 
             // Remove any to-scouted entities that are close to the attacker
@@ -3524,8 +3526,7 @@ MatchInput bot_scout(const MatchState* state, Bot& bot, uint32_t match_timer) {
                 const Entity& to_scout = state->entities.get_by_id(to_scout_id);
                 if (scout.target.id == to_scout_id || 
                         ivec2::manhattan_distance(to_scout.cell, attacker.cell) < BOT_NEAR_DISTANCE) {
-                    bot.entities_to_scout[index] = bot.entities_to_scout.back();
-                    bot.entities_to_scout.pop_back();
+                    bot.entities_to_scout.remove_at_unordered(index);
                 } else {
                     index++;
                 }
@@ -3552,8 +3553,10 @@ MatchInput bot_scout(const MatchState* state, Bot& bot, uint32_t match_timer) {
     // Determine closest entity to scout
     uint32_t closest_unscouted_entity_index = INDEX_INVALID;
     int closest_unscouted_entity_distance;
-    for (EntityId entity_id : bot.entities_to_scout) {
+    for (uint32_t entities_to_scout_index = 0; entities_to_scout_index < bot.entities_to_scout.size(); entities_to_scout_index++) {
+        EntityId entity_id = bot.entities_to_scout[entities_to_scout_index];
         uint32_t entity_index = state->entities.get_index_of(entity_id);
+
         int entity_distance = ivec2::manhattan_distance(state->entities[entity_index].cell, scout.cell);
         if (closest_unscouted_entity_index == INDEX_INVALID || 
                 (entity_distance < closest_unscouted_entity_distance && std::abs(entity_distance - closest_unscouted_entity_distance) > BOT_NEAR_DISTANCE)) {
@@ -3581,8 +3584,8 @@ MatchInput bot_scout(const MatchState* state, Bot& bot, uint32_t match_timer) {
     return (MatchInput) { .type = MATCH_INPUT_NONE };
 }
 
-std::vector<EntityId> bot_determine_entities_to_scout(const MatchState* state, const Bot& bot) {
-    return match_find_entities(state, [&state, &bot](const Entity& entity, EntityId entity_id) {
+FixedVector<EntityId, BOT_MAX_ENTITIES_TO_SCOUT> bot_determine_entities_to_scout(const MatchState* state, const Bot& bot) {
+    std::vector<EntityId> entities_to_scout_full = match_find_entities(state, [&state, &bot](const Entity& entity, EntityId entity_id) {
         // Filter down to halls, workshops, and sheriff's offices
         if (!(entity.type == ENTITY_GOLDMINE ||
                 entity.type == ENTITY_HALL ||
@@ -3598,16 +3601,41 @@ std::vector<EntityId> bot_determine_entities_to_scout(const MatchState* state, c
 
         return true;
     });
-}
-
-bool bot_is_entity_in_entities_to_scout_list(const Bot& bot, EntityId entity_id) {
-    for (EntityId to_scout_id : bot.entities_to_scout) {
-        if (entity_id == to_scout_id) {
-            return true;
-        }
+    if (entities_to_scout_full.size() > BOT_MAX_ENTITIES_TO_SCOUT) {
+        log_warn("BOT %u entities_to_scout is greater than capacity. Size: %u", bot.player_id, entities_to_scout_full.size());
     }
 
-    return false;
+    // Start with goldmines
+    FixedVector<EntityId, BOT_MAX_ENTITIES_TO_SCOUT> entities_to_scout;
+    while (!entities_to_scout_full.empty() && !entities_to_scout.is_full()) {
+        entities_to_scout.push_back(entities_to_scout_full.back());
+        entities_to_scout_full.pop_back();
+    }
+
+    return entities_to_scout;
+}
+
+void bot_assume_entity_is_scouted(Bot& bot, EntityId entity_id) {
+    if (bot.entities_assumed_to_be_scouted.is_full()) {
+        log_warn("BOT %u could not assume that entity %u was scouted because entities_assumed_to_be_scouted is full.", bot.player_id, entity_id);
+        return;
+    }
+    bot.entities_assumed_to_be_scouted.push_back(entity_id);
+    log_debug("BOT %u assumes entity %u is scouted.", bot.player_id, entity_id);
+}
+
+void bot_prune_entities_assumed_to_be_scouted_list(const MatchState* state, Bot& bot) {
+    uint32_t index = 0;
+    while (index < bot.entities_assumed_to_be_scouted.size()) {
+        EntityId entity_id = bot.entities_assumed_to_be_scouted[index];
+        uint32_t entity_index = state->entities.get_index_of(entity_id);
+        if (entity_index == INDEX_INVALID || bot_has_scouted_entity(state, bot, state->entities[entity_index], entity_id, false)) {
+            log_debug("BOT %u no longer needs to assume entity %u is scouted. Entity index %u", bot.player_id, entity_id, entity_index);
+            bot.entities_assumed_to_be_scouted.remove_at_unordered(index);
+        } else {
+            index++;
+        }
+    }
 }
 
 bool bot_release_scout(const MatchState* state, Bot& bot) {
@@ -4200,7 +4228,7 @@ int bot_score_entity_list(const MatchState* state, const Bot& bot, const std::ve
 
 // UTIL
 
-bool bot_has_scouted_entity(const MatchState* state, const Bot& bot, const Entity& entity, EntityId entity_id) {
+bool bot_has_scouted_entity(const MatchState* state, const Bot& bot, const Entity& entity, EntityId entity_id, bool allow_assumed_scouts) {
     int entity_cell_size = entity_get_data(entity.type).cell_size;
     uint32_t bot_team = state->players[bot.player_id].team;
     // If fog is revealed, then they can see it
@@ -4212,7 +4240,7 @@ bool bot_has_scouted_entity(const MatchState* state, const Bot& bot, const Entit
             match_team_remembers_entity(state, state->players[bot.player_id].team, entity_id)) {
         return true;
     }
-    if (bot.is_entity_assumed_to_be_scouted.find(entity_id) != bot.is_entity_assumed_to_be_scouted.end()) {
+    if (allow_assumed_scouts && bot.entities_assumed_to_be_scouted.contains(entity_id)) {
         return true;
     }
     // Otherwise, they have not scouted it
@@ -4439,4 +4467,22 @@ bool bot_is_area_safe(const MatchState* state, const Bot& bot, ivec2 cell) {
     });
 
     return nearby_enemy_id == ID_NULL;
+}
+
+void bot_queue_set_building_rally_point(Bot& bot, EntityId building_id) {
+    // Don't queue a building that is already queued
+    for (uint32_t queue_index = 0; queue_index < bot.buildings_to_set_rally_points.size(); queue_index++) {
+        if (bot.buildings_to_set_rally_points[queue_index] == building_id) {
+            log_warn("BOT %u queue_set_building_rally_point, building_id %u is already in queue.", bot.player_id, building_id);
+            return;
+        }
+    }
+
+    // Don't enqueue if the queue is full
+    if (bot.buildings_to_set_rally_points.is_full()) {
+        log_warn("BOT %u queue_set_building_rally_point, building_id %u, queue is full.", bot.player_id, building_id);
+        return;
+    }
+
+    bot.buildings_to_set_rally_points.push(building_id);
 }

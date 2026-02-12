@@ -10,6 +10,9 @@
 #include <queue>
 
 #define BOT_MAX_RESERVATION_REQUESTS 128
+#define BOT_MAX_RALLY_REQUESTS 16
+#define BOT_MAX_ENTITIES_TO_SCOUT 32
+#define BOT_MAX_ENTITIES_ASSUMED_TO_BE_SCOUTED 32
 
 const int BOT_SQUAD_ID_NULL = -1;
 
@@ -79,7 +82,7 @@ struct Bot {
     EntityCount desired_buildings;
     EntityCount desired_army_ratio;
     std::vector<BotDesiredSquad> desired_squads;
-    std::queue<EntityId> buildings_to_set_rally_points;
+    FixedQueue<EntityId, BOT_MAX_RALLY_REQUESTS> buildings_to_set_rally_points;
     uint32_t macro_cycle_timer;
     uint32_t macro_cycle_count;
 
@@ -92,8 +95,8 @@ struct Bot {
     EntityId scout_id;
     uint32_t scout_info;
     uint32_t last_scout_time;
-    std::vector<EntityId> entities_to_scout;
-    std::unordered_map<EntityId, bool> is_entity_assumed_to_be_scouted;
+    FixedVector<EntityId, BOT_MAX_ENTITIES_TO_SCOUT> entities_to_scout;
+    FixedVector<EntityId, BOT_MAX_ENTITIES_ASSUMED_TO_BE_SCOUTED> entities_assumed_to_be_scouted;
 
     // Base info
     std::vector<EntityId> goldmine_ids;
@@ -210,8 +213,9 @@ void bot_scout_gather_info(const MatchState* state, Bot& bot);
 BotBaseInfo bot_base_info_empty();
 void bot_update_base_info(const MatchState* state, Bot& bot);
 MatchInput bot_scout(const MatchState* state, Bot& bot, uint32_t match_timer);
-std::vector<EntityId> bot_determine_entities_to_scout(const MatchState* state, const Bot& bot);
-bool bot_is_entity_in_entities_to_scout_list(const Bot& bot, EntityId entity_id);
+FixedVector<EntityId, BOT_MAX_ENTITIES_TO_SCOUT> bot_determine_entities_to_scout(const MatchState* state, const Bot& bot);
+void bot_assume_entity_is_scouted(Bot& bot, EntityId entity_id);
+void bot_prune_entities_assumed_to_be_scouted_list(const MatchState* state, Bot& bot);
 bool bot_release_scout(const MatchState* state, Bot& bot);
 bool bot_should_scout(const Bot& bot, uint32_t match_timer);
 
@@ -257,7 +261,7 @@ int bot_score_entity_list(const MatchState* state, const Bot& bot, const std::ve
 
 // Util
 
-bool bot_has_scouted_entity(const MatchState* state, const Bot& bot, const Entity& entity, EntityId entity_id);
+bool bot_has_scouted_entity(const MatchState* state, const Bot& bot, const Entity& entity, EntityId entity_id, bool allow_assumed_scouts = true);
 EntityId bot_find_hall_surrounding_goldmine(const MatchState* state, const Bot& bot, const Entity& goldmine);
 bool bot_does_entity_surround_goldmine(const Entity& entity, ivec2 goldmine_cell);
 MatchInput bot_return_entity_to_nearest_hall(const MatchState* state, const Bot& bot, EntityId entity_id);
@@ -268,3 +272,4 @@ bool bot_has_squad_of_type(const Bot& bot, BotSquadType type);
 bool bot_has_desired_squad_of_type(const Bot& bot, BotSquadType type);
 bool bot_is_bandit_rushing(const Bot& bot);
 bool bot_is_area_safe(const MatchState* state, const Bot& bot, ivec2 cell);
+void bot_queue_set_building_rally_point(Bot& bot, EntityId building_id);

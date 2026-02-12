@@ -80,4 +80,14 @@ public:
     bool is_full() const {
         return _size == _capacity;
     }
+
+    bool contains(T value) const {
+        for (uint32_t index = 0; index < _size; index++) {
+            if (data[index] == value) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 };
