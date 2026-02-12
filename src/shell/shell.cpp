@@ -376,7 +376,7 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
             }
 
             ivec2 squad_average_position = ivec2(0, 0);
-            std::vector<EntityId> squad_entity_list;
+            EntityList squad_entity_list;
             for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entity_count; squad_entity_index++) {
                 uint32_t entity_index = squad.entities[squad_entity_index];
 
@@ -398,7 +398,7 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
                 .patrol_cell = squad.type == BOT_SQUAD_TYPE_PATROL
                     ? squad.patrol_cell
                     : ivec2(-1, -1),
-                .entities = squad_entity_list
+                .entity_list = squad_entity_list
             });
         }
     }
@@ -802,7 +802,7 @@ void match_shell_update(MatchShellState* state) {
     }
 
     // Idle miner hotkey
-    const std::vector<EntityId> idle_miners = match_shell_find_idle_miners(state);
+    const EntityList idle_miners = match_shell_find_idle_miners(state);
     if (!state->replay_mode && 
             match_shell_is_camera_free(state) &&
             !match_shell_is_selecting(state) && 
@@ -2140,7 +2140,7 @@ void match_shell_order_move(MatchShellState* state) {
     }
 }
 
-std::vector<EntityId> match_shell_find_idle_miners(const MatchShellState* state) {
+EntityList match_shell_find_idle_miners(const MatchShellState* state) {
     return match_find_entities(state->match_state, [](const Entity& entity, EntityId /*miner_id*/) {
         return entity_is_idle_miner(entity) && entity.player_id == network_get_player_id();
     });
@@ -3835,7 +3835,7 @@ void match_shell_render(const MatchShellState* state) {
 
         // Idle miner
         if (!state->replay_mode) {
-            const std::vector<EntityId> idle_miners = match_shell_find_idle_miners(state);
+            const EntityList idle_miners = match_shell_find_idle_miners(state);
             if (!idle_miners.empty()) {
                 const Rect idle_miner_button_rect = match_shell_get_idle_miner_button_rect();
                 const bool is_hovered = idle_miner_button_rect.has_point(input_get_mouse_position());

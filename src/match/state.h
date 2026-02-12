@@ -51,6 +51,8 @@
 #define BUILDING_QUEUE_SIZE 5
 #define TARGET_QUEUE_CAPACITY 32
 
+using EntityList = FixedVector<EntityId, MATCH_MAX_POPULATION>;
+
 const int FOG_HIDDEN = -1;
 const int FOG_EXPLORED = 0;
 
@@ -378,7 +380,7 @@ void match_update(MatchState* state);
 EntityId match_find_entity(const MatchState* state, std::function<bool(const Entity& entity, EntityId entity_id)> filter);
 EntityId match_find_best_entity(const MatchState* state, const MatchFindBestEntityParams& params);
 std::function<bool(const Entity& a, const Entity& b)> match_compare_closest_manhattan_distance_to(ivec2 cell);
-std::vector<EntityId> match_find_entities(const MatchState* state, std::function<bool(const Entity& entity, EntityId entity_id)> filter);
+EntityList match_find_entities(const MatchState* state, std::function<bool(const Entity& entity, EntityId entity_id)> filter);
 EntityId match_get_nearest_builder(const MatchState* state, const std::vector<EntityId>& builders, ivec2 cell);
 
 bool match_is_target_invalid(const MatchState* state, const Target& target, uint8_t player_id);

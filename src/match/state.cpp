@@ -887,16 +887,21 @@ std::function<bool(const Entity& a, const Entity& b)> match_compare_closest_manh
     };
 }
 
-std::vector<EntityId> match_find_entities(const MatchState* state, std::function<bool(const Entity& entity, EntityId entity_id)> filter) {
-    std::vector<EntityId> entity_list;
+EntityList match_find_entities(const MatchState* state, std::function<bool(const Entity& entity, EntityId entity_id)> filter) {
+    EntityList entity_list;
 
     for (uint32_t entity_index = 0; entity_index < state->entities.size(); entity_index++) {
         const Entity& entity = state->entities[entity_index];
         EntityId entity_id = state->entities.get_id_of(entity_index);
 
-        if (filter(entity, entity_id)) {
-            entity_list.push_back(entity_id);
+        if (!filter(entity, entity_id)) {
+            continue;
         }
+        if (entity_list.is_full()) {
+            log_warn("match_find_entities, entity_list is full.");
+            break;
+        }
+        entity_list.push_back(entity_id);
     }
 
     return entity_list;

@@ -249,7 +249,7 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
 void match_shell_update(MatchShellState* state);
 void match_shell_handle_input(MatchShellState* state);
 void match_shell_order_move(MatchShellState* state);
-std::vector<EntityId> match_shell_find_idle_miners(const MatchShellState* state);
+EntityList match_shell_find_idle_miners(const MatchShellState* state);
 bool match_shell_does_player_meet_hotkey_requirements(const MatchState* state, InputAction hotkey);
 bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyButtonInfo& info);
 uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type);

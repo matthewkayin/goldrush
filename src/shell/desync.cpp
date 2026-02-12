@@ -37,7 +37,7 @@ STATIC_ASSERT(sizeof(BotUnitComp) == 4ULL);
 STATIC_ASSERT(sizeof(EntityCount) == 88ULL);
 STATIC_ASSERT(sizeof(BotSquadType) == 4ULL);
 STATIC_ASSERT(sizeof(BotDesiredSquad) == 92ULL);
-STATIC_ASSERT(sizeof(BotBaseInfo) == 12ULL);
+STATIC_ASSERT(sizeof(BotBaseInfo) == 228ULL);
 
 #ifdef GOLD_DEBUG
 

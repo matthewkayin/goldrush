@@ -1680,18 +1680,27 @@ static int script_bot_add_squad(lua_State* lua_state) {
     lua_pop(lua_state, 1);
 
     // Entities
-    lua_getfield(lua_state, 1, "entities");
-    script_validate_type(lua_state, -1, "entities", LUA_TTABLE);
+    lua_getfield(lua_state, 1, "entity_list");
+    script_validate_type(lua_state, -1, "entity_list", LUA_TTABLE);
 
-    std::vector<EntityId> entities;
+    EntityList entity_list;
     lua_pushnil(lua_state);
     while (lua_next(lua_state, -2)) {
         script_validate_type(lua_state, -1, "entities.element", LUA_TNUMBER);
         EntityId entity_id = (EntityId)lua_tonumber(lua_state, -1);
         if (entity_id == ID_NULL) {
             log_warn("bot_add_squad: provided entity_id is ID_NULL.");
+            lua_pop(lua_state, 1);
+            continue;
+        } 
+        
+        if (entity_list.is_full()) {
+            log_warn("bot_add_squad: entity_list is full.");
+            lua_pop(lua_state, 1);
+            break;
         }
-        entities.push_back(entity_id);
+
+        entity_list.push_back(entity_id);
 
         lua_pop(lua_state, 1);
     }
@@ -1701,11 +1710,11 @@ static int script_bot_add_squad(lua_State* lua_state) {
     MatchShellState* state = script_get_match_shell_state(lua_state);
 
     int squad_id = BOT_SQUAD_ID_NULL;
-    if (!entities.empty()) {
+    if (!entity_list.empty()) {
         squad_id = bot_add_squad(state->bots[player_id], {
             .type = (BotSquadType)squad_type,
             .target_cell = target_cell,
-            .entities = entities
+            .entity_list = entity_list
         });
     }
 
@@ -1737,7 +1746,8 @@ static int script_bot_squad_exists(lua_State* lua_state) {
     }
 
     bool result = false;
-    for (const BotSquad& squad : state->bots[player_id].squads) {
+    for (uint32_t squad_index = 0; squad_index < state->bots[player_id].squads.size(); squad_index++) {
+        const BotSquad& squad = state->bots[player_id].squads[squad_index];
         if (squad.id == squad_id) {
             result = true;
             break;
