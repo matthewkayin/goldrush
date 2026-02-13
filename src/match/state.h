@@ -32,7 +32,7 @@
 #define MATCH_UI_STATUS_SMOKE_COOLDOWN "Smoke bomb is on cooldown."
 #define MATCH_UI_STATUS_NOT_ENOUGH_ENERGY "Not enough energy."
 
-#define MATCH_MAX_ENTITIES (200 * MAX_PLAYERS)
+#define MATCH_MAX_ENTITIES (150 * MAX_PLAYERS)
 #define MATCH_MAX_REMEMBERED_ENTITIES 64
 #define ENTITY_UNLOAD_ALL ID_NULL
 #define MATCH_MAX_MINERS_ON_GOLD 8
@@ -162,6 +162,7 @@ struct Entity {
     EntityType type;
     EntityMode mode;
     uint8_t player_id;
+    uint8_t padding[3];
     uint32_t flags;
 
     ivec2 cell;
@@ -341,6 +342,8 @@ struct FogReveal {
 };
 
 struct MatchState {
+    MatchState(int32_t lcg_seed, int map_width, int map_height, MatchPlayer players[MAX_PLAYERS]);
+
     int lcg_seed;
     Map map;
     int fog[MAX_PLAYERS][MAP_SIZE_MAX * MAP_SIZE_MAX];

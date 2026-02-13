@@ -11,15 +11,23 @@ private:
     T data[capacity];
     EntityId ids[capacity];
     uint16_t id_to_index[ID_MAX];
-    uint32_t _size;
+    // id_to_index is not 4-byte aligned and the position of next_id serves as padding
     EntityId next_id;
+    uint32_t _size;
 public:
-    IdArray() {
-        for (uint32_t id = 0; id < ID_MAX; id++) {
-            id_to_index[id] = (uint16_t)INDEX_INVALID;
+    static IdArray init() {
+        IdArray array;
+        memset(array.data, 0, sizeof(array.data));
+        for (uint32_t index = 0; index < capacity; index++) {
+            array.ids[index] = INDEX_INVALID;
         }
-        _size = 0;
-        next_id = 0;
+        for (uint32_t id = 0; id < ID_MAX; id++) {
+            array.id_to_index[id] = (uint16_t)INDEX_INVALID;
+        }
+        array.next_id = 0;
+        array._size = 0;
+
+        return array;
     }
 
     T& operator[](uint32_t index) {

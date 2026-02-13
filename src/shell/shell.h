@@ -254,6 +254,7 @@ bool match_shell_does_player_meet_hotkey_requirements(const MatchState* state, I
 bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyButtonInfo& info);
 uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type);
 uint32_t match_shell_update_displayed_gold_amount(uint32_t current_displayed_value, uint32_t current_actual_value);
+void match_shell_handle_bot_reservation_requests(MatchShellState* state, Bot* bot);
 
 // Script
 bool match_shell_script_init(MatchShellState* state, const Scenario* scenario, const char* script_path);

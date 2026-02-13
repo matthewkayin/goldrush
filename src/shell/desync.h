@@ -17,5 +17,5 @@ void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2);
 
 #endif
 
-uint32_t desync_compute_match_checksum(const MatchState* match_state, const Bot bots[MAX_PLAYERS], uint32_t frame);
+uint32_t desync_compute_match_checksum(const MatchState* match_state, const Bot* bots, uint32_t frame);
 uint32_t desync_get_checksum_frequency();

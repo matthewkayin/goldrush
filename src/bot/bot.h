@@ -74,7 +74,18 @@ struct BotReservationRequest {
 
 struct Bot {
     BotConfig config;
+
+    // Note on padding:
+    // player_id + padding + scout_id = 4 byte aligned
     uint8_t player_id;
+    uint8_t padding;
+
+    // Scouting
+    EntityId scout_id;
+    uint32_t scout_info;
+    uint32_t last_scout_time;
+    EntityList entities_to_scout;
+    FixedVector<EntityId, BOT_MAX_ENTITIES_ASSUMED_TO_BE_SCOUTED> entities_assumed_to_be_scouted;
 
     // Reservations
     FixedQueue<BotReservationRequest, BOT_MAX_RESERVATION_REQUESTS> reservation_requests;
@@ -92,13 +103,6 @@ struct Bot {
     int next_squad_id;
     FixedVector<BotSquad, BOT_MAX_SQUADS> squads;
     uint32_t next_landmine_time;
-
-    // Scouting
-    EntityId scout_id;
-    uint32_t scout_info;
-    uint32_t last_scout_time;
-    EntityList entities_to_scout;
-    FixedVector<EntityId, BOT_MAX_ENTITIES_ASSUMED_TO_BE_SCOUTED> entities_assumed_to_be_scouted;
 
     // Base info
     FixedVector<BotBaseInfo, BOT_MAX_BASE_INFO> base_info;

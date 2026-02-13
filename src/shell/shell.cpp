@@ -835,6 +835,7 @@ void match_shell_update(MatchShellState* state) {
             state->camera_pan_timer == 0) {
         state->select_origin = input_get_mouse_position() + state->camera_offset;
     }
+
     // End selecting
     if (match_shell_is_selecting(state) && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
         ivec2 world_pos = input_get_mouse_position() + state->camera_offset;
@@ -962,11 +963,7 @@ void match_shell_update(MatchShellState* state) {
             if (state->inputs[player_id].empty()) {
                 MatchInput bot_input = bot_get_turn_input(state->match_state, state->bots[player_id], state->match_timer);
                 state->inputs[player_id].push({ bot_input });
-                while (!state->bots[player_id].reservation_requests.empty()) {
-                    BotReservationRequest request = state->bots[player_id].reservation_requests.front();
-                    state->bots[player_id].reservation_requests.pop();
-                    entity_set_flag(state->match_state->entities.get_by_id(request.entity_id), ENTITY_FLAG_IS_RESERVED, request.value);
-                }
+                match_shell_handle_bot_reservation_requests(state, &state->bots[player_id]);
 
                 // Buffer empty inputs. This way the bot can always assume that all its inputs have been applied when deciding on the next one
                 for (uint32_t index = 0; index < TURN_OFFSET - 1; index++) {
@@ -2220,6 +2217,14 @@ uint32_t match_shell_update_displayed_gold_amount(uint32_t current_displayed_val
     }
 }
 
+void match_shell_handle_bot_reservation_requests(MatchShellState* state, Bot* bot) {
+    while (!bot->reservation_requests.empty()) {
+        BotReservationRequest request = bot->reservation_requests.front();
+        bot->reservation_requests.pop();
+        entity_set_flag(state->match_state->entities.get_by_id(request.entity_id), ENTITY_FLAG_IS_RESERVED, request.value);
+    }
+}
+
 // STATE QUERIES
 
 bool match_shell_is_mouse_in_ui() {
@@ -2967,24 +2972,24 @@ void match_shell_compare_checksums(MatchShellState* state, uint32_t frame) {
 #ifdef GOLD_DEBUG
 
 void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t incoming_state_buffer_length) {
-        uint32_t frame;
-        memcpy(&frame, incoming_state_buffer + sizeof(uint8_t), sizeof(frame));
-        log_info("DESYNC Received serialized frame %u with size %llu", frame, incoming_state_buffer_length);
+    uint32_t frame;
+    memcpy(&frame, incoming_state_buffer + sizeof(uint8_t), sizeof(frame));
+    log_info("DESYNC Received serialized frame %u with size %llu", frame, incoming_state_buffer_length);
 
-        size_t state_buffer_length;
-        uint8_t* state_buffer = desync_read_serialized_frame(frame, &state_buffer_length);
-        if (state_buffer == NULL) {
-            log_error("match_shell_handle_serialized_frame could not read serialized frame.");
-            return;
-        }
+    size_t state_buffer_length;
+    uint8_t* state_buffer = desync_read_serialized_frame(frame, &state_buffer_length);
+    if (state_buffer == NULL) {
+        log_error("match_shell_handle_serialized_frame could not read serialized frame.");
+        return;
+    }
 
-        size_t header_size = sizeof(uint8_t) + sizeof(uint32_t);
-        uint32_t checksum = desync_compute_buffer_checksum(state_buffer + header_size, state_buffer_length - header_size);
-        uint32_t checksum2 = desync_compute_buffer_checksum(incoming_state_buffer + header_size, incoming_state_buffer_length - header_size);
-        log_info("DESYNC Comparing serialized / incoming frame %u. size %llu / %llu. checksum %u / %u", frame, state_buffer_length - header_size, incoming_state_buffer_length - header_size, checksum, checksum2);
-        desync_compare_frames(state_buffer + sizeof(uint8_t) + sizeof(uint32_t), incoming_state_buffer + sizeof(uint8_t) + sizeof(uint32_t));
-        free(state_buffer);
-        log_info("DESYNC Finished comparing frames.");
+    size_t header_size = sizeof(uint8_t) + sizeof(uint32_t);
+    uint32_t checksum = desync_compute_buffer_checksum(state_buffer + header_size, state_buffer_length - header_size);
+    uint32_t checksum2 = desync_compute_buffer_checksum(incoming_state_buffer + header_size, incoming_state_buffer_length - header_size);
+    log_info("DESYNC Comparing serialized / incoming frame %u. size %llu / %llu. checksum %u / %u", frame, state_buffer_length - header_size, incoming_state_buffer_length - header_size, checksum, checksum2);
+    desync_compare_frames(state_buffer + sizeof(uint8_t) + sizeof(uint32_t), incoming_state_buffer + sizeof(uint8_t) + sizeof(uint32_t));
+    free(state_buffer);
+    log_info("DESYNC Finished comparing frames.");
 }
 
 #endif

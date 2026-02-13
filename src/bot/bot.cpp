@@ -38,6 +38,7 @@ Bot bot_empty() {
 
     memset(&bot.config, 0, sizeof(bot.config));
     bot.player_id = PLAYER_NONE;
+    bot.padding = 0;
 
     bot.unit_comp = BOT_UNIT_COMP_NONE;
     bot.macro_cycle_timer = 0;

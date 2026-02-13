@@ -44,6 +44,38 @@
             },
         },
         {
+            "name": "player1 desync",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/gold",
+            "args": [
+                "--logfile",
+                "player1.log",
+                "--desync"
+            ],
+            "cwd": "${workspaceFolder}/bin",
+            "windows": {
+                "program": "${workspaceFolder}/bin/gold.exe",
+                "console": "integratedTerminal"
+            },
+        },
+        {
+            "name": "player2 desync",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/gold",
+            "args": [
+                "--logfile",
+                "player2.log",
+                "--desync"
+            ],
+            "cwd": "${workspaceFolder}/bin",
+            "windows": {
+                "program": "${workspaceFolder}/bin/gold.exe",
+                "console": "integratedTerminal"
+            },
+        },
+        {
             "name": "Run Test Host",
             "type": "lldb",
             "request": "launch",
@@ -133,6 +165,11 @@
         {
             "name": "Run 2 instances",
             "configurations": ["player1", "player2"],
+            "stopAll": true
+        },
+        {
+            "name": "Run 2 instances desync",
+            "configurations": ["player1 desync", "player2 desync"],
             "stopAll": true
         },
         {

@@ -105,8 +105,6 @@ struct Map {
     uint8_t region_connection_to_connection_cost[MAP_REGION_CONNECTION_MAX][MAP_REGION_CONNECTION_MAX];
 };
 
-const size_t test = sizeof(Map);
-
 void map_init(Map& map, MapType map_type, int width, int height);
 void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
 void map_init_regions(Map& map);

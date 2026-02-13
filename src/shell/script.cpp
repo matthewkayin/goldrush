@@ -1804,9 +1804,13 @@ static int script_bot_reserve_entity(lua_State* lua_state) {
     script_validate_player_id(lua_state, state, player_id, SCRIPT_VALIDATE_PLAYER_IS_BOT);
 
     EntityId entity_id = (EntityId)lua_tonumber(lua_state, 2);
-    script_validate_entity_id(lua_state, state, entity_id);
+    uint32_t entity_index = script_validate_entity_id(lua_state, state, entity_id);
 
-    bot_reserve_entity(state->bots[player_id], entity_id);
+    if (state->match_state->entities[entity_index].player_id != player_id) {
+        script_error(lua_state, "Bot tried to reserve an entity (%u) that it didn't own.", entity_id);
+    }
+
+    entity_set_flag(state->match_state->entities[entity_index], ENTITY_FLAG_IS_RESERVED, true);
 
     return 0;
 }
@@ -1824,9 +1828,13 @@ static int script_bot_release_entity(lua_State* lua_state) {
     script_validate_player_id(lua_state, state, player_id, SCRIPT_VALIDATE_PLAYER_IS_BOT);
 
     EntityId entity_id = (EntityId)lua_tonumber(lua_state, 2);
-    script_validate_entity_id(lua_state, state, entity_id);
+    uint32_t entity_index = script_validate_entity_id(lua_state, state, entity_id);
 
-    bot_release_entity(state->bots[player_id], entity_id);
+    if (state->match_state->entities[entity_index].player_id != player_id) {
+        script_error(lua_state, "Bot tried to reserve an entity (%u) that it didn't own.", entity_id);
+    }
+
+    entity_set_flag(state->match_state->entities[entity_index], ENTITY_FLAG_IS_RESERVED, false);
 
     return 0;
 }

@@ -29,22 +29,47 @@ static const uint32_t FOG_REVEAL_DURATION = 60;
 static const fixed BLEED_SPEED_PERCENTAGE = fixed::from_int_and_raw_decimal(0, 192);
 static const uint32_t MATCH_LOW_GOLD_THRESHOLD = 1000;
 
+MatchState::MatchState(int32_t param_lcg_seed, int map_width, int map_height, MatchPlayer param_players[MAX_PLAYERS]) {
+    // LCG seed
+    #ifdef GOLD_RAND_SEED
+        lcg_seed = GOLD_RAND_SEED;
+    #endif
+        lcg_seed = lcg_seed;
+    log_info("Set random seed to %i", lcg_seed);
+
+    // Players
+    memcpy(players, param_players, sizeof(players));
+
+    // Fog and detection
+    for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
+        for (int index = 0; index < map_width * map_height; index++) {
+            fog[team][index] = FOG_HIDDEN;
+            detection[team][index] = 0;
+        }
+    }
+
+    memset(remembered_entity_count, 0, sizeof(remembered_entity_count));
+    memset(remembered_entities, 0, sizeof(remembered_entities));
+    memset(fire_cells, 0, sizeof(fire_cells));
+
+    is_fog_dirty = false;
+}
+
 MatchState* match_base_init(int32_t lcg_seed, int map_width, int map_height, MatchPlayer players[MAX_PLAYERS]) {
-    // TODO: malloc and memset
-    MatchState* state = new MatchState();
+    MatchState* state = (MatchState*)malloc(sizeof(MatchState));
+    memset(state, 0, sizeof(state));
+
+    // LCG seed
     #ifdef GOLD_RAND_SEED
         state->lcg_seed = GOLD_RAND_SEED;
     #endif
     state->lcg_seed = lcg_seed;
     log_info("Set random seed to %i", lcg_seed);
 
+    // Players
     memcpy(state->players, players, sizeof(state->players));
 
-    memset(state->remembered_entity_count, 0, sizeof(state->remembered_entity_count));
-    memset(state->remembered_entities, 0, sizeof(state->remembered_entities));
-    memset(state->fire_cells, 0, sizeof(state->fire_cells));
-
-    // Init fog and detection for each team
+    // Fog and detection
     for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
         for (int index = 0; index < map_width * map_height; index++) {
             state->fog[team][index] = FOG_HIDDEN;
@@ -1013,6 +1038,7 @@ EntityId entity_create(MatchState* state, EntityType type, ivec2 cell, uint8_t p
     entity.type = type;
     entity.mode = entity_is_unit(type) ? MODE_UNIT_IDLE : MODE_BUILDING_IN_PROGRESS;
     entity.player_id = player_id;
+    memset(entity.padding, 0, sizeof(entity.padding));
     entity.flags = 0;
 
     entity.cell = cell;
@@ -1084,6 +1110,7 @@ EntityId entity_goldmine_create(MatchState* state, ivec2 cell, uint32_t gold_lef
         ? MODE_GOLDMINE
         : MODE_GOLDMINE_COLLAPSED;
     entity.player_id = PLAYER_NONE;
+    memset(entity.padding, 0, sizeof(entity.padding));
     entity.flags = 0;
 
     entity.cell = cell;
