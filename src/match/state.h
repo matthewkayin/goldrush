@@ -131,6 +131,7 @@ struct TargetBuild {
 struct TargetPatrol {
     ivec2 cell_a;
     ivec2 cell_b;
+    uint32_t padding;
 };
 
 struct Target {
@@ -371,6 +372,7 @@ struct MatchState {
     uint8_t remembered_entity_count[MAX_PLAYERS];
     RememberedEntity remembered_entities[MAX_PLAYERS][MATCH_MAX_REMEMBERED_ENTITIES];
     bool is_fog_dirty;
+    uint8_t padding[3];
 
     IdArray<Entity, MATCH_MAX_ENTITIES> entities;
     CircularVector<Particle, MATCH_MAX_PARTICLES> particles;
@@ -492,6 +494,7 @@ Target target_unload(ivec2 cell);
 Target target_molotov(ivec2 cell);
 Target target_build(TargetBuild target_build);
 Target target_build_assist(EntityId entity_id);
+Target target_patrol(ivec2 cell_a, ivec2 cell_b);
 
 // Event
 

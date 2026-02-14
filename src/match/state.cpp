@@ -75,6 +75,7 @@ MatchState* match_init(int32_t lcg_seed, MatchPlayer players[MAX_PLAYERS], Match
     map_calculate_unreachable_cells(state->map);
     map_init_regions(state->map);
 
+    memset(state->padding, 0, sizeof(state->padding));
     memset(state->remembered_entity_count, 0, sizeof(state->remembered_entity_count));
     memset(state->remembered_entities, 0, sizeof(state->remembered_entities));
     memset(state->fire_cells, 0, sizeof(state->fire_cells));
@@ -683,13 +684,6 @@ void match_handle_input(MatchState* state, const MatchInput& input) {
             break;
         }
         case MATCH_INPUT_PATROL: {
-            Target patrol_target;
-            patrol_target.type = TARGET_PATROL;
-            patrol_target.cell = ivec2(-1, -1);
-            patrol_target.id = ID_NULL;
-            patrol_target.patrol.cell_a = input.patrol.target_cell_a;
-            patrol_target.patrol.cell_b = input.patrol.target_cell_b;
-
             for (uint32_t id_index = 0; id_index < input.patrol.unit_count; id_index++) {
                 EntityId entity_id = input.patrol.unit_ids[id_index];
                 uint32_t entity_index = state->entities.get_index_of(entity_id);
@@ -698,7 +692,7 @@ void match_handle_input(MatchState* state, const MatchInput& input) {
                     continue;
                 }
 
-                entity_set_target(state, state->entities[entity_index], patrol_target);
+                entity_set_target(state, state->entities[entity_index], target_patrol(input.patrol.target_cell_a, input.patrol.target_cell_b));
             }
             break;
         }
@@ -3597,6 +3591,14 @@ Target target_build_assist(EntityId entity_id) {
     Target target = target_none();
     target.type = TARGET_BUILD_ASSIST;
     target.id = entity_id;
+    return target;
+}
+
+Target target_patrol(ivec2 cell_a, ivec2 cell_b) {
+    Target target = target_none();
+    target.type = TARGET_PATROL;
+    target.patrol.cell_a = cell_a;
+    target.patrol.cell_b = cell_b;
     return target;
 }
 
