@@ -341,9 +341,29 @@ struct FogReveal {
     uint32_t timer;
 };
 
-struct MatchState {
-    MatchState(int32_t lcg_seed, int map_width, int map_height, MatchPlayer players[MAX_PLAYERS]);
+enum MatchInitMapType {
+    MATCH_INIT_MAP_FROM_NOISE,
+    MATCH_INIT_MAP_FROM_COPY
+};
 
+struct MatchInitMapParamsNoise {
+    MapType type;
+    Noise* noise;
+};
+
+struct MatchInitMapParamsCopy {
+    const Map* map;
+};
+
+struct MatchInitMapParams {
+    MatchInitMapType type;
+    union {
+        MatchInitMapParamsNoise noise;
+        MatchInitMapParamsCopy copy;
+    };
+};
+
+struct MatchState {
     int lcg_seed;
     Map map;
     int fog[MAX_PLAYERS][MAP_SIZE_MAX * MAP_SIZE_MAX];
@@ -367,10 +387,10 @@ struct MatchFindBestEntityParams {
     std::function<bool(const Entity& a, const Entity& b)> compare;
 };
 
-MatchState* match_base_init(int32_t lcg_seed, int map_width, int map_height, MatchPlayer players[MAX_PLAYERS]);
-MatchState* match_init(int32_t lcg_seed, MapType map_type, Noise* noise, MatchPlayer players[MAX_PLAYERS]);
+MatchState* match_init(int32_t lcg_seed, MatchPlayer players[MAX_PLAYERS], MatchInitMapParams map_params);
 void match_free(MatchState* state);
 
+void match_spawn_players(MatchState* state, const std::vector<ivec2>& map_spawn_points);
 uint32_t match_get_player_population(const MatchState* state, uint8_t player_id);
 uint32_t match_get_player_max_population(const MatchState* state, uint8_t player_id);
 bool match_player_has_upgrade(const MatchState* state, uint8_t player_id, uint32_t upgrade);

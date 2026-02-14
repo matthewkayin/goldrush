@@ -35,23 +35,21 @@ std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskPa
 bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<PoissonAvoidValue>& avoid_values);
 
 void map_init(Map& map, MapType map_type, int width, int height) {
-    // TODO:
-    // memset(&map, 0, sizeof(map));
+    memset(&map, 0, sizeof(map));
 
     map.type = map_type;
     map.width = width;
     map.height = height;
 
-    memset(map.tiles, 0, sizeof(map.tiles));
     for (int index = 0; index < width * height; index++) {
         map.tiles[index] = (Tile) {
-            .sprite = map_get_plain_ground_tile_sprite(map_type),
-            .frame = ivec2(0, 0),
+            .sprite = (uint8_t)map_get_plain_ground_tile_sprite(map_type),
+            .frame_x = 0,
+            .frame_y = 0,
             .elevation = 0
         };
     }
 
-    memset(map.cells, 0, sizeof(map.cells));
     for (int layer = 0; layer < CELL_LAYER_COUNT; layer++) {
         for (int index = 0; index < width * height; index++) {
             map.cells[layer][index] = (Cell) {
@@ -305,13 +303,7 @@ void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, 
     map_generate_decorations(map, noise, lcg_seed, goldmine_cells);
     log_debug("Generated decorations.");
 
-    map_calculate_unreachable_cells(map);
-
-    // Make sure that the map size is equally divisible by the region size
-    // At the time of writing this, map sizes are 96, 128, and 160 and region size is 32
-    GOLD_ASSERT(map.width % MAP_REGION_CHUNK_SIZE == 0);
-
-    map_init_regions(map);
+    log_info("Map generation complete.");
 }
 
 void map_init_regions(Map& map) {
@@ -747,8 +739,9 @@ void map_bake_tiles(Map& map, const Noise* noise, int* lcg_seed) {
         for (int x = 0; x < map.width; x++) {
             int index = x + (y * map.width);
             if (noise->map[index] >= NOISE_VALUE_LOWGROUND) {
-                map.tiles[index].elevation = (uint32_t)(noise->map[index] == NOISE_VALUE_HIGHGROUND || noise->map[index] == NOISE_VALUE_RAMP);
-                map.tiles[index].frame = ivec2(0, 0);
+                map.tiles[index].elevation = (uint8_t)(noise->map[index] == NOISE_VALUE_HIGHGROUND || noise->map[index] == NOISE_VALUE_RAMP);
+                map.tiles[index].frame_x = 0;
+                map.tiles[index].frame_y = 0;
                 // First check if we need to place a regular wall here
                 uint32_t neighbors = 0;
                 if (noise->map[index] == NOISE_VALUE_HIGHGROUND || noise->map[index] == NOISE_VALUE_RAMP) {
@@ -796,10 +789,11 @@ void map_bake_tiles(Map& map, const Noise* noise, int* lcg_seed) {
                     }
                 }
                 // Set the map tile based on the neighbors
-                uint32_t autotile_index = map_neighbors_to_autotile_index(neighbors);
+                uint8_t autotile_index = map_neighbors_to_autotile_index(neighbors);
                 map.tiles[index] = (Tile) {
-                    .sprite = map_choose_water_tile_sprite(map.type),
-                    .frame = ivec2(autotile_index % AUTOTILE_HFRAMES, autotile_index / AUTOTILE_HFRAMES),
+                    .sprite = (uint8_t)map_choose_water_tile_sprite(map.type),
+                    .frame_x = (uint8_t)(autotile_index % AUTOTILE_HFRAMES),
+                    .frame_y = (uint8_t)(autotile_index / AUTOTILE_HFRAMES),
                     .elevation = 0
                 };
             // End else if tile is water
@@ -813,8 +807,9 @@ void map_bake_map_tiles_and_remove_artifacts(Map& map, Noise* noise, int* lcg_se
     do {
         for (int index = 0; index < map.width * map.height; index++) {
             map.tiles[index] = (Tile) {
-                .sprite = map_get_plain_ground_tile_sprite(map.type),
-                .frame = ivec2(0, 0),
+                .sprite = (uint8_t)map_get_plain_ground_tile_sprite(map.type),
+                .frame_x = 0,
+                .frame_y = 0,
                 .elevation = 0
             };
         }
@@ -1331,11 +1326,11 @@ SpriteName map_wall_autotile_lookup(uint32_t neighbors) {
     }
 }
 
-uint32_t map_neighbors_to_autotile_index(uint32_t p_neighbors) {
-    static uint32_t autotile_index[256];
+uint8_t map_neighbors_to_autotile_index(uint32_t p_neighbors) {
+    static uint8_t autotile_index[256];
     static bool initialized = false;
     if (!initialized) {
-        uint32_t unique_index = 0;
+        uint8_t unique_index = 0;
         for (uint32_t neighbors = 0; neighbors < 256; neighbors++) {
             bool is_unique = true;
             for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
@@ -1352,6 +1347,7 @@ uint32_t map_neighbors_to_autotile_index(uint32_t p_neighbors) {
             if (!is_unique) {
                 continue;
             }
+            GOLD_ASSERT(unique_index <= UINT8_MAX);
             autotile_index[neighbors] = unique_index;
             unique_index++;
         }

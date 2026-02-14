@@ -15,19 +15,16 @@ private:
     EntityId next_id;
     uint32_t _size;
 public:
-    static IdArray init() {
-        IdArray array;
-        memset(array.data, 0, sizeof(array.data));
+    IdArray() {
+        memset(data, 0, sizeof(data));
         for (uint32_t index = 0; index < capacity; index++) {
-            array.ids[index] = INDEX_INVALID;
+            ids[index] = INDEX_INVALID;
         }
         for (uint32_t id = 0; id < ID_MAX; id++) {
-            array.id_to_index[id] = (uint16_t)INDEX_INVALID;
+            id_to_index[id] = (uint16_t)INDEX_INVALID;
         }
-        array.next_id = 0;
-        array._size = 0;
-
-        return array;
+        next_id = 0;
+        _size = 0;
     }
 
     T& operator[](uint32_t index) {

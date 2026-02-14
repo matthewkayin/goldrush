@@ -2012,8 +2012,8 @@ void editor_render() {
 
                     ivec2 tile_params_position = ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
                     RenderSpriteParams tile_params = (RenderSpriteParams) {
-                        .sprite = tile.sprite,
-                        .frame = tile.frame,
+                        .sprite = (SpriteName)tile.sprite,
+                        .frame = ivec2((int)tile.frame_x, (int)tile.frame_y),
                         .position = tile_params_position,
                         .ysort_position = tile_params_position.y,
                         .options = RENDER_SPRITE_NO_CULL,

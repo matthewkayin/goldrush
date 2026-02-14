@@ -24,11 +24,12 @@ const uint32_t MAP_OPTION_ALLOW_PATH_SQUIRRELING = 1 << 3;
 const uint32_t MAP_OPTION_NO_REGION_PATH = 1 << 4;
 
 struct Tile {
-    SpriteName sprite;
-    ivec2 frame;
-    uint32_t elevation;
+    uint8_t sprite;
+    uint8_t frame_x;
+    uint8_t frame_y;
+    uint8_t elevation;
 };
-STATIC_ASSERT(sizeof(Tile) == 16);
+STATIC_ASSERT(sizeof(Tile) == 4);
 
 enum CellLayer {
     CELL_LAYER_UNDERGROUND,
@@ -37,7 +38,7 @@ enum CellLayer {
     CELL_LAYER_COUNT
 };
 
-enum CellType {
+enum CellType: uint16_t {
     CELL_EMPTY,
     CELL_BLOCKED,
     CELL_UNREACHABLE,
@@ -54,9 +55,8 @@ struct Cell {
         EntityId id;
         uint16_t decoration_hframe;
     };
-    uint16_t padding = 0;
 };
-STATIC_ASSERT(sizeof(Cell) == 8);
+STATIC_ASSERT(sizeof(Cell) == 4);
 
 struct MapRegionPathNode {
     int parent;
@@ -126,7 +126,7 @@ bool map_is_cell_blocked(Cell cell);
 bool map_is_cell_rect_blocked(const Map& map, ivec2 cell, int cell_size);
 void map_calculate_unreachable_cells(Map& map);
 
-uint32_t map_neighbors_to_autotile_index(uint32_t neighbors);
+uint8_t map_neighbors_to_autotile_index(uint32_t neighbors);
 void map_generate_decorations(Map& map, Noise* noise, int* lcg_seed, const std::vector<ivec2>& goldmine_cells);
 void map_create_decoration_at_cell(Map& map, int* lcg_seed, ivec2 cell);
 

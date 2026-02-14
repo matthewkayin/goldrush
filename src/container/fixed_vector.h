@@ -10,6 +10,7 @@ private:
     uint32_t _size;
 public:
     FixedVector() {
+        memset(data, 0, sizeof(data));
         _size = 0;
     }
 

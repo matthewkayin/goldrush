@@ -6,8 +6,8 @@
 #include "math/gmath.h"
 #include <SDL3/SDL.h>
 
-#define AUTOTILE_HFRAMES 8
-#define AUTOTILE_VFRAMES 8
+#define AUTOTILE_HFRAMES 8U
+#define AUTOTILE_VFRAMES 8U
 
 enum RenderDisplay {
     RENDER_DISPLAY_WINDOWED,

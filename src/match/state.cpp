@@ -29,47 +29,26 @@ static const uint32_t FOG_REVEAL_DURATION = 60;
 static const fixed BLEED_SPEED_PERCENTAGE = fixed::from_int_and_raw_decimal(0, 192);
 static const uint32_t MATCH_LOW_GOLD_THRESHOLD = 1000;
 
-MatchState::MatchState(int32_t param_lcg_seed, int map_width, int map_height, MatchPlayer param_players[MAX_PLAYERS]) {
-    // LCG seed
-    #ifdef GOLD_RAND_SEED
-        lcg_seed = GOLD_RAND_SEED;
-    #endif
-        lcg_seed = lcg_seed;
-    log_info("Set random seed to %i", lcg_seed);
-
-    // Players
-    memcpy(players, param_players, sizeof(players));
-
-    // Fog and detection
-    for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
-        for (int index = 0; index < map_width * map_height; index++) {
-            fog[team][index] = FOG_HIDDEN;
-            detection[team][index] = 0;
-        }
-    }
-
-    memset(remembered_entity_count, 0, sizeof(remembered_entity_count));
-    memset(remembered_entities, 0, sizeof(remembered_entities));
-    memset(fire_cells, 0, sizeof(fire_cells));
-
-    is_fog_dirty = false;
-}
-
-MatchState* match_base_init(int32_t lcg_seed, int map_width, int map_height, MatchPlayer players[MAX_PLAYERS]) {
-    MatchState* state = (MatchState*)malloc(sizeof(MatchState));
-    memset(state, 0, sizeof(state));
+MatchState* match_init(int32_t lcg_seed, MatchPlayer players[MAX_PLAYERS], MatchInitMapParams map_params) {
+    MatchState* state = new MatchState();
 
     // LCG seed
     #ifdef GOLD_RAND_SEED
         state->lcg_seed = GOLD_RAND_SEED;
     #endif
-    state->lcg_seed = lcg_seed;
+        state->lcg_seed = lcg_seed;
     log_info("Set random seed to %i", lcg_seed);
 
     // Players
     memcpy(state->players, players, sizeof(state->players));
 
     // Fog and detection
+    const int map_width = map_params.type == MATCH_INIT_MAP_FROM_NOISE
+        ? map_params.noise.noise->width
+        : map_params.copy.map->width;
+    const int map_height = map_params.type == MATCH_INIT_MAP_FROM_NOISE
+        ? map_params.noise.noise->height
+        : map_params.copy.map->height;
     for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
         for (int index = 0; index < map_width * map_height; index++) {
             state->fog[team][index] = FOG_HIDDEN;
@@ -77,22 +56,39 @@ MatchState* match_base_init(int32_t lcg_seed, int map_width, int map_height, Mat
         }
     }
 
+    // Map
+    if (map_params.type == MATCH_INIT_MAP_FROM_NOISE) {
+        std::vector<ivec2> map_spawn_points;
+        std::vector<ivec2> goldmine_cells;
+        map_init_generate(state->map, map_params.noise.type, map_params.noise.noise, &lcg_seed, map_spawn_points, goldmine_cells);
+
+        // Init goldmines
+        for (ivec2 cell : goldmine_cells) {
+            entity_goldmine_create(state, cell, MATCH_GOLDMINE_STARTING_GOLD);
+        }
+
+        // Init player spawns
+        match_spawn_players(state, map_spawn_points);
+    } else if (map_params.type == MATCH_INIT_MAP_FROM_COPY) {
+        memcpy(&state->map, map_params.copy.map, sizeof(state->map));
+    }
+    map_calculate_unreachable_cells(state->map);
+    map_init_regions(state->map);
+
+    memset(state->remembered_entity_count, 0, sizeof(state->remembered_entity_count));
+    memset(state->remembered_entities, 0, sizeof(state->remembered_entities));
+    memset(state->fire_cells, 0, sizeof(state->fire_cells));
+
+    state->is_fog_dirty = false;
+
     return state;
 }
 
-MatchState* match_init(int32_t lcg_seed, MapType map_type, Noise* noise, MatchPlayer players[MAX_PLAYERS]) {
-    MatchState* state = match_base_init(lcg_seed, noise->width, noise->height, players);
+void match_free(MatchState* state) {
+    delete state;
+}
 
-    // Init map
-    std::vector<ivec2> map_spawn_points;
-    std::vector<ivec2> goldmine_cells;
-    map_init_generate(state->map, map_type, noise, &state->lcg_seed, map_spawn_points, goldmine_cells);
-
-    // Generate goldmines
-    for (ivec2 cell : goldmine_cells) {
-        entity_goldmine_create(state, cell, MATCH_GOLDMINE_STARTING_GOLD);
-    }
-
+void match_spawn_players(MatchState* state, const std::vector<ivec2>& map_spawn_points) {
     // Determine player spawns
     ivec2 player_spawns[MAX_PLAYERS];
     uint32_t team_player_count[MAX_PLAYERS];
@@ -210,14 +206,6 @@ MatchState* match_init(int32_t lcg_seed, MapType map_type, Noise* noise, MatchPl
             }
         }
     }
-
-    state->is_fog_dirty = false;
-
-    return state;
-}
-
-void match_free(MatchState* state) {
-    delete state;
 }
 
 uint32_t match_get_player_population(const MatchState* state, uint8_t player_id) {
@@ -2398,7 +2386,7 @@ uint32_t entity_get_elevation(const Entity& entity, const Map& map) {
     int entity_cell_size = entity_get_data(entity.type).cell_size;
     for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size; y++) {
         for (int x = entity.cell.x; x < entity.cell.x + entity_cell_size; x++) {
-            elevation = std::max(elevation, map_get_tile(map, ivec2(x, y)).elevation);
+            elevation = std::max(elevation, (uint32_t)map_get_tile(map, ivec2(x, y)).elevation);
         }
     }
 
@@ -2406,7 +2394,7 @@ uint32_t entity_get_elevation(const Entity& entity, const Map& map) {
         ivec2 unit_prev_cell = entity.cell - DIRECTION_IVEC2[entity.direction];
         for (int y = unit_prev_cell.y; y < unit_prev_cell.y + entity_cell_size; y++) {
             for (int x = unit_prev_cell.x; x < unit_prev_cell.x + entity_cell_size; x++) {
-                elevation = std::max(elevation, map_get_tile(map, ivec2(x, y)).elevation);
+                elevation = std::max(elevation, (uint32_t)map_get_tile(map, ivec2(x, y)).elevation);
             }
         }
     }

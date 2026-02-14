@@ -227,7 +227,8 @@ struct MatchShellState {
     bool replay_loading_early_exit;
 
     // Checksum
-    std::vector<uint32_t> checksums[MAX_PLAYERS];
+    uint32_t next_checksum_frame;
+    std::queue<uint32_t> checksums[MAX_PLAYERS];
 
     // Debug
     #ifdef GOLD_DEBUG
@@ -327,8 +328,8 @@ bool match_shell_is_surrender_required_to_leave(const MatchShellState* state);
 void match_shell_leave_match(MatchShellState* state, bool exit_program);
 
 // Desync
-bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t frame);
-void match_shell_compare_checksums(MatchShellState* state, uint32_t frame);
+bool match_shell_has_next_checksums(const MatchShellState* state);
+bool match_shell_are_next_checksums_out_of_sync(const MatchShellState* state);
 #ifdef GOLD_DEBUG
 void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t incoming_state_buffer_length);
 #endif

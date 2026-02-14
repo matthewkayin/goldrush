@@ -160,7 +160,13 @@ bool replay_file_read(const char* path, MatchState** state, std::vector<std::vec
     }
 
     // Init state
-    *state = match_init(lcg_seed, map_type, noise, players);
+    *state = match_init(lcg_seed, players, (MatchInitMapParams) {
+        .type = MATCH_INIT_MAP_FROM_NOISE,
+        .noise = (MatchInitMapParamsNoise) {
+            .type = map_type,
+            .noise = noise
+        }
+    });
 
     bool read_successful = true;
     while (read_successful) {

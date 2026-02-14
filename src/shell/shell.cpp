@@ -242,7 +242,13 @@ MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
     state->replay_mode = false;
 
     // Init match
-    state->match_state = match_init(lcg_seed, map_type, noise, players);
+    state->match_state = match_init(lcg_seed, players, (MatchInitMapParams) {
+        .type = MATCH_INIT_MAP_FROM_NOISE,
+        .noise = (MatchInitMapParamsNoise) {
+            .type = map_type,
+            .noise = noise
+        }
+    });
 
     // Init input queues
     match_shell_init_input_queues(state);
@@ -319,12 +325,12 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
 
     // Init match state
     int32_t lcg_seed = rand();
-    state->match_state = match_base_init(lcg_seed, scenario->map.width, scenario->map.height, players);
-
-    // Init map
-    state->match_state->map = scenario->map;
-    map_calculate_unreachable_cells(state->match_state->map);
-    map_init_regions(state->match_state->map);
+    state->match_state = match_init(lcg_seed, players, (MatchInitMapParams) {
+        .type = MATCH_INIT_MAP_FROM_COPY,
+        .copy = (MatchInitMapParamsCopy) {
+            .map = &(scenario->map)
+        }
+    });
 
     // Clear any cells that are of type unit, 
     // they will be populated by the actual entities IDs
@@ -546,11 +552,7 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
             break;
         }
         case NETWORK_EVENT_CHECKSUM: {
-            state->checksums[event.checksum.player_id].push_back(event.checksum.checksum);
-            if (state->mode == MATCH_SHELL_MODE_DESYNC) {
-                return;
-            }
-            match_shell_compare_checksums(state, state->checksums[event.checksum.player_id].size() - 1);
+            state->checksums[event.checksum.player_id].push(event.checksum.checksum);
             break;
         }
     #ifdef GOLD_DEBUG
@@ -1063,12 +1065,32 @@ void match_shell_update(MatchShellState* state) {
         }
     }
 
-    // Checksum
+    // Compute checksum
     if (!state->replay_mode && state->match_timer % desync_get_checksum_frequency() == 0) {
         uint32_t checksum = desync_compute_match_checksum(state->match_state, state->bots, state->match_timer);
+        log_debug("Checksum for frame %u is %u", state->match_timer, checksum);
         network_send_checksum(checksum);
-        state->checksums[network_get_player_id()].push_back(checksum);
-        match_shell_compare_checksums(state, state->checksums[network_get_player_id()].size() - 1);
+        state->checksums[network_get_player_id()].push(checksum);
+    }
+
+    // Compare checksums
+    if (match_shell_has_next_checksums(state)) {
+        log_debug("DESYNC has next checksums. next frame %u", state->next_checksum_frame);
+        if (match_shell_are_next_checksums_out_of_sync(state)) {
+            desync_send_serialized_frame(state->next_checksum_frame);
+            state->mode = MATCH_SHELL_MODE_DESYNC;
+
+            return;
+        } else {
+            // Pop checksums and delete serialized frame
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_READY) {
+                    state->checksums[player_id].pop();
+                }
+            }
+            desync_delete_serialized_frame(state->next_checksum_frame);
+            state->next_checksum_frame += desync_get_checksum_frequency();
+        }
     }
 
     // Match update
@@ -2906,67 +2928,38 @@ void match_shell_leave_match(MatchShellState* state, bool exit_program) {
 
 // DESYNC
 
-bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t frame) {
+bool match_shell_has_next_checksums(const MatchShellState* state) {
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (!state->match_state->players[player_id].active) {
+        // Checking for PLAYER_STATUS_READY, which is to say we are looking for active players but not bots
+        if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_READY) {
             continue;
         }
-        if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT) {
+        if (state->checksums[player_id].empty()) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool match_shell_are_next_checksums_out_of_sync(const MatchShellState* state) {
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (player_id == network_get_player_id() || 
+                network_get_player(player_id).status != NETWORK_PLAYER_STATUS_READY) {
             continue;
         }
-        if (state->checksums[player_id].size() <= frame) {
-            continue;
-        }
-        if (state->checksums[player_id][frame] != state->checksums[network_get_player_id()][frame]) {
+        if (state->checksums[player_id].front() != state->checksums[network_get_player_id()].front()) {
             log_error("DESYNC found on frame %u between player %u (checksum %u) and player %u (checksum %u)", 
-                frame, 
+                state->next_checksum_frame, 
                 player_id, 
-                state->checksums[player_id][frame],
+                state->checksums[player_id].front(),
                 network_get_player_id(), 
-                state->checksums[network_get_player_id()][frame]);
+                state->checksums[network_get_player_id()].front());
             return true;
         }
     }
 
     return false;
-}
-
-void match_shell_compare_checksums(MatchShellState* state, uint32_t frame) {
-    // If we haven't gotten to this frame yet, then we can't say for sure that it's out of sync
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_READY) {
-            continue;
-        }
-        if (state->checksums[player_id].size() <= frame) {
-            return;
-        }
-    }
-
-    const bool out_of_sync = match_shell_are_checksums_out_of_sync(state, frame);
-    if (out_of_sync) {
-        log_error("DESYNC on frame %u", frame);
-
-        state->mode = MATCH_SHELL_MODE_DESYNC;
-    }
-
-#ifdef GOLD_DEBUG
-    if (desync_is_debug_enabled()) {
-        if (out_of_sync) {
-            size_t state_buffer_length;
-            uint8_t* state_buffer = desync_read_serialized_frame(frame, &state_buffer_length);
-            if (state_buffer == NULL) {
-                log_error("match_shell_compare_checksums could not read serialized frame.");
-                return;
-            }
-
-            network_send_serialized_frame(state_buffer, state_buffer_length);
-            free(state_buffer);
-            log_info("DESYNC Sent serialized frame with size %llu.", state_buffer_length);
-        } else {
-            desync_delete_serialized_frame(frame);
-        }
-    }
-#endif
 }
 
 #ifdef GOLD_DEBUG
@@ -3027,8 +3020,8 @@ void match_shell_render(const MatchShellState* state) {
 
                     ivec2 tile_params_position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
                     RenderSpriteParams tile_params = (RenderSpriteParams) {
-                        .sprite = tile.sprite,
-                        .frame = tile.frame,
+                        .sprite = (SpriteName)tile.sprite,
+                        .frame = ivec2((int)tile.frame_x, (int)tile.frame_y),
                         .position = tile_params_position,
                         .ysort_position = tile_params_position.y,
                         .options = RENDER_SPRITE_NO_CULL,

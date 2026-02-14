@@ -3,8 +3,13 @@
 #include "core/filesystem.h"
 #include "core/logger.h"
 #include "profile/profile.h"
+#include "network/network.h"
 #include <algorithm>
 #include <cstdlib>
+
+#ifdef GOLD_DEBUG
+    #define DESYNC_FILEPATH_BUFFER_SIZE 256
+#endif
 
 struct DesyncState {
     uint32_t a;
@@ -12,15 +17,13 @@ struct DesyncState {
 
 #ifdef GOLD_DEBUG
     bool desync_debug = false;
-    std::string desync_folder_path;
+    char desync_folder_path[DESYNC_FILEPATH_BUFFER_SIZE];
 #endif
 };
 static DesyncState state;
 
 STATIC_ASSERT(sizeof(int) == 4ULL);
 STATIC_ASSERT(sizeof(MapType) == 4ULL);
-STATIC_ASSERT(sizeof(Tile) == 16ULL);
-STATIC_ASSERT(sizeof(Cell) == 8ULL);
 STATIC_ASSERT(sizeof(MapRegionConnection) == 260ULL);
 STATIC_ASSERT(sizeof(RememberedEntity) == 28ULL);
 STATIC_ASSERT(sizeof(Entity) == 1924ULL);
@@ -35,20 +38,21 @@ STATIC_ASSERT(sizeof(EntityCount) == 88ULL);
 STATIC_ASSERT(sizeof(BotSquadType) == 4ULL);
 STATIC_ASSERT(sizeof(BotDesiredSquad) == 92ULL);
 STATIC_ASSERT(sizeof(BotBaseInfo) == 228ULL);
-STATIC_ASSERT(sizeof(MatchState) == 3438800ULL);
+STATIC_ASSERT(sizeof(MatchState) == 2824400ULL);
 STATIC_ASSERT(sizeof(Bot) == 16428ULL);
 
 #ifdef GOLD_DEBUG
 
-std::string desync_get_filepath(uint32_t frame) {
-    return state.desync_folder_path + "/" + std::to_string(frame) + ".desync";
+
+void desync_get_filepath(char* buffer, uint32_t frame) {
+    sprintf(buffer, "%s/%u.desync", state.desync_folder_path, frame);
 }
 
 bool desync_init(const char* desync_foldername) {
     state.desync_debug = true;
-    state.desync_folder_path = filesystem_get_data_path() + desync_foldername;
+    sprintf(state.desync_folder_path, "%s%s", filesystem_get_data_path().c_str(), desync_foldername);
 
-    SDL_CreateDirectory(state.desync_folder_path.c_str());
+    SDL_CreateDirectory(state.desync_folder_path);
     return true;
 }
 
@@ -56,18 +60,15 @@ void desync_quit() {
     if (!state.desync_debug) {
         return;
     }
-    SDL_RemovePath(state.desync_folder_path.c_str());
-}
-
-bool desync_is_debug_enabled() {
-    return state.desync_debug;
+    SDL_RemovePath(state.desync_folder_path);
 }
 
 void desync_write_file(const MatchState* match_state, const Bot* bots, uint32_t frame) {
-    std::string desync_filepath = desync_get_filepath(frame);
-    FILE* desync_file = fopen(desync_filepath.c_str(), "wb");
+    char desync_filepath[DESYNC_FILEPATH_BUFFER_SIZE];
+    desync_get_filepath(desync_filepath, frame);
+    FILE* desync_file = fopen(desync_filepath, "wb");
     if (desync_file == NULL) {
-        log_error("Could not open desync file for writing.");
+        log_error("Could not open desync file %s for writing.", desync_filepath);
         return;
     }
 
@@ -75,6 +76,7 @@ void desync_write_file(const MatchState* match_state, const Bot* bots, uint32_t 
     fwrite(bots, sizeof(Bot) * MAX_PLAYERS, 1, desync_file);
 
     fclose(desync_file);
+    log_debug("Wrote desync file %s", desync_filepath);
 }
 
 #endif
@@ -132,16 +134,36 @@ uint32_t desync_compute_buffer_checksum(uint8_t* data, size_t length) {
     return (b << 16) | a;
 }
 
+void desync_send_serialized_frame(uint32_t frame) {
+    size_t state_buffer_length;
+    uint8_t* state_buffer = desync_read_serialized_frame(frame, &state_buffer_length);
+    if (state_buffer == NULL) {
+        return;
+    }
+
+    network_send_serialized_frame(state_buffer, state_buffer_length);
+    free(state_buffer);
+
+    log_info("DESYNC Sent serialized frame %u with size %llu", frame, state_buffer_length);
+}
+
 void desync_delete_serialized_frame(uint32_t frame) {
-    std::string desync_filepath = desync_get_filepath(frame);
-    SDL_RemovePath(desync_filepath.c_str());
+    if (!state.desync_debug) {
+        return;
+    }
+
+    char desync_filepath[DESYNC_FILEPATH_BUFFER_SIZE];
+    desync_get_filepath(desync_filepath, frame);
+    SDL_RemovePath(desync_filepath);
+    log_debug("DESYNC deleted serialized frame %s", desync_filepath);
 }
 
 uint8_t* desync_read_serialized_frame(uint32_t frame_number, size_t* state_buffer_length) {
-    std::string desync_filepath = desync_get_filepath(frame_number);
-    FILE* desync_file = fopen(desync_filepath.c_str(), "rb");
+    char desync_filepath[DESYNC_FILEPATH_BUFFER_SIZE];
+    desync_get_filepath(desync_filepath, frame_number);
+    FILE* desync_file = fopen(desync_filepath, "rb");
     if (desync_file == NULL) {
-        log_error("desync file with path %s could not be opened.", desync_filepath.c_str());
+        log_error("desync file with path %s could not be opened.", desync_filepath);
         return NULL;
     }
 

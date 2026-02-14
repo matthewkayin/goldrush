@@ -19,6 +19,7 @@ private:
     }
 public:
     FixedQueue() {
+        memset(data, 0, sizeof(data));
         tail = 0;
         _size = 0;
     }
