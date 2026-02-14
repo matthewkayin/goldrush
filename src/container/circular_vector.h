@@ -64,13 +64,13 @@ public:
     }
 
     const InternalState* get_internal_state() const {
-        return state;
+        return &state;
     }
 private:
     InternalState state;
 
     uint32_t wrap_index(uint32_t index) const {
-        uint32_t wrapped_index = tail + index;
+        uint32_t wrapped_index = state.tail + index;
         if (wrapped_index >= capacity) {
             wrapped_index -= capacity;
         }

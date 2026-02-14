@@ -184,12 +184,24 @@ uint8_t* desync_read_serialized_frame(uint32_t frame_number, size_t* state_buffe
     return state_buffer;
 }
 
-// Use this only when T == T is a trivial comparison
+// Use this only when T is trivially copiable
 template <typename T, uint32_t _capacity>
 void desync_assert_fixed_vectors_equal(const FixedVector<T, _capacity>& vector_a, const FixedVector<T, _capacity>& vector_b) {
-    const FixedVector<T, _capacity>::InternalState* state_a = vector_a.get_internal_state();
-    const FixedVector<T, _capacity>::InternalState* state_b = vector_b.get_internal_state();
+    const typename FixedVector<T, _capacity>::InternalState* state_a = vector_a.get_internal_state();
+    const typename FixedVector<T, _capacity>::InternalState* state_b = vector_b.get_internal_state();
     GOLD_ASSERT(state_a->size == state_b->size);
+    for (size_t index = 0; index < _capacity; index++) {
+        GOLD_ASSERT(state_a->data[index] == state_b->data[index]);
+    }
+}
+
+// Use this only when T is trivially copiable
+template <typename T, uint32_t _capacity>
+void desync_assert_fixed_queues_equal(const FixedQueue<T, _capacity>& queue_a, const FixedQueue<T, _capacity>& queue_b) {
+    const typename FixedQueue<T, _capacity>::InternalState* state_a = queue_a.get_internal_state();
+    const typename FixedQueue<T, _capacity>::InternalState* state_b = queue_b.get_internal_state();
+    GOLD_ASSERT(state_a->size == state_b->size);
+    GOLD_ASSERT(state_a->tail == state_b->tail);
     for (size_t index = 0; index < _capacity; index++) {
         GOLD_ASSERT(state_a->data[index] == state_b->data[index]);
     }
@@ -217,9 +229,7 @@ void desync_assert_targets_equal(const Target& target_a, const Target& target_b)
 
 void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
     const MatchState* state_a = (MatchState*)state_buffer_a;
-    const Bot* bots_a = (Bot*)(state_buffer_a + sizeof(MatchState));
     const MatchState* state_b = (MatchState*)state_buffer_b;
-    const Bot* bots_b = (Bot*)(state_buffer_b + sizeof(MatchState));
 
     // LCG seed
     GOLD_ASSERT(state_a->lcg_seed == state_b->lcg_seed);
@@ -506,7 +516,105 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
             const MatchEvent& event_a = events_a->data[index];
             const MatchEvent& event_b = events_b->data[index];
 
+            GOLD_ASSERT(memcmp(&event_a, &event_b, sizeof(MatchEvent)) == 0);
+        }
+    }
 
+    // Bots
+    const Bot* bots_a = (Bot*)(state_buffer_a + sizeof(MatchState));
+    const Bot* bots_b = (Bot*)(state_buffer_b + sizeof(MatchState));
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        const Bot& bot_a = bots_a[player_id];
+        const Bot& bot_b = bots_b[player_id];
+
+        // Config
+        {
+            GOLD_ASSERT(bot_a.config.flags == bot_b.config.flags);
+            GOLD_ASSERT(bot_a.config.target_base_count == bot_b.config.target_base_count);
+            GOLD_ASSERT(bot_a.config.macro_cycle_cooldown == bot_b.config.macro_cycle_cooldown);
+            GOLD_ASSERT(bot_a.config.allowed_upgrades == bot_b.config.allowed_upgrades);
+            for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+                GOLD_ASSERT(bot_a.config.is_entity_allowed[entity_type] == bot_b.config.is_entity_allowed[entity_type]);
+            }
+            GOLD_ASSERT(bot_a.config.padding2 == bot_b.config.padding2);
+            GOLD_ASSERT(bot_a.config.padding2 == bot_b.config.padding2);
+            GOLD_ASSERT(bot_a.config.opener == bot_b.config.opener);
+            GOLD_ASSERT(bot_a.config.preferred_unit_comp == bot_b.config.preferred_unit_comp);
+        }
+
+        GOLD_ASSERT(bot_a.player_id == bot_b.player_id);
+        GOLD_ASSERT(bot_a.padding == bot_b.padding);
+
+        GOLD_ASSERT(bot_a.scout_id == bot_b.scout_id);
+        GOLD_ASSERT(bot_a.scout_info == bot_b.scout_info);
+        GOLD_ASSERT(bot_a.last_scout_time == bot_b.last_scout_time);
+        desync_assert_fixed_vectors_equal(bot_a.entities_to_scout, bot_b.entities_to_scout);
+        desync_assert_fixed_vectors_equal(bot_a.entities_assumed_to_be_scouted, bot_b.entities_assumed_to_be_scouted);
+
+        // Reservation requests
+        {
+            const FixedQueue<BotReservationRequest, BOT_MAX_RESERVATION_REQUESTS>::InternalState* reservation_requests_a = bot_a.reservation_requests.get_internal_state();
+            const FixedQueue<BotReservationRequest, BOT_MAX_RESERVATION_REQUESTS>::InternalState* reservation_requests_b = bot_b.reservation_requests.get_internal_state();
+            GOLD_ASSERT(reservation_requests_a->size == reservation_requests_b->size);
+            GOLD_ASSERT(reservation_requests_a->tail == reservation_requests_b->tail);
+            for (size_t index = 0; index < BOT_MAX_RESERVATION_REQUESTS; index++) {
+                const BotReservationRequest& request_a = reservation_requests_a->data[index];
+                const BotReservationRequest& request_b = reservation_requests_b->data[index];
+
+                GOLD_ASSERT(memcmp(&request_a, &request_b, sizeof(BotReservationRequest)) == 0);
+            }
+        }
+
+        GOLD_ASSERT(bot_a.unit_comp == bot_b.unit_comp);
+        GOLD_ASSERT(memcmp(&bot_a.desired_buildings, &bot_b.desired_buildings, sizeof(EntityCount)) == 0);
+        GOLD_ASSERT(memcmp(&bot_a.desired_army_ratio, &bot_b.desired_army_ratio, sizeof(EntityCount)) == 0);
+
+        // Desired squads
+        {
+            const FixedVector<BotDesiredSquad, BOT_MAX_DESIRED_SQUADS>::InternalState* desired_squads_a = bot_a.desired_squads.get_internal_state();
+            const FixedVector<BotDesiredSquad, BOT_MAX_DESIRED_SQUADS>::InternalState* desired_squads_b = bot_b.desired_squads.get_internal_state();
+            GOLD_ASSERT(desired_squads_a->size == desired_squads_b->size);
+            for (size_t index = 0; index < BOT_MAX_DESIRED_SQUADS; index++) {
+                const BotDesiredSquad& squad_a = desired_squads_a->data[index];
+                const BotDesiredSquad& squad_b = desired_squads_b->data[index];
+
+                GOLD_ASSERT(memcmp(&squad_a, &squad_b, sizeof(BotDesiredSquad)) == 0);
+            }
+        }
+
+        desync_assert_fixed_queues_equal(bot_a.buildings_to_set_rally_points, bot_b.buildings_to_set_rally_points);
+
+        GOLD_ASSERT(bot_a.macro_cycle_timer == bot_b.macro_cycle_timer);
+        GOLD_ASSERT(bot_a.macro_cycle_count == bot_b.macro_cycle_count);
+
+        GOLD_ASSERT(bot_a.next_squad_id == bot_b.next_squad_id);
+
+        // Squads
+        {
+            const FixedVector<BotSquad, BOT_MAX_SQUADS>::InternalState* squads_a = bot_a.squads.get_internal_state();
+            const FixedVector<BotSquad, BOT_MAX_SQUADS>::InternalState* squads_b = bot_b.squads.get_internal_state();
+            GOLD_ASSERT(squads_a->size == squads_b->size);
+            for (size_t index = 0; index < BOT_MAX_SQUADS; index++) {
+                const BotSquad& squad_a = squads_a->data[index];
+                const BotSquad& squad_b = squads_b->data[index];
+
+                GOLD_ASSERT(memcmp(&squad_a, &squad_b, sizeof(BotSquad)) == 0);
+            }
+        }
+
+        GOLD_ASSERT(bot_a.next_landmine_time == bot_b.next_landmine_time);
+
+        // Base info
+        {
+            const FixedVector<BotBaseInfo, BOT_MAX_BASE_INFO>::InternalState* base_info_array_a = bot_a.base_info.get_internal_state();
+            const FixedVector<BotBaseInfo, BOT_MAX_BASE_INFO>::InternalState* base_info_array_b = bot_b.base_info.get_internal_state();
+            GOLD_ASSERT(base_info_array_a->size == base_info_array_b->size);
+            for (size_t index = 0; index < BOT_MAX_BASE_INFO; index++) {
+                const BotBaseInfo& base_info_a = base_info_array_a->data[index];
+                const BotBaseInfo& base_info_b = base_info_array_b->data[index];
+
+                GOLD_ASSERT(memcmp(&base_info_a, &base_info_b, sizeof(BotBaseInfo)) == 0);
+            }
         }
     }
 }

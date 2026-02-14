@@ -33,7 +33,7 @@ public:
 
     void push(T value) {
         GOLD_ASSERT(state.size + 1 <= capacity);
-        data[wrap_index(state.size)] = value;
+        state.data[wrap_index(state.size)] = value;
         state.size++;
     }
 

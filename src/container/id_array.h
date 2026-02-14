@@ -69,7 +69,7 @@ public:
         GOLD_ASSERT(state.size < capacity);
 
         EntityId id = state.next_id;
-        GOLD_ASSERT(next_id < ID_MAX - 1);
+        GOLD_ASSERT(state.next_id < ID_MAX - 1);
         state.next_id++;
         state.id_to_index[id] = state.size;
         state.ids[state.size] = id;

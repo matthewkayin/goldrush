@@ -258,20 +258,20 @@ struct MatchEventAlert {
     int cell_size;
 };
 
-struct MatchEventResearchComplete {
-    uint32_t upgrade;
-    uint8_t player_id;
-};
-
 struct MatchEventSelectionHandoff {
     uint8_t player_id;
     EntityId to_deselect;
     EntityId to_select;
 };
 
-struct MatchEventStatus {
+struct MatchEventResearchComplete {
     uint8_t player_id;
+    uint32_t upgrade;
+};
+
+struct MatchEventStatus {
     const char* message;
+    uint8_t player_id;
 };
 
 struct MatchEventPlayerDefeated {
@@ -500,7 +500,10 @@ Target target_patrol(ivec2 cell_a, ivec2 cell_b);
 
 void match_event_play_sound(MatchState* state, SoundName sound, ivec2 position);
 void match_event_alert(MatchState* state, MatchAlertType type, uint8_t player_id, ivec2 cell, int cell_size);
+void match_event_research_complete(MatchState* state, uint8_t player_id, uint32_t upgrade);
+void match_event_selection_handoff(MatchState* state, uint8_t player_id, EntityId to_deselect, EntityId to_select);
 void match_event_show_status(MatchState* state, uint8_t player_id, const char* message);
+void match_event_player_defeated(MatchState* state, uint8_t player_id);
 
 // Fog
 

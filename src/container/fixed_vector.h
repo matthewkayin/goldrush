@@ -45,7 +45,7 @@ public:
 
     void push_back(T value) {
         GOLD_ASSERT(state.size < _capacity);
-        data[state.size] = value;
+        state.data[state.size] = value;
         state.size++;
     }
 
@@ -58,7 +58,7 @@ public:
     // This is fast, but does not preserve array order
     void remove_at_unordered(uint32_t index) {
         GOLD_ASSERT(state.size != 0 && index < state.size);
-        data[index] = data[state.size - 1];
+        state.data[index] = state.data[state.size - 1];
         state.size--;
     }
 
@@ -67,7 +67,7 @@ public:
     void remove_at_ordered(uint32_t index) {
         GOLD_ASSERT(state.size != 0 && index < state.size);
         for (uint32_t replace_index = index; replace_index < state.size - 1; replace_index++) {
-            data[replace_index] = data[replace_index + 1];
+            state.data[replace_index] = state.data[replace_index + 1];
         }
         state.size--;
     }

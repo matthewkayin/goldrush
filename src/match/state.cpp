@@ -1213,12 +1213,7 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                 (!entity_is_building(entity.type) && 
                     !match_player_has_entities(state, entity.player_id)))) {
             state->players[entity.player_id].active = false;
-            state->events.push((MatchEvent) {
-                .type = MATCH_EVENT_PLAYER_DEFEATED,
-                .player_defeated = (MatchEventPlayerDefeated) {
-                    .player_id = entity.player_id
-                }
-            });
+            match_event_player_defeated(state, entity.player_id);
         }
     }
     // End if entity should die
@@ -1606,14 +1601,7 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                                 entity.mode = MODE_UNIT_BUILD;
                                 entity.timer = UNIT_BUILD_TICK_DURATION;
 
-                                state->events.push((MatchEvent) {
-                                    .type = MATCH_EVENT_SELECTION_HANDOFF,
-                                    .selection_handoff = (MatchEventSelectionHandoff) {
-                                        .player_id = entity.player_id,
-                                        .to_deselect = entity_id,
-                                        .to_select = entity.target.id
-                                    }
-                                });
+                                match_event_selection_handoff(state, entity.player_id, entity_id, entity.target.id);
                             } else {
                                 entity.target = target_none();
                                 match_event_show_status(state, entity.player_id, "Cannot create building. Entity limit reached.");
@@ -2127,13 +2115,7 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                         match_grant_player_upgrade(state, entity.player_id, entity.queue[0].upgrade);
 
                         // Show status
-                        state->events.push((MatchEvent) {
-                            .type = MATCH_EVENT_RESEARCH_COMPLETE,
-                            .research_complete = (MatchEventResearchComplete) {
-                                .upgrade = entity.queue[0].upgrade,
-                                .player_id = entity.player_id
-                            }
-                        });
+                        match_event_research_complete(state, entity.player_id, entity.queue[0].upgrade);
 
                         // Create alert
                         match_event_alert(state, MATCH_ALERT_TYPE_RESEARCH, entity.player_id, entity.cell, entity_data.cell_size);
@@ -3639,35 +3621,71 @@ uint32_t building_queue_population_cost(const BuildingQueueItem& item) {
 // EVENTS
 
 void match_event_play_sound(MatchState* state, SoundName sound, ivec2 position) {
-    state->events.push((MatchEvent) {
-        .type = MATCH_EVENT_SOUND,
-        .sound = (MatchEventSound) {
-            .position = position,
-            .sound = sound
-        }
-    });
+    MatchEvent event;
+    memset(&event, 0, sizeof(event));
+
+    event.type = MATCH_EVENT_SOUND;
+    event.sound.position = position;
+    event.sound.sound = sound;
+
+    state->events.push(event);
 }
 
 void match_event_alert(MatchState* state, MatchAlertType type, uint8_t player_id, ivec2 cell, int cell_size) {
-    state->events.push((MatchEvent) {
-        .type = MATCH_EVENT_ALERT,
-        .alert = (MatchEventAlert) {
-            .type = type,
-            .player_id = player_id,
-            .cell = cell,
-            .cell_size = cell_size
-        }
-    });
+    MatchEvent event;
+    memset(&event, 0, sizeof(event));
+
+    event.type = MATCH_EVENT_ALERT;
+    event.alert.type = type;
+    event.alert.player_id = player_id;
+    event.alert.cell = cell;
+    event.alert.cell_size = cell_size;
+
+    state->events.push(event);
+}
+
+void match_event_selection_handoff(MatchState* state, uint8_t player_id, EntityId to_deselect, EntityId to_select) {
+    MatchEvent event;
+    memset(&event, 0, sizeof(event));
+
+    event.type = MATCH_EVENT_SELECTION_HANDOFF;
+    event.selection_handoff.player_id = player_id;
+    event.selection_handoff.to_deselect = to_deselect;
+    event.selection_handoff.to_select = to_select;
+
+    state->events.push(event);
+}
+
+void match_event_research_complete(MatchState* state, uint8_t player_id, uint32_t upgrade) {
+    MatchEvent event;
+    memset(&event, 0, sizeof(event));
+
+    event.type = MATCH_EVENT_RESEARCH_COMPLETE;
+    event.research_complete.player_id = player_id;
+    event.research_complete.upgrade = upgrade;
+
+    state->events.push(event);
 }
 
 void match_event_show_status(MatchState* state, uint8_t player_id, const char* message) {
-    state->events.push((MatchEvent) {
-        .type = MATCH_EVENT_STATUS,
-        .status = (MatchEventStatus) {
-            .player_id = player_id,
-            .message = message
-        }
-    });
+    MatchEvent event;
+    memset(&event, 0, sizeof(event));
+
+    event.type = MATCH_EVENT_STATUS;
+    event.status.player_id = player_id;
+    event.status.message = message;
+
+    state->events.push(event);
+}
+
+void match_event_player_defeated(MatchState* state, uint8_t player_id) {
+    MatchEvent event;
+    memset(&event, 0, sizeof(event));
+
+    event.type = MATCH_EVENT_PLAYER_DEFEATED;
+    event.player_defeated.player_id = player_id;
+
+    state->events.push(event);
 }
 
 // FOG
