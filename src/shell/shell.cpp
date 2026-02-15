@@ -1073,7 +1073,6 @@ void match_shell_update(MatchShellState* state) {
 
     // Compare checksums
     if (match_shell_has_next_checksums(state)) {
-        log_debug("DESYNC has next checksums. next frame %u", state->next_checksum_frame);
         if (match_shell_are_next_checksums_out_of_sync(state)) {
             desync_send_serialized_frame(state->next_checksum_frame);
             state->mode = MATCH_SHELL_MODE_DESYNC;

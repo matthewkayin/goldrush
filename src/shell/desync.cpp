@@ -155,7 +155,6 @@ void desync_delete_serialized_frame(uint32_t frame) {
     char desync_filepath[DESYNC_FILEPATH_BUFFER_SIZE];
     desync_get_filepath(desync_filepath, frame);
     SDL_RemovePath(desync_filepath);
-    log_debug("DESYNC deleted serialized frame %s", desync_filepath);
 }
 
 uint8_t* desync_read_serialized_frame(uint32_t frame_number, size_t* state_buffer_length) {
