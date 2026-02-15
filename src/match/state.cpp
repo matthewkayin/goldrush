@@ -75,12 +75,7 @@ MatchState* match_init(int32_t lcg_seed, MatchPlayer players[MAX_PLAYERS], Match
     map_calculate_unreachable_cells(state->map);
     map_init_regions(state->map);
 
-    memset(state->padding, 0, sizeof(state->padding));
-    memset(state->remembered_entity_count, 0, sizeof(state->remembered_entity_count));
-    memset(state->remembered_entities, 0, sizeof(state->remembered_entities));
     memset(state->fire_cells, 0, sizeof(state->fire_cells));
-
-    state->is_fog_dirty = false;
 
     return state;
 }
@@ -369,7 +364,7 @@ void match_handle_input(MatchState* state, const MatchInput& input) {
                     entity_clear_target_queue(state, entity);
                     entity_set_target(state, entity, target);
                 } else if (entity.target_queue.is_full()) {
-                    match_event_show_status(state, entity.player_id, "Command queue is full.");
+                    match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_COMMAND_QUEUE_IS_FULL);
                 } else {
                     entity.target_queue.push(target);
                 }
@@ -833,25 +828,20 @@ void match_update(MatchState* state) {
     }
 
     // Update remembered entities
-    if (state->is_fog_dirty) {
-        for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
-            // Remove any remembered entities (but only if the players can see that they should be removed)
-            uint8_t remembered_entity_index = 0;
-            while (remembered_entity_index < state->remembered_entity_count[team]) {
-                const RememberedEntity& remembered_entity = state->remembered_entities[team][remembered_entity_index];
-                uint32_t entity_index = state->entities.get_index_of(remembered_entity.entity_id);
-                if ((entity_index == INDEX_INVALID || state->entities[entity_index].health == 0) && 
-                        match_is_cell_rect_revealed(state, team, remembered_entity.cell, entity_get_data(remembered_entity.type).cell_size)) {
-                    // Remove remembered entity
-                    state->remembered_entities[team][remembered_entity_index] = state->remembered_entities[team][state->remembered_entity_count[team] - 1];
-                    state->remembered_entity_count[team]--;
-                } else {
-                    remembered_entity_index++;
-                }
+    for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
+        // Remove any remembered entities (but only if the players can see that they should be removed)
+        uint8_t remembered_entity_index = 0;
+        while (remembered_entity_index < state->remembered_entities[team].size()) {
+            const RememberedEntity& remembered_entity = state->remembered_entities[team][remembered_entity_index];
+            uint32_t entity_index = state->entities.get_index_of(remembered_entity.entity_id);
+            if ((entity_index == INDEX_INVALID || state->entities[entity_index].health == 0) && 
+                    match_is_cell_rect_revealed(state, team, remembered_entity.cell, entity_get_data(remembered_entity.type).cell_size)) {
+                // Remove remembered entity
+                state->remembered_entities[team].remove_at_unordered(remembered_entity_index);
+            } else {
+                remembered_entity_index++;
             }
         }
-
-        state->is_fog_dirty = false;
     }
 }
 
@@ -987,7 +977,7 @@ bool match_player_has_entities(const MatchState* state, uint8_t player_id) {
 }
 
 uint32_t match_team_find_remembered_entity_index(const MatchState* state, uint8_t team, EntityId entity_id) {
-    for (uint32_t index = 0; index < state->remembered_entity_count[team]; index++) {
+    for (uint32_t index = 0; index < state->remembered_entities[team].size(); index++) {
         if (state->remembered_entities[team][index].entity_id == entity_id) {
             return index;
         }
@@ -997,7 +987,7 @@ uint32_t match_team_find_remembered_entity_index(const MatchState* state, uint8_
 }
 
 bool match_team_remembers_entity(const MatchState* state, uint8_t team, EntityId entity_id) {
-    for (uint32_t index = 0; index < state->remembered_entity_count[team]; index++) {
+    for (uint32_t index = 0; index < state->remembered_entities[team].size(); index++) {
         if (state->remembered_entities[team][index].entity_id == entity_id) {
             return true;
         }
@@ -1604,7 +1594,7 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                                 match_event_selection_handoff(state, entity.player_id, entity_id, entity.target.id);
                             } else {
                                 entity.target = target_none();
-                                match_event_show_status(state, entity.player_id, "Cannot create building. Entity limit reached.");
+                                match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_ENTITY_LIMIT_REACHED);
                             }
                         }
 
@@ -3673,7 +3663,7 @@ void match_event_show_status(MatchState* state, uint8_t player_id, const char* m
 
     event.type = MATCH_EVENT_STATUS;
     event.status.player_id = player_id;
-    event.status.message = message;
+    strncpy(event.status.message, message, MATCH_EVENT_STATUS_MESSAGE_BUFFER_SIZE);
 
     state->events.push(event);
 }
@@ -3814,19 +3804,21 @@ void match_fog_update(MatchState* state, uint32_t player_team, ivec2 cell, int c
                             if (entity.type == ENTITY_GOLDMINE && frame.x == 1) {
                                 frame.x = 0;
                             }
-                            uint32_t remembered_entity_index = match_team_find_remembered_entity_index(state, player_team, map_cell.id);
-                            if (remembered_entity_index == MATCH_ENTITY_NOT_REMEMBERED) {
-                                GOLD_ASSERT(state->remembered_entity_count[player_team] < MATCH_MAX_REMEMBERED_ENTITIES);
-                                remembered_entity_index = state->remembered_entity_count[player_team];
-                                state->remembered_entity_count[player_team]++;
-                            }
-                            state->remembered_entities[player_team][remembered_entity_index] = (RememberedEntity) {
+
+                            RememberedEntity remembered_entity = (RememberedEntity) {
                                 .entity_id = map_cell.id,
                                 .type = entity.type,
                                 .frame = frame,
                                 .cell = entity.cell,
                                 .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLDMINE ? 0 : state->players[entity.player_id].recolor_id
                             };
+
+                            uint32_t remembered_entity_index = match_team_find_remembered_entity_index(state, player_team, map_cell.id);
+                            if (remembered_entity_index == MATCH_ENTITY_NOT_REMEMBERED) {
+                                state->remembered_entities[player_team].push_back(remembered_entity);
+                            } else {
+                                state->remembered_entities[player_team][remembered_entity_index] = remembered_entity;
+                            }
                         }
                     } // End if cell value < cell empty
                 } // End if !increment
@@ -3843,8 +3835,6 @@ void match_fog_update(MatchState* state, uint32_t player_team, ivec2 cell, int c
             } // End for each line cell in line
         } // End for each line end from corner to corner
     } // End for each search index
-
-    state->is_fog_dirty = true;
 }
 
 // FIRE

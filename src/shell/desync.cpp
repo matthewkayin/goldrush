@@ -38,7 +38,7 @@ STATIC_ASSERT(sizeof(EntityCount) == 88ULL);
 STATIC_ASSERT(sizeof(BotSquadType) == 4ULL);
 STATIC_ASSERT(sizeof(BotDesiredSquad) == 92ULL);
 STATIC_ASSERT(sizeof(BotBaseInfo) == 228ULL);
-STATIC_ASSERT(sizeof(MatchState) == 2824400ULL);
+STATIC_ASSERT(sizeof(MatchState) == 2825556ULL);
 STATIC_ASSERT(sizeof(Bot) == 16428ULL);
 
 #ifdef GOLD_DEBUG
@@ -306,13 +306,9 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
         }
     }
 
-    // Remembered entity count
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        GOLD_ASSERT(state_a->remembered_entity_count[player_id] == state_b->remembered_entity_count[player_id]);
-    }
-
     // Remembered entities
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        GOLD_ASSERT(state_a->remembered_entities[player_id].size() == state_b->remembered_entities[player_id].size());
         for (size_t index = 0; index < MATCH_MAX_REMEMBERED_ENTITIES; index++) {
             const RememberedEntity& entity_a = state_a->remembered_entities[player_id][index];
             const RememberedEntity& entity_b = state_b->remembered_entities[player_id][index];
@@ -324,14 +320,6 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
             GOLD_ASSERT(entity_a.recolor_id == entity_b.recolor_id);
         }
     }
-
-    // Is fog dirty
-    GOLD_ASSERT(state_a->is_fog_dirty == state_b->is_fog_dirty);
-
-    // Padding
-    GOLD_ASSERT(state_a->padding[0] == state_b->padding[0]);
-    GOLD_ASSERT(state_a->padding[1] == state_b->padding[1]);
-    GOLD_ASSERT(state_a->padding[2] == state_b->padding[2]);
 
     // Entities
     const IdArray<Entity, MATCH_MAX_ENTITIES>::InternalState* entities_a = state_a->entities.get_internal_state();

@@ -415,8 +415,6 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
     // Player spawn
     match_shell_center_camera_on_cell(state, scenario->player_spawn);
 
-    state->match_state->is_fog_dirty = false;
-
     // Script
     if (!match_shell_script_init(state, scenario, script_path)) {
         delete state;
@@ -3268,7 +3266,7 @@ void match_shell_render(const MatchShellState* state) {
                 continue;
             }
 
-            for (uint32_t remembered_entity_index = 0; remembered_entity_index < state->match_state->remembered_entity_count[team]; remembered_entity_index++) {
+            for (uint32_t remembered_entity_index = 0; remembered_entity_index < state->match_state->remembered_entities[team].size(); remembered_entity_index++) {
                 const RememberedEntity& remembered_entity = state->match_state->remembered_entities[team][remembered_entity_index];
                 const EntityData& entity_data = entity_get_data(remembered_entity.type);
                 // Don't draw the remembered entity if we can see it, otherwise we will double draw them
@@ -4323,7 +4321,7 @@ void match_shell_render(const MatchShellState* state) {
                 continue;
             }
 
-            for (uint32_t remembered_entity_index = 0; remembered_entity_index < state->match_state->remembered_entity_count[team]; remembered_entity_index++) {
+            for (uint32_t remembered_entity_index = 0; remembered_entity_index < state->match_state->remembered_entities[team].size(); remembered_entity_index++) {
                 const RememberedEntity& remembered_entity = state->match_state->remembered_entities[team][remembered_entity_index];
                 const EntityData& entity_data = entity_get_data(remembered_entity.type);
                 Rect entity_rect = (Rect) {

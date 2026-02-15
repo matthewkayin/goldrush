@@ -31,6 +31,8 @@
 #define MATCH_UI_STATUS_REPAIR_TARGET_INVALID "Must target an allied building."
 #define MATCH_UI_STATUS_SMOKE_COOLDOWN "Smoke bomb is on cooldown."
 #define MATCH_UI_STATUS_NOT_ENOUGH_ENERGY "Not enough energy."
+#define MATCH_UI_STATUS_COMMAND_QUEUE_IS_FULL "Command queue is full."
+#define MATCH_UI_STATUS_ENTITY_LIMIT_REACHED "Cannot create building. Entity limit reached."
 
 #define MATCH_MAX_ENTITIES (150 * MAX_PLAYERS)
 #define MATCH_MAX_REMEMBERED_ENTITIES 64
@@ -50,6 +52,8 @@
 #define GARRISONED_UNITS_MAX 4
 #define BUILDING_QUEUE_SIZE 5
 #define TARGET_QUEUE_CAPACITY 32
+
+#define MATCH_EVENT_STATUS_MESSAGE_BUFFER_SIZE 63
 
 using EntityList = FixedVector<EntityId, MATCH_MAX_POPULATION>;
 
@@ -270,8 +274,8 @@ struct MatchEventResearchComplete {
 };
 
 struct MatchEventStatus {
-    const char* message;
     uint8_t player_id;
+    char message[MATCH_EVENT_STATUS_MESSAGE_BUFFER_SIZE];
 };
 
 struct MatchEventPlayerDefeated {
@@ -369,10 +373,7 @@ struct MatchState {
     Map map;
     int fog[MAX_PLAYERS][MAP_SIZE_MAX * MAP_SIZE_MAX];
     int detection[MAX_PLAYERS][MAP_SIZE_MAX * MAP_SIZE_MAX];
-    uint8_t remembered_entity_count[MAX_PLAYERS];
-    RememberedEntity remembered_entities[MAX_PLAYERS][MATCH_MAX_REMEMBERED_ENTITIES];
-    bool is_fog_dirty;
-    uint8_t padding[3];
+    FixedVector<RememberedEntity, MATCH_MAX_REMEMBERED_ENTITIES> remembered_entities[MAX_PLAYERS];
 
     IdArray<Entity, MATCH_MAX_ENTITIES> entities;
     CircularVector<Particle, MATCH_MAX_PARTICLES> particles;
