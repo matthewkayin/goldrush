@@ -229,7 +229,7 @@ void bot_strategy_update(const MatchState* state, Bot& bot) {
     for (uint32_t base_info_index = 0; base_info_index < bot.base_info.size(); base_info_index++) {
         const BotBaseInfo& base_info = bot.base_info[base_info_index];
 
-        if (base_info.controlling_player == bot.player_id && base_info.is_under_attack) {
+        if (base_info.controlling_player == bot.player_id && bitflag_check(base_info.flags, BOT_BASE_IS_UNDER_ATTACK)) {
             bitflag_set(&bot.scout_info, BOT_SCOUT_INFO_ENEMY_HAS_ATTACKED, true);
             ivec2 location = state->entities.get_by_id(base_info.goldmine_id).cell;
             bot_defend_location(state, bot, location, BOT_DEFEND_COUNTERATTACK | BOT_DEFEND_WITH_WORKERS);
@@ -461,7 +461,7 @@ uint32_t bot_get_player_mining_base_count(const Bot& bot, uint8_t player_id) {
         if (base_info.controlling_player != player_id) {
             continue;
         }
-        if (base_info.has_surrounding_hall && base_info.has_gold) {
+        if (bitflag_check(base_info.flags, BOT_BASE_HAS_SURROUNDING_HALL | BOT_BASE_HAS_GOLD)) {
             count++;
         }
     }
@@ -472,8 +472,9 @@ uint32_t bot_get_player_mining_base_count(const Bot& bot, uint8_t player_id) {
 bool bot_are_bases_fully_saturated(const Bot& bot) {
     for (uint32_t base_info_index = 0; base_info_index < bot.base_info.size(); base_info_index++) {
         const BotBaseInfo& base_info = bot.base_info[base_info_index];
-        if (base_info.controlling_player == bot.player_id && base_info.has_gold &&
-                !base_info.is_saturated) {
+        if (base_info.controlling_player == bot.player_id &&
+                bitflag_check(base_info.flags, BOT_BASE_HAS_GOLD) &&
+                !bitflag_check(base_info.flags, BOT_BASE_IS_SATURATED)) {
             return false;
         }
     }
@@ -485,7 +486,8 @@ uint32_t bot_get_low_on_gold_base_count(const Bot& bot) {
     uint32_t count = 0;
     for (uint32_t base_info_index = 0; base_info_index < bot.base_info.size(); base_info_index++) {
         const BotBaseInfo& base_info = bot.base_info[base_info_index];
-        if (base_info.controlling_player == bot.player_id && base_info.is_low_on_gold) {
+        if (base_info.controlling_player == bot.player_id && 
+                bitflag_check(base_info.flags, BOT_BASE_IS_LOW_ON_GOLD)) {
             count++;
         }
     }
@@ -507,7 +509,9 @@ uint32_t bot_get_max_enemy_mining_base_count(const MatchState* state, const Bot&
 bool bot_has_base_that_is_missing_a_hall(const Bot& bot, EntityId* goldmine_id) {
     for (uint32_t base_info_index = 0; base_info_index < bot.base_info.size(); base_info_index++) {
         const BotBaseInfo& base_info = bot.base_info[base_info_index];
-        if (base_info.controlling_player == bot.player_id && base_info.has_gold && !base_info.has_surrounding_hall) {
+        if (base_info.controlling_player == bot.player_id && 
+                bitflag_check(base_info.flags, BOT_BASE_HAS_GOLD) &&
+                !bitflag_check(base_info.flags, BOT_BASE_HAS_SURROUNDING_HALL)) {
             if (goldmine_id != NULL) {
                 *goldmine_id = base_info.goldmine_id;
             }
@@ -524,7 +528,8 @@ bool bot_has_base_that_is_missing_a_hall(const Bot& bot, EntityId* goldmine_id) 
 bool bot_is_unoccupied_goldmine_available(const Bot& bot) {
     for (uint32_t base_info_index = 0; base_info_index < bot.base_info.size(); base_info_index++) {
         const BotBaseInfo& base_info = bot.base_info[base_info_index];
-        if (base_info.controlling_player == PLAYER_NONE && base_info.has_gold) {
+        if (base_info.controlling_player == PLAYER_NONE && 
+                bitflag_check(base_info.flags, BOT_BASE_HAS_GOLD)) {
             return true;
         }
     }
@@ -554,7 +559,8 @@ uint32_t bot_get_least_defended_enemy_base_info_index(const MatchState* state, c
 bool bot_is_under_attack(const Bot& bot) {
     for (uint32_t base_info_index = 0; base_info_index < bot.base_info.size(); base_info_index++) {
         const BotBaseInfo& base_info = bot.base_info[base_info_index];
-        if (base_info.controlling_player == bot.player_id && base_info.is_under_attack) {
+        if (base_info.controlling_player == bot.player_id && 
+                bitflag_check(base_info.flags, BOT_BASE_IS_UNDER_ATTACK)) {
             return true;
         }
     }
@@ -1516,7 +1522,8 @@ EntityId bot_find_unoccupied_goldmine_nearest_to_entity(const MatchState* state,
     for (uint32_t base_info_index = 0; base_info_index < bot.base_info.size(); base_info_index++) {
         const BotBaseInfo& base_info = bot.base_info[base_info_index];
 
-        if (base_info.controlling_player != PLAYER_NONE || !base_info.has_gold) {
+        if (base_info.controlling_player != PLAYER_NONE || 
+                !bitflag_check(base_info.flags, BOT_BASE_HAS_GOLD)) {
             continue;
         }
 
@@ -3284,12 +3291,7 @@ void bot_scout_gather_info(const MatchState* state, Bot& bot) {
 
 void bot_clear_base_info(BotBaseInfo& info) {
     info.controlling_player = PLAYER_NONE,
-    info.has_surrounding_hall = false,
-    info.is_saturated = false,
-    info.has_gold = false,
-    info.is_low_on_gold = false,
-    info.is_under_attack = false,
-    info.has_been_scouted = false,
+    info.flags = 0;
     info.defense_score = 0;
 }
 
@@ -3306,12 +3308,16 @@ void bot_update_base_info(const MatchState* state, Bot& bot) {
             continue;
         }
 
-        base_info.has_gold = goldmine.gold_held != 0;
+        if (goldmine.gold_held != 0) {
+            base_info.flags |= BOT_BASE_HAS_GOLD;
+        }
         // Base is not considered low_on_gold if it does not have gold
         // This is to prevent a bug where bot was building an extra base than it should have because
         // it considered its collapsed goldmine base (which it had already replaced) as a low_on_gold base
-        base_info.is_low_on_gold = goldmine.gold_held != 0 && goldmine.gold_held < 1000;
-        base_info.has_been_scouted = true;
+        if (goldmine.gold_held != 0 && goldmine.gold_held < 1000) {
+            base_info.flags |= BOT_BASE_IS_LOW_ON_GOLD;
+        }
+        base_info.flags |= BOT_BASE_HAS_BEEN_SCOUTED;
 
         // First try to find the surrounding hall
         EntityId nearest_building_id = bot_find_hall_surrounding_goldmine(state, bot, goldmine);
@@ -3335,12 +3341,14 @@ void bot_update_base_info(const MatchState* state, Bot& bot) {
 
         const Entity& nearest_building = state->entities.get_by_id(nearest_building_id);
         base_info.controlling_player = nearest_building.player_id;
-        base_info.has_surrounding_hall = nearest_building.type == ENTITY_HALL;
+        if (nearest_building.type == ENTITY_HALL) {
+            base_info.flags |= BOT_BASE_HAS_SURROUNDING_HALL;
+        }
 
-        base_info.is_saturated = 
-            base_info.has_surrounding_hall &&
-            base_info.has_gold &&
-            match_get_miners_on_gold(state, base_info.goldmine_id, base_info.controlling_player) == MATCH_MAX_MINERS_ON_GOLD;
+        if (bitflag_check(base_info.flags, BOT_BASE_HAS_SURROUNDING_HALL | BOT_BASE_HAS_GOLD) && 
+                match_get_miners_on_gold(state, base_info.goldmine_id, base_info.controlling_player) == MATCH_MAX_MINERS_ON_GOLD) {
+            base_info.flags |= BOT_BASE_IS_SATURATED;
+        }
     }
 
     // Calculate base defense score for each controlled goldmine
@@ -3421,7 +3429,7 @@ void bot_update_base_info(const MatchState* state, Bot& bot) {
         BotBaseInfo& base_info = bot.base_info[base_info_index];
 
         if (base_info.controlling_player == PLAYER_NONE) {
-            base_info.is_under_attack = false;
+            bitflag_set(&base_info.flags, BOT_BASE_IS_UNDER_ATTACK, false);
             continue;
         }
 
@@ -3436,7 +3444,9 @@ void bot_update_base_info(const MatchState* state, Bot& bot) {
                 ivec2::manhattan_distance(entity.cell, goldmine.cell) < BOT_NEAR_DISTANCE;
         });
 
-        base_info.is_under_attack = nearby_enemy_id != ID_NULL;
+        if (nearby_enemy_id != ID_NULL) {
+            base_info.flags |= BOT_BASE_IS_UNDER_ATTACK;
+        }
     }
 }
 

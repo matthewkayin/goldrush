@@ -4,20 +4,11 @@
 #include <cstdint>
 
 template <typename T, uint32_t capacity>
-class FixedQueue {
-private:
+struct FixedQueue {
     T data[capacity];
     uint32_t tail;
     uint32_t _size;
 
-    uint32_t wrap_index(uint32_t index) const {
-        uint32_t wrapped_index = tail + index;
-        if (wrapped_index >= capacity) {
-            wrapped_index -= capacity;
-        }
-        return wrapped_index;
-    }
-public:
     FixedQueue() {
         tail = 0;
         size = 0;
@@ -60,5 +51,13 @@ public:
 
     bool is_full() const {
         return _size == capacity;
+    }
+
+    uint32_t wrap_index(uint32_t index) const {
+        uint32_t wrapped_index = tail + index;
+        if (wrapped_index >= capacity) {
+            wrapped_index -= capacity;
+        }
+        return wrapped_index;
     }
 };

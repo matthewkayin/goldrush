@@ -18,6 +18,13 @@
 
 const int BOT_SQUAD_ID_NULL = -1;
 
+const uint32_t BOT_BASE_HAS_SURROUNDING_HALL = 1 << 0U;
+const uint32_t BOT_BASE_IS_SATURATED = 1 << 1U;
+const uint32_t BOT_BASE_HAS_GOLD = 1 << 2U;
+const uint32_t BOT_BASE_IS_LOW_ON_GOLD = 1 << 3U;
+const uint32_t BOT_BASE_IS_UNDER_ATTACK = 1 << 4U;
+const uint32_t BOT_BASE_HAS_BEEN_SCOUTED = 1 << 5U;
+
 enum BotSquadType {
     BOT_SQUAD_TYPE_ATTACK,
     BOT_SQUAD_TYPE_DEFEND,
@@ -51,19 +58,11 @@ struct BotDesiredSquad {
 
 struct BotBaseInfo {
     EntityId goldmine_id;
-
     uint8_t controlling_player;
-    bool has_surrounding_hall;
-    bool is_saturated;
-    bool has_gold;
-    bool is_low_on_gold;
-    bool is_under_attack;
-    bool has_been_scouted;
-    uint8_t padding = 0;
+    uint8_t retreat_count;
+    uint32_t flags;
     int defense_score;
-
     EntityList retreat_entity_list;
-    int retreat_count;
     uint32_t retreat_time;
 };
 

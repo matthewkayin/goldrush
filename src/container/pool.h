@@ -3,12 +3,11 @@
 #include <cstdint>
 
 template <typename T, uint32_t capacity>
-class Pool {
-private:
+struct Pool {
     T data[capacity];
     uint32_t free_list[capacity];
     uint32_t head;
-public:
+
     Pool() {
         for (uint32_t index = 0; index < capacity - 1; index++) {
             free_list[index] = index + 1;

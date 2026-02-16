@@ -5,15 +5,14 @@
 #include <cstdint>
 
 template <typename T, size_t capacity>
-class IdArray {
-private:
+struct IdArray {
     T data[capacity];
     EntityId ids[capacity];
     uint16_t id_to_index[ID_MAX];
     // id_to_index is not 4-byte aligned and the position of next_id serves as padding
     EntityId next_id;
     uint32_t _size;
-public:
+
     IdArray() {
         memset(data, 0, sizeof(data));
         for (uint32_t index = 0; index < capacity; index++) {

@@ -4,11 +4,10 @@
 #include <cstdint>
 
 template <typename T, uint32_t _capacity>
-class FixedVector {
-private:
+struct FixedVector {
     T data[_capacity];
     uint32_t _size;
-public:
+
     FixedVector() {
         clear();
     }
@@ -47,7 +46,7 @@ public:
     }
 
     void pop_back() {
-        GOLD_ASSERT()size != 0);
+        GOLD_ASSERT(_size != 0);
         _size--;
     }
 
