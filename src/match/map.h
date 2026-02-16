@@ -155,7 +155,7 @@ ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, in
 uint8_t map_get_region(const Map& map, ivec2 cell);
 bool map_are_regions_connected(const Map& map, uint8_t region_a, uint8_t region_b);
 
-void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, uint32_t options, MapPath* ignore_cells, MapPath* path);
+void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, uint32_t options, const MapPath* ignore_cells, MapPath* path);
 ivec2 map_get_ideal_mine_exit_path_rally_cell(const Map& map, ivec2 mine_cell, ivec2 hall_cell);
 void map_get_ideal_mine_exit_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, MapPath* path);
 ivec2 map_get_ideal_mine_entrance_cell(const Map& map, ivec2 mine_cell, ivec2 hall_cell);

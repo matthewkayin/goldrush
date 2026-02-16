@@ -360,13 +360,11 @@ void match_handle_input(MatchState* state, const MatchInput& input) {
                     target.id = input.move.target_id;
                 }
 
-                if (!input.move.shift_command || (entity.target.type == TARGET_NONE && entity.target_queue.empty())) {
-                    entity_clear_target_queue(state, entity);
+                if (!input.move.shift_command || (entity.target.type == TARGET_NONE && entity.target_queue_index == ENTITY_TARGET_QUEUE_INDEX_NONE)) {
+                    entity_target_queue_clear(state, entity);
                     entity_set_target(state, entity, target);
-                } else if (entity.target_queue.is_full()) {
-                    match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_COMMAND_QUEUE_IS_FULL);
                 } else {
-                    entity.target_queue.push(target);
+                    entity_target_queue_push(state, entity, target);
                 }
             } // End for each unit in move input
             break;
@@ -395,11 +393,11 @@ void match_handle_input(MatchState* state, const MatchInput& input) {
             Target target = target_molotov(input.move.target_cell);
 
             if (!input.move.shift_command || 
-                    (state->entities[thrower_index].target.type == TARGET_NONE && state->entities[thrower_index].target_queue.empty())) {
-                entity_clear_target_queue(state, state->entities[thrower_index]);
+                    (state->entities[thrower_index].target.type == TARGET_NONE && state->entities[thrower_index].target_queue_index == ENTITY_TARGET_QUEUE_INDEX_NONE)) {
+                entity_target_queue_clear(state, state->entities[thrower_index]);
                 entity_set_target(state, state->entities[thrower_index], target);
             } else {
-                state->entities[thrower_index].target_queue.push(target);
+                entity_target_queue_push(state, state->entities[thrower_index], target);
             }
 
             break;
@@ -413,8 +411,8 @@ void match_handle_input(MatchState* state, const MatchInput& input) {
                 }
 
                 Entity& entity = state->entities[entity_index];
-                entity.path.clear();
-                entity_clear_target_queue(state, entity);
+                entity_path_clear(state, entity);
+                entity_target_queue_clear(state, entity);
                 entity_set_target(state, entity, target_none());
                 if (input.type == MATCH_INPUT_DEFEND) {
                     entity_set_flag(entity, ENTITY_FLAG_HOLD_POSITION, true);
@@ -474,11 +472,11 @@ void match_handle_input(MatchState* state, const MatchInput& input) {
                 .building_cell = input.build.target_cell,
                 .building_type = (EntityType)input.build.building_type
             });
-            if (!input.move.shift_command || (lead_builder.target.type == TARGET_NONE && lead_builder.target_queue.empty())) {
-                entity_clear_target_queue(state, lead_builder);
+            if (!input.move.shift_command || (lead_builder.target.type == TARGET_NONE && lead_builder.target_queue_index == ENTITY_TARGET_QUEUE_INDEX_NONE)) {
+                entity_target_queue_clear(state, lead_builder);
                 entity_set_target(state, lead_builder, build_target);
             } else {
-                lead_builder.target_queue.push(build_target);
+                entity_target_queue_push(state, lead_builder, build_target);
             }
 
             // Assign the helpers' target
@@ -488,7 +486,7 @@ void match_handle_input(MatchState* state, const MatchInput& input) {
                         continue;
                     } 
                     Entity& builder = state->entities.get_by_id(builder_id);
-                    entity_clear_target_queue(state, builder);
+                    entity_target_queue_clear(state, builder);
                     entity_set_target(state, builder, target_build_assist(lead_builder_id));
                 }
             }
@@ -513,7 +511,7 @@ void match_handle_input(MatchState* state, const MatchInput& input) {
                     builder.position = entity_get_target_position(builder);
                     builder.target = target_none();
                     builder.mode = MODE_UNIT_IDLE;
-                    entity_clear_target_queue(state, builder);
+                    entity_target_queue_clear(state, builder);
                     map_set_cell_rect(state->map, CELL_LAYER_GROUND, builder.cell, builder_data.cell_size, (Cell) {
                         .type = CELL_UNIT,
                         .id = state->entities.get_id_of(entity_index)
@@ -1139,10 +1137,14 @@ void entity_update(MatchState* state, uint32_t entity_index) {
 
             // Clear the unit's target
             // This is so that we refund any buildings
+            // It also frees the allocated target queue
             if (entity.target.type == TARGET_BUILD) {
                 entity_refund_target_build(state, entity, entity.target);
             }
-            entity_clear_target_queue(state, entity);
+            entity_target_queue_clear(state, entity);
+
+            // Release entity path
+            entity_path_clear(state, entity);
 
             if (entity_has_detection(state, entity) && entity.garrison_id == ID_NULL) {
                 // Remove this units detection
@@ -1227,9 +1229,17 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                 }
 
                 // If unit is idle, check target queue
-                if (entity.target.type == TARGET_NONE && !entity.target_queue.empty()) {
-                    entity_set_target(state, entity, entity.target_queue[0]);
-                    entity.target_queue.pop();
+                if (entity.target.type == TARGET_NONE && entity.target_queue_index != ENTITY_TARGET_QUEUE_INDEX_NONE) {
+                    TargetQueue* target_queue = state->entity_target_queues.get(entity.target_queue_index);
+                    GOLD_ASSERT(!target_queue->empty());
+
+                    entity_set_target(state, entity, (*target_queue)[0]);
+                    target_queue->pop();
+
+                    if (target_queue->empty()) {
+                        state->entity_target_queues.release(entity.target_queue_index);
+                        entity.target_queue_index = ENTITY_TARGET_QUEUE_INDEX_NONE;
+                    }
                 }
 
                 // If unit is idle, try to find a nearby target
@@ -1339,11 +1349,11 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                     if (entity.target.type == TARGET_CELL && entity.pathfind_attempts == 0) {
                         pathfind_options |= MAP_OPTION_ALLOW_PATH_SQUIRRELING;
                     }
-                    map_pathfind(state->map, entity_data.cell_layer, entity.cell, entity_get_target_cell(state, entity), entity_data.cell_size, pathfind_options, &mine_exit_path, &entity.path);
+                    entity_pathfind(state, entity, entity_get_target_cell(state, entity), pathfind_options, &mine_exit_path);
                 }
 
                 // Check path
-                if (!entity.path.empty()) {
+                if (!entity_has_path(entity)) {
                     entity.pathfind_attempts = 0;
                     entity.mode = MODE_UNIT_MOVE;
                 } else {
@@ -1382,12 +1392,13 @@ void entity_update(MatchState* state, uint32_t entity_index) {
 
                 while (movement_left.raw_value > 0) {
                     // If the unit is not moving between tiles, then pop the next cell off the path
-                    if (entity.position == entity_get_target_position(entity) && !entity.path.empty()) {
-                        entity.direction = enum_from_ivec2_direction(entity.path.back() - entity.cell);
+                    if (entity.position == entity_get_target_position(entity) && entity_has_path(entity)) {
+                        MapPath* entity_path = state->entity_paths.get(entity.path_index);
+                        entity.direction = enum_from_ivec2_direction(entity_path->back() - entity.cell);
 
                         // Miner - detect traffic jam and try to walk around entity
                         if (entity_is_mining(state, entity) &&
-                                map_is_cell_rect_occupied(state->map, entity_data.cell_layer, entity.path.back(), entity_data.cell_size, entity.cell, 0) &&
+                                map_is_cell_rect_occupied(state->map, entity_data.cell_layer, entity_path->back(), entity_data.cell_size, entity.cell, 0) &&
                                 entity_is_blocker_walking_towards_entity(state, entity)) {
 
                             uint32_t target_index = state->entities.get_index_of(entity.target.id);
@@ -1400,10 +1411,10 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                                 // Pathfind without ignoring miners to see if we can walk around
                                 MapPath mine_exit_path;
                                 entity_get_mining_path_to_avoid(state, entity, &mine_exit_path);
-                                map_pathfind(state->map, entity_data.cell_layer, entity.cell, target_cell, entity_data.cell_size, MAP_OPTION_NO_REGION_PATH, &mine_exit_path, &entity.path);
+                                entity_pathfind(state, entity, target_cell, MAP_OPTION_NO_REGION_PATH, &mine_exit_path);
 
                                 // If no path was generated, then just consider ourselves blocked
-                                if (entity.path.empty()) {
+                                if (!entity_has_path(entity)) {
                                     path_is_blocked = true;
                                     // breaks out of while movement left
                                     break;
@@ -1411,11 +1422,13 @@ void entity_update(MatchState* state, uint32_t entity_index) {
 
                                 // Otherwise, orient towards the new path and try to keep walking
                                 // The code below this block should double-check that path.back() is not blocked
-                                entity.direction = enum_from_ivec2_direction(entity.path.back() - entity.cell);
+                                // Note that we reset the entity_path pointer since the path was realloced
+                                entity_path = state->entity_paths.get(entity.path_index);
+                                entity.direction = enum_from_ivec2_direction(entity_path->back() - entity.cell);
                             }
                         }
 
-                        if (map_is_cell_rect_occupied(state->map, entity_data.cell_layer, entity.path.back(), entity_data.cell_size, entity.cell, 0)) {
+                        if (map_is_cell_rect_occupied(state->map, entity_data.cell_layer, entity_path->back(), entity_data.cell_size, entity.cell, 0)) {
                             path_is_blocked = true;
                             // breaks out of while movement left
                             break;
@@ -1428,13 +1441,18 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                             });
                         }
                         match_fog_update(state, state->players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, false);
-                        entity.cell = entity.path.back();
+                        entity.cell = entity_path->back();
                         map_set_cell_rect(state->map, entity_data.cell_layer, entity.cell, entity_data.cell_size, (Cell) {
                             .type = entity_is_mining(state, entity) ? CELL_MINER : CELL_UNIT,
                             .id = entity_id
                         });
                         match_fog_update(state, state->players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, true);
-                        entity.path.pop_back();
+                        entity_path->pop_back();
+                        if (entity_path->empty()) {
+                            state->entity_paths.release(entity.path_index);
+                            entity.path_index = ENTITY_PATH_INDEX_NONE;
+                            entity_path = NULL;
+                        }
                     }
 
                     // Step unit along movement
@@ -1464,7 +1482,7 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                             Target attack_target = entity_target_nearest_enemy(state, entity);
                             if (attack_target.type != TARGET_NONE) {
                                 entity.target = attack_target;
-                                entity.path.clear();
+                                entity_path_clear(state, entity);
                                 entity.mode = entity_has_reached_target(state, entity) ? MODE_UNIT_MOVE_FINISHED : MODE_UNIT_IDLE;
                                 // breaks out of while movement left > 0
                                 break;
@@ -1474,27 +1492,23 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                             entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
                             entity.mode = MODE_UNIT_IDLE;
                             entity.target = target_none();
-                            entity.path.clear();
+                            entity_path_clear(state, entity);
                             break;
                         }
                         if (entity_has_reached_target(state, entity)) {
                             entity.mode = MODE_UNIT_MOVE_FINISHED;
-                            entity.path.clear();
+                            entity_path_clear(state, entity);
                             // break out of while movement left
                             break;
                         }
                         // If our path is no longer close to the target entity, then clear path and go into idle to trigger a repath
-                        if (!entity.path.empty() && entity.path.size() < 8 &&
-                                (entity.target.type == TARGET_ENTITY || entity.target.type == TARGET_ATTACK_ENTITY)) {
-                            ivec2 target_cell = entity_get_target_cell(state, entity);
-                            if (ivec2::manhattan_distance(entity.path[0], target_cell) > 8) {
-                                entity.mode = MODE_UNIT_IDLE;
-                                entity.path.clear();
-                                // break out of while movement left
-                                break;
-                            }
+                        if (entity_is_path_end_too_far_from_target(state, entity)) {
+                            entity.mode = MODE_UNIT_IDLE;
+                            entity_path_clear(state, entity);
+                            // break out of while movement left
+                            break;
                         }
-                        if (entity.path.empty()) {
+                        if (!entity_has_path(entity)) {
                             entity.mode = MODE_UNIT_IDLE;
                             // break out of while movement left
                             break;
@@ -2556,7 +2570,7 @@ bool entity_is_in_mine(const MatchState* state, const Entity& entity) {
 
 bool entity_is_idle_miner(const Entity& entity) {
     return entity.type == ENTITY_MINER && entity.mode == MODE_UNIT_IDLE &&
-            entity.target.type == TARGET_NONE && entity.target_queue.empty() && 
+            entity.target.type == TARGET_NONE && entity.target_queue_index == ENTITY_TARGET_QUEUE_INDEX_NONE &&
             entity_is_selectable(entity);
 }
 
@@ -2591,7 +2605,8 @@ void entity_get_mining_path_to_avoid(const MatchState* state, const Entity& enti
 }
 
 bool entity_is_blocker_walking_towards_entity(const MatchState* state, const Entity& entity) {
-    Cell blocking_cell = map_get_cell(state->map, entity_get_data(entity.type).cell_layer, entity.path.back());
+    const MapPath* entity_path = state->entity_paths.get(entity.path_index);
+    Cell blocking_cell = map_get_cell(state->map, entity_get_data(entity.type).cell_layer, entity_path->back());
     if (blocking_cell.type != CELL_MINER) {
         return false;
     }
@@ -2637,6 +2652,73 @@ bool entity_is_visible_to_player(const MatchState* state, const Entity& entity, 
     return false;
 }
 
+bool entity_has_path(const Entity& entity) {
+    return entity.path_index != ENTITY_PATH_INDEX_NONE;
+}
+
+void entity_pathfind(MatchState* state, Entity& entity, ivec2 to, uint32_t options, const MapPath* ignore_cells) {
+    if (entity_has_path(entity)) {
+        entity_path_clear(state, entity);
+    }
+
+    const EntityData& entity_data = entity_get_data(entity.type);
+
+    entity.path_index = state->entity_paths.reserve();
+    MapPath* entity_path = state->entity_paths.get(entity.path_index);
+    map_pathfind(state->map, entity_data.cell_layer, entity.cell, to, entity_data.cell_size, options, ignore_cells, entity_path);
+
+    if (entity_path->empty()) {
+        entity_path_clear(state, entity);
+    }
+}
+
+void entity_path_clear(MatchState* state, Entity& entity) {
+    if (entity.path_index == ENTITY_PATH_INDEX_NONE) {
+        return;
+    }
+    state->entity_paths.release(entity.path_index);
+    entity.path_index = ENTITY_PATH_INDEX_NONE;
+}
+
+/**
+ * X
+ * |
+ * |     A
+ * |
+ * O
+ * 
+ * Imagine that O is an entity and it is attacking unit A
+ * Unit A used to be standing at point X, and so unit O's path goes to point X
+ * But now unit A has moved to the side a little, and yet unit O will follow the
+ * path all the way to X anyways.
+ * 
+ * This function detects when we're in such a situation. If it returns true, it
+ * means we should clear O's path and make a new path that is more direct to A.
+ */
+// 
+bool entity_is_path_end_too_far_from_target(const MatchState* state, const Entity& entity) {
+    // Only apply this logic when we're moving towards an entity
+    if ((entity.target.type == TARGET_ENTITY || entity.target.type == TARGET_ATTACK_ENTITY)) {
+        return false;
+    }
+
+    // If we don't have a path, then there's no need to discard our current path, so return false
+    if (!entity_has_path(entity)) {
+        return false;
+    }
+
+    const MapPath* entity_path = state->entity_paths.get(entity.path_index);
+
+    // If the path is really long, then don't concern ourselves with re-calculating just yet
+    if (entity_path->size() >= 8) {
+        return false;
+    }
+
+    // Return true if the end of our path is far away from our target cell
+    // Note that entity_path[0] is in fact the path end because paths are consumed in reverse
+    return ivec2::manhattan_distance((*entity_path)[0], entity_get_target_cell(state, entity)) > 8;
+}
+
 void entity_set_target(MatchState* state, Entity& entity, Target target) {
     GOLD_ASSERT(entity.mode != MODE_UNIT_BUILD);
 
@@ -2646,7 +2728,7 @@ void entity_set_target(MatchState* state, Entity& entity, Target target) {
     }
 
     entity.target = target;
-    entity.path.clear();
+    entity_path_clear(state, entity);
     entity.goldmine_id = ID_NULL;
     entity.attack_move_cell = target.type == TARGET_ATTACK_CELL ? target.cell : ivec2(-1, -1);
     entity_set_flag(entity, ENTITY_FLAG_HOLD_POSITION, false);
@@ -2664,15 +2746,39 @@ void entity_set_target(MatchState* state, Entity& entity, Target target) {
     }
 }
 
-void entity_clear_target_queue(MatchState* state, Entity& entity) {
-    for (uint32_t target_queue_index = 0; target_queue_index < entity.target_queue.size(); target_queue_index++) {
-        const Target& target = entity.target_queue[target_queue_index];
+void entity_target_queue_push(MatchState* state, Entity& entity, Target target) {
+    TargetQueue* target_queue;
+
+    if (entity.target_queue_index == ENTITY_TARGET_QUEUE_INDEX_NONE) {
+        entity.target_queue_index = state->entity_target_queues.reserve();
+        target_queue = state->entity_target_queues.get(entity.target_queue_index);
+        target_queue->clear();
+    } else {
+        target_queue = state->entity_target_queues.get(entity.target_queue_index);
+    }
+
+    if (target_queue->is_full()) {
+        match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_COMMAND_QUEUE_IS_FULL);
+    } else {
+        target_queue->push(target);
+    }
+}
+
+void entity_target_queue_clear(MatchState* state, Entity& entity) {
+    if (entity.target_queue_index == ENTITY_TARGET_QUEUE_INDEX_NONE) {
+        return;
+    }
+
+    TargetQueue* target_queue = state->entity_target_queues.get(entity.target_queue_index);
+    for (uint32_t target_queue_index = 0; target_queue_index < target_queue->size(); target_queue_index++) {
+        const Target& target = (*target_queue)[target_queue_index];
         if (target.type == TARGET_BUILD) {
             entity_refund_target_build(state, entity, target);
         }
     }
 
-    entity.target_queue.clear();
+    state->entity_target_queues.release(entity.target_queue_index);
+    entity.target_queue_index = ENTITY_TARGET_QUEUE_INDEX_NONE;
 }
 
 void entity_refund_target_build(MatchState* state, Entity& entity, const Target& target) {
@@ -2735,7 +2841,7 @@ bool entity_has_reached_target(const MatchState* state, const Entity& entity) {
             return unit_rect.is_adjacent_to(building_rect);
         }
         case TARGET_UNLOAD:
-            return entity.path.empty() && ivec2::manhattan_distance(entity.cell, entity.target.cell) < 3;
+            return entity.path_index == ENTITY_PATH_INDEX_NONE && ivec2::manhattan_distance(entity.cell, entity.target.cell) < 3;
         case TARGET_ENTITY:
         case TARGET_ATTACK_ENTITY:
         case TARGET_REPAIR: {

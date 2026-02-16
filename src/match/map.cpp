@@ -1842,7 +1842,7 @@ bool map_are_regions_connected(const Map& map, uint8_t region_a, uint8_t region_
     return map.region_connection_indices[region_a][region_b] != MAP_REGIONS_NOT_CONNECTED;
 }
 
-ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, uint32_t ignore, MapPath* ignore_cells) {
+ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, uint32_t ignore, const MapPath* ignore_cells) {
     ZoneScoped;
 
     if (from == to) {
@@ -2085,7 +2085,7 @@ std::vector<int> map_get_region_path(const Map& map, ivec2 from, ivec2 to) {
     return path;
 }
 
-void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, uint32_t options, MapPath* ignore_cells, MapPath* path) {
+void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, uint32_t options, const MapPath* ignore_cells, MapPath* path) {
     ZoneScoped;
 
     static const int EXPLORED_INDEX_NOT_EXPLORED = -1;

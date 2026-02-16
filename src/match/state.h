@@ -9,6 +9,7 @@
 #include "container/fixed_queue.h"
 #include "container/fixed_vector.h"
 #include "container/circular_vector.h"
+#include "container/pool.h"
 #include <vector>
 #include <unordered_map>
 #include <functional>
@@ -34,7 +35,7 @@
 #define MATCH_UI_STATUS_COMMAND_QUEUE_IS_FULL "Command queue is full."
 #define MATCH_UI_STATUS_ENTITY_LIMIT_REACHED "Cannot create building. Entity limit reached."
 
-#define MATCH_MAX_ENTITIES (150 * MAX_PLAYERS)
+#define MATCH_MAX_ENTITIES (200U * MAX_PLAYERS)
 #define MATCH_MAX_REMEMBERED_ENTITIES 64
 #define ENTITY_UNLOAD_ALL ID_NULL
 #define MATCH_MAX_MINERS_ON_GOLD 8
@@ -44,6 +45,9 @@
 #define MATCH_MAX_FIRES 256U
 #define MATCH_MAX_FOG_REVEALS 32U
 #define MATCH_MAX_EVENTS 32U
+#define MATCH_MAX_UNITS (MATCH_MAX_POPULATION * MAX_PLAYERS)
+#define ENTITY_PATH_INDEX_NONE MATCH_MAX_UNITS
+#define ENTITY_TARGET_QUEUE_INDEX_NONE MATCH_MAX_UNITS
 
 #define MOLOTOV_ENERGY_COST 40
 #define CAMO_ENERGY_COST 30
@@ -56,6 +60,7 @@
 #define MATCH_EVENT_STATUS_MESSAGE_BUFFER_SIZE 63
 
 using EntityList = FixedVector<EntityId, MATCH_MAX_POPULATION>;
+using TargetQueue = FixedQueue<Target, TARGET_QUEUE_CAPACITY>;
 
 const int FOG_HIDDEN = -1;
 const int FOG_EXPLORED = 0;
@@ -188,9 +193,9 @@ struct Entity {
     uint32_t gold_held;
 
     Target target;
-    FixedQueue<Target, TARGET_QUEUE_CAPACITY> target_queue;
+    uint32_t target_queue_index;
 
-    MapPath path;
+    uint32_t path_index;
     uint32_t pathfind_attempts;
 
     // This is a FixedVector because players can remove items from the middle of a building queue
@@ -376,6 +381,9 @@ struct MatchState {
     FixedVector<RememberedEntity, MATCH_MAX_REMEMBERED_ENTITIES> remembered_entities[MAX_PLAYERS];
 
     IdArray<Entity, MATCH_MAX_ENTITIES> entities;
+    Pool<MapPath, MATCH_MAX_UNITS> entity_paths;
+    Pool<TargetQueue, MATCH_MAX_UNITS> entity_target_queues;
+
     CircularVector<Particle, MATCH_MAX_PARTICLES> particles;
     CircularVector<Projectile, MATCH_MAX_PROJECTILES> projectiles;
     CircularVector<Fire, MATCH_MAX_FIRES> fires;
@@ -448,8 +456,14 @@ void entity_get_mining_path_to_avoid(const MatchState* state, const Entity& enti
 bool entity_is_blocker_walking_towards_entity(const MatchState* state, const Entity& entity);
 bool entity_is_visible_to_player(const MatchState* state, const Entity& entity, uint8_t player_id);
 
+bool entity_has_path(const Entity& entity);
+void entity_pathfind(MatchState* state, Entity& entity, ivec2 to, uint32_t options, const MapPath* ignore_cells);
+void entity_path_clear(MatchState* state, Entity& entity);
+bool entity_is_path_end_too_far_from_target(const MatchState* state, const Entity& entity);
+
 void entity_set_target(MatchState* state, Entity& entity, Target target);
-void entity_clear_target_queue(MatchState* state, Entity& entity);
+void entity_target_queue_push(MatchState* state, Entity& entity, Target target);
+void entity_target_queue_clear(MatchState* state, Entity& entity);
 void entity_refund_target_build(MatchState* state, Entity& entity, const Target& target);
 bool entity_is_target_invalid(const MatchState* state, const Entity& entity);
 bool entity_has_reached_target(const MatchState* state, const Entity& entity);
