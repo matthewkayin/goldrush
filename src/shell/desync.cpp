@@ -147,6 +147,35 @@ uint32_t desync_compute_match_checksum(const MatchState* match_state, const Bot*
     desync_checksum_add_block(checksum, (uint8_t*)&match_state->entities.data, match_state->entities._size * sizeof(Entity));
     desync_checksum_add_block(checksum, (uint8_t*)&match_state->entities.ids, match_state->entities._size * sizeof(EntityId));
 
+    FixedVector<uint32_t, MATCH_MAX_UNITS> entity_path_indices;
+    FixedVector<uint32_t, MATCH_MAX_UNITS> entity_target_queue_indices;
+    for (uint32_t entity_index = 0; entity_index < match_state->entities.size(); entity_index++) {
+        const Entity& entity = match_state->entities[entity_index];
+        if (entity.path_index != ENTITY_PATH_INDEX_NONE) {
+            entity_path_indices.push_back(entity.path_index);
+        }
+        if (entity.target_queue_index != ENTITY_TARGET_QUEUE_INDEX_NONE) {
+            entity_target_queue_indices.push_back(entity.target_queue_index);
+        }
+    }
+
+    // Paths
+    desync_checksum_add_block(checksum, (uint8_t*)&entity_path_indices._size, sizeof(entity_path_indices._size));
+    for (uint32_t path_indices_index = 0; path_indices_index < entity_path_indices.size(); path_indices_index++) {
+        uint32_t path_index = entity_path_indices[path_indices_index];
+        const MapPath* path = match_state->entity_paths.get(path_index);
+        desync_checksum_add_block(checksum, (uint8_t*)path->_size, sizeof(path->_size));
+        desync_checksum_add_block(checksum, (uint8_t*)path->data, path->_size * sizeof(ivec2));
+    }
+
+    // Target queues
+    desync_checksum_add_block(checksum, (uint8_t*)&entity_target_queue_indices._size, sizeof(entity_target_queue_indices._size));
+    for (uint32_t target_queue_indices_index = 0; target_queue_indices_index < entity_target_queue_indices.size(); target_queue_indices_index++) {
+        uint32_t target_queue_index = entity_target_queue_indices[target_queue_indices_index];
+        const TargetQueue* target_queue = match_state->entity_target_queues.get(target_queue_index);
+        desync_checksum_add_circular_vector(checksum, (uint8_t*)target_queue->data, target_queue->tail, target_queue->_size, TARGET_QUEUE_CAPACITY, sizeof(Target));
+    }
+
     // Particles
     desync_checksum_add_circular_vector(checksum, (uint8_t*)&match_state->particles.data, match_state->particles.tail, match_state->particles._size, MATCH_MAX_PARTICLES, sizeof(Particle));
 
