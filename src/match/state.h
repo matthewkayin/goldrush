@@ -60,7 +60,6 @@
 #define MATCH_EVENT_STATUS_MESSAGE_BUFFER_SIZE 63
 
 using EntityList = FixedVector<EntityId, MATCH_MAX_POPULATION>;
-using TargetQueue = FixedQueue<Target, TARGET_QUEUE_CAPACITY>;
 
 const int FOG_HIDDEN = -1;
 const int FOG_EXPLORED = 0;
@@ -154,6 +153,7 @@ struct Target {
         TargetPatrol patrol;
     };
 };
+using TargetQueue = FixedQueue<Target, TARGET_QUEUE_CAPACITY>;
 
 enum BuildingQueueItemType {
     BUILDING_QUEUE_ITEM_UNIT,

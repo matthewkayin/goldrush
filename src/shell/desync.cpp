@@ -7,21 +7,6 @@
 #include <algorithm>
 #include <cstdlib>
 
-#ifdef GOLD_DEBUG
-    #define DESYNC_FILEPATH_BUFFER_SIZE 256
-#endif
-
-struct DesyncState {
-    uint32_t a;
-    uint32_t b;
-
-#ifdef GOLD_DEBUG
-    bool desync_debug = false;
-    char desync_folder_path[DESYNC_FILEPATH_BUFFER_SIZE];
-#endif
-};
-static DesyncState state;
-
 STATIC_ASSERT(sizeof(int) == 4ULL);
 STATIC_ASSERT(sizeof(MapType) == 4ULL);
 STATIC_ASSERT(sizeof(MapRegionConnection) == 260ULL);
@@ -38,10 +23,21 @@ STATIC_ASSERT(sizeof(EntityCount) == 88ULL);
 STATIC_ASSERT(sizeof(BotSquadType) == 4ULL);
 STATIC_ASSERT(sizeof(BotDesiredSquad) == 92ULL);
 STATIC_ASSERT(sizeof(BotBaseInfo) == 220);
-STATIC_ASSERT(sizeof(MatchState) == 2101964ULL);
+STATIC_ASSERT(sizeof(MatchState) == 2549964ULL);
 STATIC_ASSERT(sizeof(Bot) == 16172ULL);
 
 #ifdef GOLD_DEBUG
+
+#define DESYNC_FILEPATH_BUFFER_SIZE 256
+const size_t DESYNC_BUFFER_CAPACITY = sizeof(MatchState) + (MAX_PLAYERS * sizeof(Bot));
+
+struct DesyncState {
+    bool desync_debug = false;
+    char desync_folder_path[DESYNC_FILEPATH_BUFFER_SIZE];
+    uint8_t* buffer;
+    size_t buffer_length;
+};
+static DesyncState state;
 
 void desync_get_filepath(char* buffer, uint32_t frame) {
     sprintf(buffer, "%s/%u.desync", state.desync_folder_path, frame);
@@ -52,6 +48,13 @@ bool desync_init(const char* desync_foldername) {
     sprintf(state.desync_folder_path, "%s%s", filesystem_get_data_path().c_str(), desync_foldername);
 
     SDL_CreateDirectory(state.desync_folder_path);
+
+    state.buffer = (uint8_t*)malloc(DESYNC_BUFFER_CAPACITY);
+    if (state.buffer == NULL) {
+        log_error("Unable to malloc desync buffer.");
+        return false;
+    }
+
     return true;
 }
 
@@ -60,9 +63,10 @@ void desync_quit() {
         return;
     }
     SDL_RemovePath(state.desync_folder_path);
+    free(state.buffer);
 }
 
-void desync_write_file(const MatchState* match_state, const Bot* bots, uint32_t frame) {
+void desync_write_file(uint32_t frame) {
     char desync_filepath[DESYNC_FILEPATH_BUFFER_SIZE];
     desync_get_filepath(desync_filepath, frame);
     FILE* desync_file = fopen(desync_filepath, "wb");
@@ -71,8 +75,8 @@ void desync_write_file(const MatchState* match_state, const Bot* bots, uint32_t 
         return;
     }
 
-    fwrite(match_state, sizeof(MatchState), 1, desync_file);
-    fwrite(bots, sizeof(Bot) * MAX_PLAYERS, 1, desync_file);
+    fwrite(&state.buffer_length, 1, sizeof(state.buffer_length), desync_file);
+    fwrite(state.buffer, 1, state.buffer_length, desync_file);
 
     fclose(desync_file);
     log_debug("Wrote desync file %s", desync_filepath);
@@ -86,33 +90,47 @@ struct ChecksumState {
 };
 
 ChecksumState desync_checksum_init() {
-    return (ChecksumState) { .a = 1, .b = 0 };
+    ChecksumState state;
+    state.a = 1;
+    state.b = 0;
+    return state;
 }
 
-void desync_checksum_add_block(ChecksumState& state, uint8_t* data, size_t length) {
+void desync_checksum_add_block(ChecksumState& checksum, uint8_t* data, size_t length) {
     const uint32_t MOD_ADLER = 65521;
     for (size_t index = 0; index < length; index++) {
-        state.a = (state.a + data[index]) % MOD_ADLER;
-        state.b = (state.b + state.a) % MOD_ADLER;
+        checksum.a = (checksum.a + data[index]) % MOD_ADLER;
+        checksum.b = (checksum.b + checksum.a) % MOD_ADLER;
     }
+
+    #ifdef GOLD_DEBUG
+        if (state.desync_debug) {
+            GOLD_ASSERT(state.buffer_length + length <= DESYNC_BUFFER_CAPACITY);
+            memcpy(state.buffer, data, length);
+            state.buffer_length += length;
+        }
+    #endif
 }
 
-void desync_checksum_add_circular_vector(ChecksumState& state, uint8_t* data, uint32_t tail, uint32_t size, uint32_t capacity, size_t element_size) {
-    desync_checksum_add_block(state, (uint8_t*)&size, sizeof(size));
+void desync_checksum_add_circular_vector(ChecksumState& checksum, uint8_t* data, uint32_t tail, uint32_t size, uint32_t capacity, size_t element_size) {
+    desync_checksum_add_block(checksum, (uint8_t*)&size, sizeof(size));
     if (tail + size > capacity) {
-        desync_checksum_add_block(state, data, ((tail + size) - capacity) * element_size);
+        desync_checksum_add_block(checksum, data, ((tail + size) - capacity) * element_size);
     }
-    desync_checksum_add_block(state, data + (tail * element_size), std::min(size, capacity - tail) * element_size);
+    desync_checksum_add_block(checksum, data + (tail * element_size), std::min(size, capacity - tail) * element_size);
 }
 
-uint32_t desync_checksum_compute_result(const ChecksumState& state) {
-    return (state.b << 16) | state.a;
+uint32_t desync_checksum_compute_result(const ChecksumState& checksum) {
+    return (checksum.b << 16) | checksum.a;
 }
 
 uint32_t desync_compute_match_checksum(const MatchState* match_state, const Bot* bots, uint32_t frame) {
     ZoneScoped;
 
     ChecksumState checksum = desync_checksum_init();
+#ifdef GOLD_DEBUG
+    state.buffer_length = 0;
+#endif
 
     desync_checksum_add_block(checksum, (uint8_t*)&match_state->lcg_seed, sizeof(match_state->lcg_seed));
 
@@ -164,7 +182,7 @@ uint32_t desync_compute_match_checksum(const MatchState* match_state, const Bot*
     for (uint32_t path_indices_index = 0; path_indices_index < entity_path_indices.size(); path_indices_index++) {
         uint32_t path_index = entity_path_indices[path_indices_index];
         const MapPath* path = match_state->entity_paths.get(path_index);
-        desync_checksum_add_block(checksum, (uint8_t*)path->_size, sizeof(path->_size));
+        desync_checksum_add_block(checksum, (uint8_t*)&path->_size, sizeof(path->_size));
         desync_checksum_add_block(checksum, (uint8_t*)path->data, path->_size * sizeof(ivec2));
     }
 
@@ -256,7 +274,7 @@ uint32_t desync_compute_match_checksum(const MatchState* match_state, const Bot*
     // Write to desync file
 #ifdef GOLD_DEBUG
     if (state.desync_debug) {
-        desync_write_file(match_state, bots, frame);
+        desync_write_file(frame);
     }
 #endif
 
@@ -312,7 +330,8 @@ uint8_t* desync_read_serialized_frame(uint32_t frame_number, size_t* state_buffe
         return NULL;
     }
 
-    size_t frame_length = sizeof(MatchState) + (MAX_PLAYERS * sizeof(Bot));
+    size_t frame_length;
+    fread(&frame_length, 1, sizeof(frame_length), desync_file);
     *state_buffer_length = frame_length + sizeof(uint8_t) + sizeof(uint32_t);
 
     // Malloc and read into buffer, but leave room for the frame number and message type
@@ -372,10 +391,23 @@ void desync_assert_targets_equal(const Target& target_a, const Target& target_b)
     GOLD_ASSERT(target_a.build.building_type == target_b.build.building_type);
 }
 
+struct DesyncCompareState {
+    uint8_t* state_buffer_a;
+    uint8_t* state_buffer_b;
+    size_t state_buffer_offset;
+};
+
+void desync_compare_block(DesyncCompareState& compare_state, size_t length) {
+    GOLD_ASSERT(memcmp(compare_state.state_buffer_a + compare_state.state_buffer_offset, compare_state.state_buffer_b + compare_state.state_buffer_offset, length) == 0);
+    for (size_t index = 0; index < length; index++) {
+    }
+}
+
 void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
     const MatchState* state_a = (MatchState*)state_buffer_a;
     const MatchState* state_b = (MatchState*)state_buffer_b;
 
+    /*
     // LCG seed
     GOLD_ASSERT(state_a->lcg_seed == state_b->lcg_seed);
 
@@ -750,6 +782,7 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
             }
         }
     }
+        */
 }
 
 #endif

@@ -29,11 +29,11 @@ struct Pool {
 
     T* get(uint32_t index) {
         GOLD_ASSERT(index < capacity);
-        return index;
+        return &data[index];
     }
 
     const T* get(uint32_t index) const {
         GOLD_ASSERT(index < capacity);
-        return index;
+        return &data[index];
     }
 };

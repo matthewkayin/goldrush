@@ -17,11 +17,11 @@ struct CircularVector {
     }
 
     T& operator[](uint32_t index) {
-        GOLD_ASSERT(index < size);
+        GOLD_ASSERT(index < _size);
         return data[wrap_index(index)];
     }
     const T& operator[](uint32_t index) const {
-        GOLD_ASSERT(index < size);
+        GOLD_ASSERT(index < _size);
         return data[wrap_index(index)];
     }
 
@@ -40,7 +40,7 @@ struct CircularVector {
         }
     #endif
         data[wrap_index(_size)] = value;
-        if (size == capacity) {
+        if (_size == capacity) {
             tail = tail == capacity - 1
                 ? 0
                 : tail + 1;

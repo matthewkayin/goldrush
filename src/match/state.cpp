@@ -1022,6 +1022,8 @@ EntityId entity_create(MatchState* state, EntityType type, ivec2 cell, uint8_t p
                         : (entity_data.max_health / 10);
     entity.energy = entity_is_unit(type) ? entity_data.unit_data.max_energy / 4 : 0;
     entity.target = target_none();
+    entity.target_queue_index = ENTITY_TARGET_QUEUE_INDEX_NONE;
+    entity.path_index = ENTITY_PATH_INDEX_NONE;
     entity.pathfind_attempts = 0;
     entity.timer = entity_is_unit(type) || entity.type == ENTITY_LANDMINE
                         ? 0
@@ -1090,6 +1092,8 @@ EntityId entity_goldmine_create(MatchState* state, ivec2 cell, uint32_t gold_lef
     entity.health = 0;
     entity.energy = 0;
     entity.target = target_none();
+    entity.target_queue_index = ENTITY_TARGET_QUEUE_INDEX_NONE;
+    entity.path_index = ENTITY_PATH_INDEX_NONE;
     entity.attack_move_cell = ivec2(-1, -1);
     entity.rally_point = ivec2(-1, -1);
     entity.pathfind_attempts = 0;
@@ -1353,7 +1357,7 @@ void entity_update(MatchState* state, uint32_t entity_index) {
                 }
 
                 // Check path
-                if (!entity_has_path(entity)) {
+                if (entity_has_path(entity)) {
                     entity.pathfind_attempts = 0;
                     entity.mode = MODE_UNIT_MOVE;
                 } else {
@@ -2666,6 +2670,7 @@ void entity_pathfind(MatchState* state, Entity& entity, ivec2 to, uint32_t optio
     entity.path_index = state->entity_paths.reserve();
     MapPath* entity_path = state->entity_paths.get(entity.path_index);
     map_pathfind(state->map, entity_data.cell_layer, entity.cell, to, entity_data.cell_size, options, ignore_cells, entity_path);
+    log_debug("entity_pathfind %u", entity_path->size());
 
     if (entity_path->empty()) {
         entity_path_clear(state, entity);

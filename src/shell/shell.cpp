@@ -3339,21 +3339,21 @@ void match_shell_render(const MatchShellState* state) {
         // Check if it's an allied unit
         if (entity_is_unit(entity.type) &&
                 (state->replay_mode || entity.player_id == network_get_player_id())) {
-            // Render flag for entity's current target
-            if (!entity.target_queue.empty()) {
+            if (entity.target_queue_index != ENTITY_TARGET_QUEUE_INDEX_NONE) {
+                // Render flag for entity's current target
                 ivec2 queued_target_position = match_shell_get_queued_target_position(state, entity.target);
                 if (queued_target_position.x != -1) {
                     queue_render_rally_flag(queued_target_position, entity.player_id);
                 }
 
-            }
-
-            // Render flag for queued targets
-            for (uint32_t target_queue_index = 0; target_queue_index < entity.target_queue.size(); target_queue_index++) {
-                const Target& target = entity.target_queue[target_queue_index];
-                ivec2 queued_target_position = match_shell_get_queued_target_position(state, target);
-                if (queued_target_position.x != -1) {
-                    queue_render_rally_flag(queued_target_position, entity.player_id);
+                // Render flag for queued targets
+                const TargetQueue* entity_target_queue = state->match_state->entity_target_queues.get(entity.target_queue_index);
+                for (uint32_t target_queue_index = 0; target_queue_index < entity_target_queue->size(); target_queue_index++) {
+                    const Target& target = (*entity_target_queue)[target_queue_index];
+                    ivec2 queued_target_position = match_shell_get_queued_target_position(state, target);
+                    if (queued_target_position.x != -1) {
+                        queue_render_rally_flag(queued_target_position, entity.player_id);
+                    }
                 }
             }
         }
@@ -3714,11 +3714,14 @@ void match_shell_render(const MatchShellState* state) {
             if (entity.target.type == TARGET_BUILD && entity.target.id == ID_NULL) {
                 match_shell_render_target_build(state, entity.target, entity.player_id);
             }
-            for (uint32_t target_queue_index = 0; target_queue_index < entity.target_queue.size(); target_queue_index++) {
-                const Target& target = entity.target_queue[target_queue_index];
-                if (target.type == TARGET_BUILD) {
-                    match_shell_render_target_build(state, target, entity.player_id);
-                } 
+            if (entity.target_queue_index != ENTITY_TARGET_QUEUE_INDEX_NONE) {
+                const TargetQueue* entity_target_queue = state->match_state->entity_target_queues.get(entity.target_queue_index);
+                for (uint32_t target_queue_index = 0; target_queue_index < entity_target_queue->size(); target_queue_index++) {
+                    const Target& target = (*entity_target_queue)[target_queue_index];
+                    if (target.type == TARGET_BUILD) {
+                        match_shell_render_target_build(state, target, entity.player_id);
+                    } 
+                }
             }
         }
 

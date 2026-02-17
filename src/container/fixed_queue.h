@@ -11,7 +11,7 @@ struct FixedQueue {
 
     FixedQueue() {
         tail = 0;
-        size = 0;
+        _size = 0;
     }
 
     const T& operator[](uint32_t index) const {
