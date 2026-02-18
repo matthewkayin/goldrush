@@ -116,7 +116,7 @@ void replay_file_write_chat(FILE* file, const ReplayChatMessage& message) {
     fwrite(&message, 1, sizeof(ReplayChatMessage), file);
 }
 
-bool replay_file_read(const char* path, MatchState** state, std::vector<std::vector<MatchInput>>* match_inputs, std::vector<ReplayChatMessage>* match_chatlog) {
+bool replay_file_read(const char* path, MatchState* state, std::vector<std::vector<MatchInput>>* match_inputs, std::vector<ReplayChatMessage>* match_chatlog) {
     std::string replay_path = filesystem_get_data_path() + FILESYSTEM_REPLAY_FOLDER_NAME + path;
     FILE* file = fopen(replay_path.c_str(), "rb");
     if (file == NULL) {
@@ -160,7 +160,7 @@ bool replay_file_read(const char* path, MatchState** state, std::vector<std::vec
     }
 
     // Init state
-    *state = match_init(lcg_seed, players, (MatchInitMapParams) {
+    match_init(state, lcg_seed, players, (MatchInitMapParams) {
         .type = MATCH_INIT_MAP_FROM_NOISE,
         .noise = (MatchInitMapParamsNoise) {
             .type = map_type,

@@ -29,9 +29,7 @@ static const uint32_t FOG_REVEAL_DURATION = 60;
 static const fixed BLEED_SPEED_PERCENTAGE = fixed::from_int_and_raw_decimal(0, 192);
 static const uint32_t MATCH_LOW_GOLD_THRESHOLD = 1000;
 
-MatchState* match_init(int32_t lcg_seed, MatchPlayer players[MAX_PLAYERS], MatchInitMapParams map_params) {
-    MatchState* state = new MatchState();
-
+void match_init(MatchState* state, int32_t lcg_seed, MatchPlayer players[MAX_PLAYERS], MatchInitMapParams map_params) {
     // LCG seed
     #ifdef GOLD_RAND_SEED
         state->lcg_seed = GOLD_RAND_SEED;
@@ -76,12 +74,6 @@ MatchState* match_init(int32_t lcg_seed, MatchPlayer players[MAX_PLAYERS], Match
     map_init_regions(state->map);
 
     memset(state->fire_cells, 0, sizeof(state->fire_cells));
-
-    return state;
-}
-
-void match_free(MatchState* state) {
-    delete state;
 }
 
 void match_spawn_players(MatchState* state, const std::vector<ivec2>& map_spawn_points) {

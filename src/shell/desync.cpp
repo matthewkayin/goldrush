@@ -4,6 +4,7 @@
 #include "core/logger.h"
 #include "profile/profile.h"
 #include "network/network.h"
+#include "util/adler32.h"
 #include <algorithm>
 #include <cstdlib>
 
@@ -126,150 +127,12 @@ uint32_t desync_checksum_compute_result(const ChecksumState& checksum) {
 
 uint32_t desync_compute_match_checksum(const MatchState* match_state, const Bot* bots, uint32_t frame) {
     ZoneScoped;
-
+    return adler32((uint8_t*)match_state, sizeof(MatchState) + (MAX_PLAYERS * sizeof(Bot)));
+    /*
     ChecksumState checksum = desync_checksum_init();
 #ifdef GOLD_DEBUG
     state.buffer_length = 0;
 #endif
-
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->lcg_seed, sizeof(match_state->lcg_seed));
-
-    // Map
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->map.type, sizeof(match_state->map.type));
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->map.width, sizeof(match_state->map.width));
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->map.height, sizeof(match_state->map.height));
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->map.tiles, match_state->map.width * match_state->map.height * sizeof(Tile));
-    for (uint32_t layer = 0; layer < CELL_LAYER_COUNT; layer++) {
-        desync_checksum_add_block(checksum, (uint8_t*)&match_state->map.cells[layer], match_state->map.width * match_state->map.height * sizeof(Cell));
-    }
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->map.region_count, sizeof(match_state->map.region_count));
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->map.regions, match_state->map.width * match_state->map.height * sizeof(uint8_t));
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->map.region_connection_indices, match_state->map.region_count * match_state->map.region_count * sizeof(uint8_t));
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->map.region_connection_count, sizeof(match_state->map.region_connection_count));
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->map.region_connections, match_state->map.region_connection_count * sizeof(MapRegionConnection));
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->map.region_connection_to_connection_cost, match_state->map.region_connection_count * match_state->map.region_connection_count * sizeof(uint8_t));
-
-    // Fog and detection
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->fog, match_state->map.width * match_state->map.height * sizeof(int));
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->detection, match_state->map.width * match_state->map.height * sizeof(int));
-
-    // Remembered entities
-    for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        desync_checksum_add_block(checksum, (uint8_t*)&match_state->remembered_entities[player_id]._size, sizeof(match_state->remembered_entities[player_id]._size));
-        desync_checksum_add_block(checksum, (uint8_t*)&match_state->remembered_entities[player_id].data, match_state->remembered_entities[player_id]._size * sizeof(RememberedEntity));
-    }
-
-    // Entities
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->entities._size, sizeof(match_state->entities._size));
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->entities.next_id, sizeof(match_state->entities.next_id));
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->entities.data, match_state->entities._size * sizeof(Entity));
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->entities.ids, match_state->entities._size * sizeof(EntityId));
-
-    FixedVector<uint32_t, MATCH_MAX_UNITS> entity_path_indices;
-    FixedVector<uint32_t, MATCH_MAX_UNITS> entity_target_queue_indices;
-    for (uint32_t entity_index = 0; entity_index < match_state->entities.size(); entity_index++) {
-        const Entity& entity = match_state->entities[entity_index];
-        if (entity.path_index != ENTITY_PATH_INDEX_NONE) {
-            entity_path_indices.push_back(entity.path_index);
-        }
-        if (entity.target_queue_index != ENTITY_TARGET_QUEUE_INDEX_NONE) {
-            entity_target_queue_indices.push_back(entity.target_queue_index);
-        }
-    }
-
-    // Paths
-    desync_checksum_add_block(checksum, (uint8_t*)&entity_path_indices._size, sizeof(entity_path_indices._size));
-    for (uint32_t path_indices_index = 0; path_indices_index < entity_path_indices.size(); path_indices_index++) {
-        uint32_t path_index = entity_path_indices[path_indices_index];
-        const MapPath* path = match_state->entity_paths.get(path_index);
-        desync_checksum_add_block(checksum, (uint8_t*)&path->_size, sizeof(path->_size));
-        desync_checksum_add_block(checksum, (uint8_t*)path->data, path->_size * sizeof(ivec2));
-    }
-
-    // Target queues
-    desync_checksum_add_block(checksum, (uint8_t*)&entity_target_queue_indices._size, sizeof(entity_target_queue_indices._size));
-    for (uint32_t target_queue_indices_index = 0; target_queue_indices_index < entity_target_queue_indices.size(); target_queue_indices_index++) {
-        uint32_t target_queue_index = entity_target_queue_indices[target_queue_indices_index];
-        const TargetQueue* target_queue = match_state->entity_target_queues.get(target_queue_index);
-        desync_checksum_add_circular_vector(checksum, (uint8_t*)target_queue->data, target_queue->tail, target_queue->_size, TARGET_QUEUE_CAPACITY, sizeof(Target));
-    }
-
-    // Particles
-    desync_checksum_add_circular_vector(checksum, (uint8_t*)&match_state->particles.data, match_state->particles.tail, match_state->particles._size, MATCH_MAX_PARTICLES, sizeof(Particle));
-
-    // Projectiles
-    desync_checksum_add_circular_vector(checksum, (uint8_t*)&match_state->projectiles.data, match_state->projectiles.tail, match_state->projectiles._size, MATCH_MAX_PROJECTILES, sizeof(Projectile));
-
-    // Fires
-    desync_checksum_add_circular_vector(checksum, (uint8_t*)&match_state->fires.data, match_state->fires.tail, match_state->fires._size, MATCH_MAX_FIRES, sizeof(Fire));
-
-    // Fire cells
-    desync_checksum_add_block(checksum, (uint8_t*)&match_state->fires, match_state->map.width * match_state->map.height * sizeof(int));
-
-    // Fog reveals
-    desync_checksum_add_circular_vector(checksum, (uint8_t*)&match_state->fog_reveals.data, match_state->fog_reveals.tail, match_state->fog_reveals._size, MATCH_MAX_FOG_REVEALS, sizeof(FogReveal));
-
-    // Players
-    desync_checksum_add_block(checksum, (uint8_t*)match_state->players, MAX_PLAYERS * sizeof(MatchPlayer));
-
-    // Bots
-    for (uint32_t bot_index = 0; bot_index < MAX_PLAYERS; bot_index++) {
-        const Bot& bot = bots[bot_index];
-
-        // Config
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.config, sizeof(bot.config));
-
-        // Player ID
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.player_id, sizeof(bot.player_id));
-
-        // Scouting
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.scout_id, sizeof(bot.scout_id));
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.scout_info, sizeof(bot.scout_info));
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.last_scout_time, sizeof(bot.last_scout_time));
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.entities_to_scout._size, sizeof(bot.entities_to_scout._size));
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.entities_to_scout.data, bot.entities_to_scout._size * sizeof(EntityId));
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.entities_assumed_to_be_scouted._size, sizeof(bot.entities_assumed_to_be_scouted._size));
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.entities_assumed_to_be_scouted.data, bot.entities_assumed_to_be_scouted._size * sizeof(EntityId));
-
-        // Production
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.unit_comp, sizeof(bot.unit_comp));
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.desired_buildings, sizeof(bot.desired_buildings));
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.desired_army_ratio, sizeof(bot.desired_army_ratio));
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.desired_squads._size, sizeof(bot.desired_squads._size));
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.desired_squads.data, bot.desired_squads._size * sizeof(BotDesiredSquad));
-        desync_checksum_add_circular_vector(checksum, (uint8_t*)&bot.buildings_to_set_rally_points.data, bot.buildings_to_set_rally_points.tail, bot.buildings_to_set_rally_points._size, BOT_MAX_RALLY_REQUESTS, sizeof(EntityId));
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.macro_cycle_timer, sizeof(bot.macro_cycle_timer));
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.macro_cycle_count, sizeof(bot.macro_cycle_count));
-
-        // Squads
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.next_squad_id, sizeof(bot.next_squad_id));
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.squads._size, sizeof(bot.squads._size));
-        for (uint32_t index = 0; index < bot.squads._size; index++) {
-            const BotSquad& squad = bot.squads[index];
-            desync_checksum_add_block(checksum, (uint8_t*)&squad.id, sizeof(squad.id));
-            desync_checksum_add_block(checksum, (uint8_t*)&squad.type, sizeof(squad.type));
-            desync_checksum_add_block(checksum, (uint8_t*)&squad.target_cell, sizeof(squad.target_cell));
-            desync_checksum_add_block(checksum, (uint8_t*)&squad.patrol_cell, sizeof(squad.patrol_cell));
-            desync_checksum_add_block(checksum, (uint8_t*)&squad.entity_list._size, sizeof(squad.entity_list._size));
-            desync_checksum_add_block(checksum, (uint8_t*)&squad.entity_list.data, squad.entity_list._size * sizeof(EntityId));
-        }
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.next_landmine_time, sizeof(bot.next_landmine_time));
-
-        // Base info
-        desync_checksum_add_block(checksum, (uint8_t*)&bot.base_info._size, sizeof(bot.base_info._size));
-        for (uint32_t index = 0; index < bot.base_info._size; index++) {
-            const BotBaseInfo& base_info = bot.base_info[index];
-
-            desync_checksum_add_block(checksum, (uint8_t*)&base_info.goldmine_id, sizeof(base_info.goldmine_id));
-            desync_checksum_add_block(checksum, (uint8_t*)&base_info.controlling_player, sizeof(base_info.controlling_player));
-            desync_checksum_add_block(checksum, (uint8_t*)&base_info.retreat_count, sizeof(base_info.retreat_count));
-            desync_checksum_add_block(checksum, (uint8_t*)&base_info.flags, sizeof(base_info.flags));
-            desync_checksum_add_block(checksum, (uint8_t*)&base_info.defense_score, sizeof(base_info.defense_score));
-            desync_checksum_add_block(checksum, (uint8_t*)&base_info.retreat_entity_list._size, sizeof(base_info.retreat_entity_list._size));
-            desync_checksum_add_block(checksum, (uint8_t*)&base_info.retreat_entity_list.data, base_info.retreat_entity_list._size * sizeof(EntityId));
-            desync_checksum_add_block(checksum, (uint8_t*)&base_info.retreat_time, sizeof(base_info.retreat_time));
-        }
-    }
 
     // Write to desync file
 #ifdef GOLD_DEBUG
@@ -277,8 +140,7 @@ uint32_t desync_compute_match_checksum(const MatchState* match_state, const Bot*
         desync_write_file(frame);
     }
 #endif
-
-    return desync_checksum_compute_result(checksum);
+*/
 }
 
 uint32_t desync_get_checksum_frequency() {

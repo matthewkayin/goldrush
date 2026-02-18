@@ -735,7 +735,7 @@ void script_validate_entity_type(lua_State* lua_state, int entity_type) {
 }
 
 uint32_t script_validate_entity_id(lua_State* lua_state, const MatchShellState* state, EntityId entity_id) {
-    uint32_t entity_index = state->match_state->entities.get_index_of(entity_id);
+    uint32_t entity_index = state->match_state.entities.get_index_of(entity_id);
     if (entity_index == INDEX_INVALID) {
         script_error(lua_state, "Entity ID %u does not exist.", entity_id);
     }
@@ -782,7 +782,7 @@ void script_validate_player_id(lua_State* lua_state, const MatchShellState* stat
     if (bitflag_check(options, SCRIPT_VALIDATE_PLAYER_IS_BOT) && player_id == 0) {
         script_error(lua_state, "player_id is 0, but it must be a bot.");
     }
-    if (bitflag_check(options, SCRIPT_VALIDATE_PLAYER_IS_ACTIVE) && !state->match_state->players[player_id].active) {
+    if (bitflag_check(options, SCRIPT_VALIDATE_PLAYER_IS_ACTIVE) && !state->match_state.players[player_id].active) {
         script_error(lua_state, "player %u is inactive.");
     }
 }
@@ -928,7 +928,7 @@ static int script_player_is_defeated(lua_State* lua_state) {
     uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
     script_validate_player_id(lua_state, state, player_id);
 
-    lua_pushboolean(lua_state, !state->match_state->players[player_id].active);
+    lua_pushboolean(lua_state, !state->match_state.players[player_id].active);
 
     return 1;
 }
@@ -945,7 +945,7 @@ static int script_player_get_gold(lua_State* lua_state) {
     uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
     script_validate_player_id(lua_state, state, player_id);
 
-    lua_pushnumber(lua_state, state->match_state->players[player_id].gold);
+    lua_pushnumber(lua_state, state->match_state.players[player_id].gold);
 
     return 1;
 }
@@ -962,7 +962,7 @@ static int script_player_get_gold_mined_total(lua_State* lua_state) {
     uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
     script_validate_player_id(lua_state, state, player_id);
 
-    lua_pushnumber(lua_state, state->match_state->players[player_id].gold_mined_total);
+    lua_pushnumber(lua_state, state->match_state.players[player_id].gold_mined_total);
 
     return 1;
 }
@@ -1052,9 +1052,9 @@ static int script_fog_reveal(lua_State* lua_state) {
     lua_pop(lua_state, 1);
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
-    uint8_t team = state->match_state->players[network_get_player_id()].team;
-    match_fog_update(state->match_state, team, cell, cell_size, sight, false, CELL_LAYER_GROUND, true);
-    state->match_state->fog_reveals.push_back((FogReveal) {
+    uint8_t team = state->match_state.players[network_get_player_id()].team;
+    match_fog_update(&state->match_state, team, cell, cell_size, sight, false, CELL_LAYER_GROUND, true);
+    state->match_state.fog_reveals.push_back((FogReveal) {
         .team = team,
         .cell = cell,
         .cell_size = cell_size,
@@ -1101,8 +1101,8 @@ static int script_begin_camera_pan(lua_State* lua_state) {
     // Convert to cell into camera offset
     state->camera_pan_end_offset.x = (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
     state->camera_pan_end_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / 2);
-    state->camera_pan_end_offset.x = std::clamp(state->camera_pan_end_offset.x, 0, (state->match_state->map.width * TILE_SIZE) - SCREEN_WIDTH);
-    state->camera_pan_end_offset.y = std::clamp(state->camera_pan_end_offset.y, 0, (state->match_state->map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
+    state->camera_pan_end_offset.x = std::clamp(state->camera_pan_end_offset.x, 0, (state->match_state.map.width * TILE_SIZE) - SCREEN_WIDTH);
+    state->camera_pan_end_offset.y = std::clamp(state->camera_pan_end_offset.y, 0, (state->match_state.map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
 
     state->camera_pan_start_offset = state->camera_offset;
     state->camera_pan_timer = (uint32_t)(duration * (double)UPDATES_PER_SECOND);
@@ -1321,7 +1321,7 @@ static int script_entity_is_visible_to_player(lua_State* lua_state) {
     EntityId entity_id = lua_tonumber(lua_state, 1);
     uint32_t entity_index = script_validate_entity_id(lua_state, state, entity_id);
 
-    bool result = entity_is_visible_to_player(state->match_state, state->match_state->entities[entity_index], network_get_player_id());
+    bool result = entity_is_visible_to_player(&state->match_state, state->match_state.entities[entity_index], network_get_player_id());
     lua_pushboolean(lua_state, result);
 
     return 1;
@@ -1341,17 +1341,17 @@ static int script_highlight_entity(lua_State* lua_state) {
     state->highlight_entity_id = entity_id;
 
     // Do a fog reveal on the highlighted entity
-    const Entity& entity = state->match_state->entities.get_by_id(entity_id);
+    const Entity& entity = state->match_state.entities.get_by_id(entity_id);
     FogReveal fog_reveal = (FogReveal) {
-        .team = state->match_state->players[network_get_player_id()].team,
+        .team = state->match_state.players[network_get_player_id()].team,
         .cell = entity.cell,
         .cell_size = entity_get_data(entity.type).cell_size,
         .sight = 3,
         .timer = 160U // this is the duration of animation_ui_highlight_entity
     };
 
-    match_fog_update(state->match_state, fog_reveal.team, fog_reveal.cell, fog_reveal.cell_size, fog_reveal.sight, false, CELL_LAYER_GROUND, true);
-    state->match_state->fog_reveals.push_back(fog_reveal);
+    match_fog_update(&state->match_state, fog_reveal.team, fog_reveal.cell, fog_reveal.cell_size, fog_reveal.sight, false, CELL_LAYER_GROUND, true);
+    state->match_state.fog_reveals.push_back(fog_reveal);
 
     return 0;
 }
@@ -1387,8 +1387,8 @@ static int script_player_get_full_bunker_count(lua_State* lua_state) {
     const MatchShellState* state = script_get_match_shell_state(lua_state);
 
     uint32_t count = 0;
-    for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
-        const Entity& entity = state->match_state->entities[entity_index];
+    for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
+        const Entity& entity = state->match_state.entities[entity_index];
         if (entity.player_id != player_id ||
                 entity.type != ENTITY_BUNKER ||
                 entity.garrisoned_units.size() != 4) {
@@ -1397,7 +1397,7 @@ static int script_player_get_full_bunker_count(lua_State* lua_state) {
         bool is_all_cowboys = true;
         for (uint32_t garrisoned_units_index = 0; garrisoned_units_index < entity.garrisoned_units.size(); garrisoned_units_index++) {
             EntityId garrisoned_unit_id = entity.garrisoned_units[garrisoned_units_index];
-            if (state->match_state->entities.get_by_id(garrisoned_unit_id).type != ENTITY_COWBOY) {
+            if (state->match_state.entities.get_by_id(garrisoned_unit_id).type != ENTITY_COWBOY) {
                 is_all_cowboys = false;
             }
         }
@@ -1428,8 +1428,8 @@ static int script_player_has_entity_near_cell(lua_State* lua_state) {
     const MatchShellState* state = script_get_match_shell_state(lua_state);
 
     bool result = false;
-    for (uint32_t entity_index = 0; entity_index < state->match_state->entities.size(); entity_index++) {
-        const Entity& entity = state->match_state->entities[entity_index];
+    for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
+        const Entity& entity = state->match_state.entities[entity_index];
         if (entity.player_id == player_id && 
                 entity.health != 0 && 
                 ivec2::manhattan_distance(entity.cell, cell) < distance) {
@@ -1453,14 +1453,14 @@ static int script_entity_get_info(lua_State* lua_state) {
     const MatchShellState* state = script_get_match_shell_state(lua_state);
 
     EntityId entity_id = (EntityId)lua_tonumber(lua_state, 1);
-    uint32_t entity_index = state->match_state->entities.get_index_of(entity_id);
+    uint32_t entity_index = state->match_state.entities.get_index_of(entity_id);
 
     if (entity_index == INDEX_INVALID) {
         lua_pushnil(lua_state);
         return 1;
     }
 
-    const Entity& entity = state->match_state->entities[entity_index];
+    const Entity& entity = state->match_state.entities[entity_index];
     lua_newtable(lua_state);
 
     // Type
@@ -1537,7 +1537,7 @@ static int script_entity_find_spawn_cell(lua_State* lua_state) {
     const MatchShellState* state = script_get_match_shell_state(lua_state);
 
     std::vector<ivec2> frontier;
-    std::vector<bool> explored = std::vector<bool>(state->match_state->map.width * state->match_state->map.height, false);
+    std::vector<bool> explored = std::vector<bool>(state->match_state.map.width * state->match_state.map.height, false);
     ivec2 result = ivec2(-1, -1);
 
     frontier.push_back(spawn_cell);
@@ -1554,19 +1554,19 @@ static int script_entity_find_spawn_cell(lua_State* lua_state) {
         frontier[nearest_index] = frontier.back();
         frontier.pop_back();
 
-        if (!map_is_cell_rect_occupied(state->match_state->map, entity_data.cell_layer, next, entity_data.cell_size)) {
+        if (!map_is_cell_rect_occupied(state->match_state.map, entity_data.cell_layer, next, entity_data.cell_size)) {
             result = next;
             break;
         }
 
-        explored[next.x + (next.y * state->match_state->map.width)] = true;
+        explored[next.x + (next.y * state->match_state.map.width)] = true;
 
         for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
             ivec2 child = next + DIRECTION_IVEC2[direction];
-            if (!map_is_cell_rect_in_bounds(state->match_state->map, child, entity_data.cell_size)) {
+            if (!map_is_cell_rect_in_bounds(state->match_state.map, child, entity_data.cell_size)) {
                 continue;
             }
-            if (explored[child.x + (child.y * state->match_state->map.width)]) {
+            if (explored[child.x + (child.y * state->match_state.map.width)]) {
                 continue;
             }
             if (ivec2::manhattan_distance(child, spawn_cell) > 16) {
@@ -1615,7 +1615,7 @@ static int script_entity_create(lua_State* lua_state) {
     uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 3);
     script_validate_player_id(lua_state, state, player_id, SCRIPT_VALIDATE_PLAYER_IS_ACTIVE);
 
-    EntityId entity_id = entity_create(state->match_state, (EntityType)entity_type, cell, player_id);
+    EntityId entity_id = entity_create(&state->match_state, (EntityType)entity_type, cell, player_id);
     lua_pushnumber(lua_state, entity_id);
 
     return 1;
@@ -1633,16 +1633,16 @@ static int script_entity_get_player_who_controls_goldmine(lua_State* lua_state) 
     EntityId entity_id = (EntityId)lua_tonumber(lua_state, 1);
     uint32_t entity_index = script_validate_entity_id(lua_state, state, entity_id);
 
-    const Entity& goldmine = state->match_state->entities[entity_index];
+    const Entity& goldmine = state->match_state.entities[entity_index];
 
-    EntityId hall_surrounding_goldmine_id = match_find_entity(state->match_state, [&goldmine](const Entity& hall, EntityId /*hall_id*/) {
+    EntityId hall_surrounding_goldmine_id = match_find_entity(&state->match_state, [&goldmine](const Entity& hall, EntityId /*hall_id*/) {
         return hall.type == ENTITY_HALL &&
             entity_is_selectable(hall) &&
             bot_does_entity_surround_goldmine(hall, goldmine.cell);
     });
 
     uint8_t controlling_player_id = hall_surrounding_goldmine_id != ID_NULL
-        ? state->match_state->entities.get_by_id(hall_surrounding_goldmine_id).player_id
+        ? state->match_state.entities.get_by_id(hall_surrounding_goldmine_id).player_id
         : PLAYER_NONE;
     lua_pushnumber(lua_state, controlling_player_id);
 
@@ -1806,11 +1806,11 @@ static int script_bot_reserve_entity(lua_State* lua_state) {
     EntityId entity_id = (EntityId)lua_tonumber(lua_state, 2);
     uint32_t entity_index = script_validate_entity_id(lua_state, state, entity_id);
 
-    if (state->match_state->entities[entity_index].player_id != player_id) {
+    if (state->match_state.entities[entity_index].player_id != player_id) {
         script_error(lua_state, "Bot tried to reserve an entity (%u) that it didn't own.", entity_id);
     }
 
-    entity_set_flag(state->match_state->entities[entity_index], ENTITY_FLAG_IS_RESERVED, true);
+    entity_set_flag(state->match_state.entities[entity_index], ENTITY_FLAG_IS_RESERVED, true);
 
     return 0;
 }
@@ -1830,11 +1830,11 @@ static int script_bot_release_entity(lua_State* lua_state) {
     EntityId entity_id = (EntityId)lua_tonumber(lua_state, 2);
     uint32_t entity_index = script_validate_entity_id(lua_state, state, entity_id);
 
-    if (state->match_state->entities[entity_index].player_id != player_id) {
+    if (state->match_state.entities[entity_index].player_id != player_id) {
         script_error(lua_state, "Bot tried to reserve an entity (%u) that it didn't own.", entity_id);
     }
 
-    entity_set_flag(state->match_state->entities[entity_index], ENTITY_FLAG_IS_RESERVED, false);
+    entity_set_flag(state->match_state.entities[entity_index], ENTITY_FLAG_IS_RESERVED, false);
 
     return 0;
 }

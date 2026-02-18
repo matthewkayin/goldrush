@@ -124,9 +124,12 @@ struct GlobalObjectiveCounter {
 
 struct MatchShellState {
     MatchShellMode mode;
-    MatchState* match_state;
     UI ui;
     OptionsMenuState options_menu;
+
+    // Match state and bots (synced state)
+    MatchState match_state;
+    Bot bots[MAX_PLAYERS];
 
     // Simulation timers
     uint32_t match_timer;
@@ -138,9 +141,6 @@ struct MatchShellState {
     // Inputs
     std::queue<std::vector<MatchInput>> inputs[MAX_PLAYERS];
     std::vector<MatchInput> input_queue;
-
-    // Bots
-    Bot bots[MAX_PLAYERS];
 
     // Camera
     CameraMode camera_mode;
