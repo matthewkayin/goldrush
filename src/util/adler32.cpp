@@ -234,23 +234,34 @@ uint32_t adler32(uint8_t* data, size_t length) {
     return adler32_scaler(data, length);
 }
 
+#ifdef GOLD_SIMD_CHECKSUM_TEST
+
 void adler32_test(uint8_t* data, size_t length) {
     #ifdef __ARM_NEON
         if (!SDL_HasNEON()) {
             log_error("Cannot test adler32 without NEON.");
             return;
         }
-        uint32_t neon_checksum = adler32_neon(data, length);
-        uint32_t scaler_checksum = adler32_scaler(data, length);
-        GOLD_ASSERT(neon_checksum == scaler_checksum);
     #endif
+
     #ifdef __SSE3__
         if (!SDL_HasSSE3()) {
             log_error("Cannot test adler32 without SSE3.");
-            return;
+            return false;
         }
-        uint32_t sse3_checksum = adler32_sse3(data, length);
-        uint32_t scaler_checksum = adler32_scaler(data, length);
-        GOLD_ASSERT(sse3_checksum == scaler_checksum);
     #endif
+
+    uint32_t simd_checksum = adler32(data, length);
+    uint32_t scaler_checksum = adler32_scaler(data, length);
+    if (simd_checksum == scaler_checksum) {
+        log_info("SIMD CHECKSUM test pass. simd %u vs scaler %u", simd_checksum, scaler_checksum);
+    } else {
+        log_error("SIMD CHECKSUM test fail. simd %u vs scaler %u", simd_checksum, scaler_checksum);
+    }
 }
+
+#else
+
+#define adler32_test(data, length)
+
+#endif

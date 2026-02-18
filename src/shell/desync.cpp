@@ -127,6 +127,11 @@ uint32_t desync_checksum_compute_result(const ChecksumState& checksum) {
 
 uint32_t desync_compute_match_checksum(const MatchState* match_state, const Bot* bots, uint32_t frame) {
     ZoneScoped;
+
+#ifdef GOLD_SIMD_CHECKSUM_TEST
+    adler32_test((uint8_t*)match_state, sizeof(MatchState) + (MAX_PLAYERS * sizeof(Bot)));
+#endif
+
     return adler32((uint8_t*)match_state, sizeof(MatchState) + (MAX_PLAYERS * sizeof(Bot)));
     /*
     ChecksumState checksum = desync_checksum_init();
