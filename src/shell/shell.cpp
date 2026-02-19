@@ -2855,8 +2855,7 @@ void match_shell_replay_scrub(MatchShellState* state, uint32_t position) {
     if (position < state->match_timer || (position > state->match_timer && position - state->match_timer > REPLAY_CHECKPOINT_FREQ)) {
         uint32_t nearest_checkpoint = position / REPLAY_CHECKPOINT_FREQ;
         SDL_LockMutex(state->replay_loading_mutex);
-        // TODO:
-        // state->match_state = state->replay_checkpoints[nearest_checkpoint];
+        state->match_state = state->replay_checkpoints[nearest_checkpoint];
         SDL_UnlockMutex(state->replay_loading_mutex);
         state->match_timer = nearest_checkpoint * REPLAY_CHECKPOINT_FREQ;
     }
