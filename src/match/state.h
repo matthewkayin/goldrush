@@ -398,46 +398,46 @@ struct MatchFindBestEntityParams {
     std::function<bool(const Entity& a, const Entity& b)> compare;
 };
 
-void match_init(MatchState* state, int32_t lcg_seed, MatchPlayer players[MAX_PLAYERS], MatchInitMapParams map_params);
+void match_init(MatchState& state, int32_t lcg_seed, MatchPlayer players[MAX_PLAYERS], MatchInitMapParams map_params);
 
-void match_spawn_players(MatchState* state, const std::vector<ivec2>& map_spawn_points);
-uint32_t match_get_player_population(const MatchState* state, uint8_t player_id);
-uint32_t match_get_player_max_population(const MatchState* state, uint8_t player_id);
-bool match_player_has_upgrade(const MatchState* state, uint8_t player_id, uint32_t upgrade);
-bool match_player_upgrade_is_available(const MatchState* state, uint8_t player_id, uint32_t upgrade);
-void match_grant_player_upgrade(MatchState* state, uint8_t player_id, uint32_t upgrade);
-uint32_t match_get_miners_on_gold(const MatchState* state, EntityId goldmine_id, uint8_t player_id);
-void match_handle_input(MatchState* state, const MatchInput& input);
-void match_update(MatchState* state);
+void match_spawn_players(MatchState& state, const std::vector<ivec2>& map_spawn_points);
+uint32_t match_get_player_population(const MatchState& state, uint8_t player_id);
+uint32_t match_get_player_max_population(const MatchState& state, uint8_t player_id);
+bool match_player_has_upgrade(const MatchState& state, uint8_t player_id, uint32_t upgrade);
+bool match_player_upgrade_is_available(const MatchState& state, uint8_t player_id, uint32_t upgrade);
+void match_grant_player_upgrade(MatchState& state, uint8_t player_id, uint32_t upgrade);
+uint32_t match_get_miners_on_gold(const MatchState& state, EntityId goldmine_id, uint8_t player_id);
+void match_handle_input(MatchState& state, const MatchInput& input);
+void match_update(MatchState& state);
 
-EntityId match_find_entity(const MatchState* state, std::function<bool(const Entity& entity, EntityId entity_id)> filter);
-EntityId match_find_best_entity(const MatchState* state, const MatchFindBestEntityParams& params);
+EntityId match_find_entity(const MatchState& state, std::function<bool(const Entity& entity, EntityId entity_id)> filter);
+EntityId match_find_best_entity(const MatchState& state, const MatchFindBestEntityParams& params);
 std::function<bool(const Entity& a, const Entity& b)> match_compare_closest_manhattan_distance_to(ivec2 cell);
-EntityList match_find_entities(const MatchState* state, std::function<bool(const Entity& entity, EntityId entity_id)> filter);
-EntityId match_get_nearest_builder(const MatchState* state, const std::vector<EntityId>& builders, ivec2 cell);
+EntityList match_find_entities(const MatchState& state, std::function<bool(const Entity& entity, EntityId entity_id)> filter);
+EntityId match_get_nearest_builder(const MatchState& state, const std::vector<EntityId>& builders, ivec2 cell);
 
-bool match_is_target_invalid(const MatchState* state, const Target& target, uint8_t player_id);
-bool match_player_has_buildings(const MatchState* state, uint8_t player_id);
-bool match_player_has_entities(const MatchState* state, uint8_t player_id);
+bool match_is_target_invalid(const MatchState& state, const Target& target, uint8_t player_id);
+bool match_player_has_buildings(const MatchState& state, uint8_t player_id);
+bool match_player_has_entities(const MatchState& state, uint8_t player_id);
 
-uint32_t match_team_find_remembered_entity_index(const MatchState* state, uint8_t team, EntityId entity_id);
-bool match_team_remembers_entity(const MatchState* state, uint8_t team, EntityId entity_id);
+uint32_t match_team_find_remembered_entity_index(const MatchState& state, uint8_t team, EntityId entity_id);
+bool match_team_remembers_entity(const MatchState& state, uint8_t team, EntityId entity_id);
 
 // Entity
 
-EntityId entity_create(MatchState* state, EntityType type, ivec2 cell, uint8_t player_id);
-EntityId entity_goldmine_create(MatchState* state, ivec2 cell, uint32_t gold_left);
-void entity_update(MatchState* state, uint32_t entity_index);
+EntityId entity_create(MatchState& state, EntityType type, ivec2 cell, uint8_t player_id);
+EntityId entity_goldmine_create(MatchState& state, ivec2 cell, uint32_t gold_left);
+void entity_update(MatchState& state, uint32_t entity_index);
 
-SpriteName entity_get_sprite(const MatchState* state, const Entity& entity);
-SpriteName entity_get_icon(const MatchState* state, EntityType type, uint8_t player_id);
-fixed entity_get_speed(const MatchState* state, const Entity& entity);
-bool entity_has_detection(const MatchState* state, const Entity& entity);
-uint32_t entity_get_energy_regen_duration(const MatchState* state, const Entity& entity);
-int entity_get_armor(const MatchState* state, const Entity& entity);
-int entity_get_range_squared(const MatchState* state, const Entity& entity);
+SpriteName entity_get_sprite(const MatchState& state, const Entity& entity);
+SpriteName entity_get_icon(const MatchState& state, EntityType type, uint8_t player_id);
+fixed entity_get_speed(const MatchState& state, const Entity& entity);
+bool entity_has_detection(const MatchState& state, const Entity& entity);
+uint32_t entity_get_energy_regen_duration(const MatchState& state, const Entity& entity);
+int entity_get_armor(const MatchState& state, const Entity& entity);
+int entity_get_range_squared(const MatchState& state, const Entity& entity);
 bool entity_is_selectable(const Entity& entity);
-bool entity_can_be_given_orders(const MatchState* state, const Entity& entity);
+bool entity_can_be_given_orders(const MatchState& state, const Entity& entity);
 uint32_t entity_get_elevation(const Entity& entity, const Map& map);
 Rect entity_get_rect(const Entity& entity);
 fvec2 entity_get_target_position(const Entity& entity);
@@ -448,47 +448,47 @@ AnimationName entity_get_expected_animation(const Entity& entity);
 ivec2 entity_get_animation_frame(const Entity& entity);
 Rect entity_goldmine_get_block_building_rect(ivec2 cell);
 
-bool entity_is_mining(const MatchState* state, const Entity& entity);
-bool entity_is_in_mine(const MatchState* state, const Entity& entity);
+bool entity_is_mining(const MatchState& state, const Entity& entity);
+bool entity_is_in_mine(const MatchState& state, const Entity& entity);
 bool entity_is_idle_miner(const Entity& entity);
-void entity_get_mining_path_to_avoid(const MatchState* state, const Entity& entity, MapPath* mine_exit_path);
-bool entity_is_blocker_walking_towards_entity(const MatchState* state, const Entity& entity);
-bool entity_is_visible_to_player(const MatchState* state, const Entity& entity, uint8_t player_id);
+void entity_get_mining_path_to_avoid(const MatchState& state, const Entity& entity, MapPath* mine_exit_path);
+bool entity_is_blocker_walking_towards_entity(const MatchState& state, const Entity& entity);
+bool entity_is_visible_to_player(const MatchState& state, const Entity& entity, uint8_t player_id);
 
 bool entity_has_path(const Entity& entity);
-void entity_pathfind(MatchState* state, Entity& entity, ivec2 to, uint32_t options, const MapPath* ignore_cells);
-void entity_path_clear(MatchState* state, Entity& entity);
-bool entity_is_path_end_too_far_from_target(const MatchState* state, const Entity& entity);
+void entity_pathfind(MatchState& state, Entity& entity, ivec2 to, uint32_t options, const MapPath* ignore_cells);
+void entity_path_clear(MatchState& state, Entity& entity);
+bool entity_is_path_end_too_far_from_target(const MatchState& state, const Entity& entity);
 
-void entity_set_target(MatchState* state, Entity& entity, Target target);
-void entity_target_queue_push(MatchState* state, Entity& entity, Target target);
-void entity_target_queue_clear(MatchState* state, Entity& entity);
-void entity_refund_target_build(MatchState* state, Entity& entity, const Target& target);
-bool entity_is_target_invalid(const MatchState* state, const Entity& entity);
-bool entity_has_reached_target(const MatchState* state, const Entity& entity);
-bool entity_is_target_in_range(const MatchState* state, const Entity& entity, const Entity& target, TargetType target_type);
-ivec2 entity_get_target_cell(const MatchState* state, const Entity& entity);
+void entity_set_target(MatchState& state, Entity& entity, Target target);
+void entity_target_queue_push(MatchState& state, Entity& entity, Target target);
+void entity_target_queue_clear(MatchState& state, Entity& entity);
+void entity_refund_target_build(MatchState& state, Entity& entity, const Target& target);
+bool entity_is_target_invalid(const MatchState& state, const Entity& entity);
+bool entity_has_reached_target(const MatchState& state, const Entity& entity);
+bool entity_is_target_in_range(const MatchState& state, const Entity& entity, const Entity& target, TargetType target_type);
+ivec2 entity_get_target_cell(const MatchState& state, const Entity& entity);
 bool entity_is_target_within_min_range(const Entity& entity, const Entity& target);
 
-Target entity_target_nearest_goldmine(const MatchState* state, const Entity& entity);
-Target entity_target_nearest_hall(const MatchState* state, const Entity& entity);
+Target entity_target_nearest_goldmine(const MatchState& state, const Entity& entity);
+Target entity_target_nearest_hall(const MatchState& state, const Entity& entity);
 uint32_t entity_get_target_attack_priority(const Entity& entity, const Entity& target);
-Target entity_target_nearest_enemy(const MatchState* state, const Entity& entity);
+Target entity_target_nearest_enemy(const MatchState& state, const Entity& entity);
 
-void entity_attack_target(MatchState* state, EntityId attacker_id);
-void entity_on_attack(MatchState* state, EntityId attacker_id, Entity& defender);
-uint32_t entity_get_garrisoned_occupancy(const MatchState* state, const Entity& entity);
-void entity_unload_unit(MatchState* state, Entity& carrier, EntityId garrisoned_unit_id);
-void entity_release_garrisoned_units_on_death(MatchState* state, Entity& entity);
-void entity_explode(MatchState* state, EntityId entity_id);
+void entity_attack_target(MatchState& state, EntityId attacker_id);
+void entity_on_attack(MatchState& state, EntityId attacker_id, Entity& defender);
+uint32_t entity_get_garrisoned_occupancy(const MatchState& state, const Entity& entity);
+void entity_unload_unit(MatchState& state, Entity& carrier, EntityId garrisoned_unit_id);
+void entity_release_garrisoned_units_on_death(MatchState& state, Entity& entity);
+void entity_explode(MatchState& state, EntityId entity_id);
 bool entity_should_die(const Entity& entity);
 void entity_on_damage_taken(Entity& entity);
 
-void entity_stop_building(MatchState* state, EntityId entity_id);
-void entity_building_finish(MatchState* state, EntityId building_id);
-void entity_building_enqueue(MatchState* state, Entity& building, BuildingQueueItem item);
-void entity_building_dequeue(MatchState* state, Entity& building);
-bool entity_building_is_supply_blocked(const MatchState* state, const Entity& building);
+void entity_stop_building(MatchState& state, EntityId entity_id);
+void entity_building_finish(MatchState& state, EntityId building_id);
+void entity_building_enqueue(MatchState& state, Entity& building, BuildingQueueItem item);
+void entity_building_dequeue(MatchState& state, Entity& building);
+bool entity_building_is_supply_blocked(const MatchState& state, const Entity& building);
 
 // Building Queue
 
@@ -512,22 +512,22 @@ Target target_patrol(ivec2 cell_a, ivec2 cell_b);
 
 // Event
 
-void match_event_play_sound(MatchState* state, SoundName sound, ivec2 position);
-void match_event_alert(MatchState* state, MatchAlertType type, uint8_t player_id, ivec2 cell, int cell_size);
-void match_event_research_complete(MatchState* state, uint8_t player_id, uint32_t upgrade);
-void match_event_selection_handoff(MatchState* state, uint8_t player_id, EntityId to_deselect, EntityId to_select);
-void match_event_show_status(MatchState* state, uint8_t player_id, const char* message);
-void match_event_player_defeated(MatchState* state, uint8_t player_id);
+void match_event_play_sound(MatchState& state, SoundName sound, ivec2 position);
+void match_event_alert(MatchState& state, MatchAlertType type, uint8_t player_id, ivec2 cell, int cell_size);
+void match_event_research_complete(MatchState& state, uint8_t player_id, uint32_t upgrade);
+void match_event_selection_handoff(MatchState& state, uint8_t player_id, EntityId to_deselect, EntityId to_select);
+void match_event_show_status(MatchState& state, uint8_t player_id, const char* message);
+void match_event_player_defeated(MatchState& state, uint8_t player_id);
 
 // Fog
 
-int match_get_fog(const MatchState* state, uint8_t team, ivec2 cell);
-bool match_is_cell_rect_revealed(const MatchState* state, uint8_t team, ivec2 cell, int cell_size);
-bool match_is_cell_rect_explored(const MatchState* state, uint8_t team, ivec2 cell, int cell_size);
-void match_fog_update(MatchState* state, uint32_t team, ivec2 cell, int cell_size, int sight, bool has_detection, CellLayer cell_layer, bool increment);
+int match_get_fog(const MatchState& state, uint8_t team, ivec2 cell);
+bool match_is_cell_rect_revealed(const MatchState& state, uint8_t team, ivec2 cell, int cell_size);
+bool match_is_cell_rect_explored(const MatchState& state, uint8_t team, ivec2 cell, int cell_size);
+void match_fog_update(MatchState& state, uint32_t team, ivec2 cell, int cell_size, int sight, bool has_detection, CellLayer cell_layer, bool increment);
 
 // Fire
 
-bool match_is_cell_on_fire(const MatchState* state, ivec2 cell);
-bool match_is_cell_rect_on_fire(const MatchState* state, ivec2 cell, int cell_size);
-void match_set_cell_on_fire(MatchState* state, ivec2 cell, ivec2 source);
+bool match_is_cell_on_fire(const MatchState& state, ivec2 cell);
+bool match_is_cell_rect_on_fire(const MatchState& state, ivec2 cell, int cell_size);
+void match_set_cell_on_fire(MatchState& state, ivec2 cell, ivec2 source);

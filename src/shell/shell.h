@@ -206,7 +206,7 @@ struct MatchShellState {
     // Replay data (read)
     bool replay_mode;
     UI replay_ui;
-    std::vector<MatchState*> replay_checkpoints;
+    std::vector<MatchState> replay_checkpoints;
     std::vector<std::vector<MatchInput>> replay_inputs[MAX_PLAYERS];
     std::vector<ReplayChatMessage> replay_chatlog;
 
@@ -217,7 +217,7 @@ struct MatchShellState {
 
     // Replay loading thread
     SDL_Thread* replay_loading_thread;
-    MatchState* replay_loading_match_state;
+    MatchState replay_loading_match_state;
     uint32_t replay_loading_match_timer;
 
     SDL_Mutex* replay_loading_mutex;
@@ -251,7 +251,7 @@ void match_shell_update(MatchShellState* state);
 void match_shell_handle_input(MatchShellState* state);
 void match_shell_order_move(MatchShellState* state);
 EntityList match_shell_find_idle_miners(const MatchShellState* state);
-bool match_shell_does_player_meet_hotkey_requirements(const MatchState* state, InputAction hotkey);
+bool match_shell_does_player_meet_hotkey_requirements(const MatchState& state, InputAction hotkey);
 bool match_shell_is_hotkey_available(const MatchShellState* state, const HotkeyButtonInfo& info);
 uint32_t match_shell_get_player_entity_count(const MatchShellState* state, uint8_t player_id, EntityType entity_type);
 uint32_t match_shell_update_displayed_gold_amount(uint32_t current_displayed_value, uint32_t current_actual_value);
@@ -317,7 +317,7 @@ const char* match_shell_get_menu_header_text(const MatchShellState* state);
 bool match_shell_is_fire_on_screen(const MatchShellState* state);
 
 // Replay
-void match_shell_replay_begin_turn(MatchShellState* state, MatchState* match_state, uint32_t match_timer);
+void match_shell_replay_begin_turn(MatchShellState* state, MatchState& match_state, uint32_t match_timer);
 void match_shell_replay_scrub(MatchShellState* state, uint32_t position);
 size_t match_shell_replay_end_of_tape(const MatchShellState* state);
 

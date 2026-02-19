@@ -41,7 +41,7 @@ STATIC_ASSERT(sizeof(int) == sizeof(int32_t));
     // #define GOLD_TEST_SEED 934781452
 #endif
 
-#define GOLD_SIMD_CHECKSUM_TEST
+// #define GOLD_SIMD_CHECKSUM_TEST
 
 // #define GOLD_STEAM
 #ifdef GOLD_STEAM

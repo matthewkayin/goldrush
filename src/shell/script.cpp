@@ -1053,7 +1053,7 @@ static int script_fog_reveal(lua_State* lua_state) {
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
     uint8_t team = state->match_state.players[network_get_player_id()].team;
-    match_fog_update(&state->match_state, team, cell, cell_size, sight, false, CELL_LAYER_GROUND, true);
+    match_fog_update(state->match_state, team, cell, cell_size, sight, false, CELL_LAYER_GROUND, true);
     state->match_state.fog_reveals.push_back((FogReveal) {
         .team = team,
         .cell = cell,
@@ -1321,7 +1321,7 @@ static int script_entity_is_visible_to_player(lua_State* lua_state) {
     EntityId entity_id = lua_tonumber(lua_state, 1);
     uint32_t entity_index = script_validate_entity_id(lua_state, state, entity_id);
 
-    bool result = entity_is_visible_to_player(&state->match_state, state->match_state.entities[entity_index], network_get_player_id());
+    bool result = entity_is_visible_to_player(state->match_state, state->match_state.entities[entity_index], network_get_player_id());
     lua_pushboolean(lua_state, result);
 
     return 1;
@@ -1350,7 +1350,7 @@ static int script_highlight_entity(lua_State* lua_state) {
         .timer = 160U // this is the duration of animation_ui_highlight_entity
     };
 
-    match_fog_update(&state->match_state, fog_reveal.team, fog_reveal.cell, fog_reveal.cell_size, fog_reveal.sight, false, CELL_LAYER_GROUND, true);
+    match_fog_update(state->match_state, fog_reveal.team, fog_reveal.cell, fog_reveal.cell_size, fog_reveal.sight, false, CELL_LAYER_GROUND, true);
     state->match_state.fog_reveals.push_back(fog_reveal);
 
     return 0;
@@ -1615,7 +1615,7 @@ static int script_entity_create(lua_State* lua_state) {
     uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 3);
     script_validate_player_id(lua_state, state, player_id, SCRIPT_VALIDATE_PLAYER_IS_ACTIVE);
 
-    EntityId entity_id = entity_create(&state->match_state, (EntityType)entity_type, cell, player_id);
+    EntityId entity_id = entity_create(state->match_state, (EntityType)entity_type, cell, player_id);
     lua_pushnumber(lua_state, entity_id);
 
     return 1;
@@ -1635,7 +1635,7 @@ static int script_entity_get_player_who_controls_goldmine(lua_State* lua_state) 
 
     const Entity& goldmine = state->match_state.entities[entity_index];
 
-    EntityId hall_surrounding_goldmine_id = match_find_entity(&state->match_state, [&goldmine](const Entity& hall, EntityId /*hall_id*/) {
+    EntityId hall_surrounding_goldmine_id = match_find_entity(state->match_state, [&goldmine](const Entity& hall, EntityId /*hall_id*/) {
         return hall.type == ENTITY_HALL &&
             entity_is_selectable(hall) &&
             bot_does_entity_surround_goldmine(hall, goldmine.cell);

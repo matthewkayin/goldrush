@@ -447,8 +447,8 @@ int gold_main(int argc, char** argv) {
                     Cell map_cell = map_get_cell(state.match_shell_state->match_state.map, CELL_LAYER_GROUND, cell);
                     if (map_cell.type == CELL_UNIT || map_cell.type == CELL_BUILDING || map_cell.type == CELL_MINER || map_cell.type == CELL_GOLDMINE) {
                         const Entity& entity = state.match_shell_state->match_state.entities.get_by_id(map_cell.id);
-                        ivec2 target_cell = entity_is_target_invalid(&state.match_shell_state->match_state, entity) ? ivec2(-1, -1) : entity_get_target_cell(&state.match_shell_state->match_state, entity);
-                        sprintf(debug_text, "Entity %u %s mode %u target %u cell <%i, %i> is mining %i goldmine id %u pathfind attempts %u", map_cell.id, entity_get_data(entity.type).name, entity.mode, entity.target.type, target_cell.x, target_cell.y, (int)entity_is_mining(&state.match_shell_state->match_state, entity), entity.goldmine_id, entity.pathfind_attempts);
+                        ivec2 target_cell = entity_is_target_invalid(state.match_shell_state->match_state, entity) ? ivec2(-1, -1) : entity_get_target_cell(state.match_shell_state->match_state, entity);
+                        sprintf(debug_text, "Entity %u %s mode %u target %u cell <%i, %i> is mining %i goldmine id %u pathfind attempts %u", map_cell.id, entity_get_data(entity.type).name, entity.mode, entity.target.type, target_cell.x, target_cell.y, (int)entity_is_mining(state.match_shell_state->match_state, entity), entity.goldmine_id, entity.pathfind_attempts);
                         render_text(FONT_HACK_WHITE, debug_text, ivec2(0, render_y));
                         render_y += 10;
                     }
@@ -560,7 +560,7 @@ void game_set_mode_match(int lcg_seed, Noise* noise) {
         BotConfig bot_config = bot_config_init_from_difficulty(DIFFICULTY_HARD);
         bot_config.opener = BOT_OPENER_TECH_FIRST;
         bot_config.preferred_unit_comp = bot_config_roll_preferred_unit_comp(&test_lcg_seed);
-        state.test_bot = bot_init(&state.match_shell_state->match_state, network_get_player_id(), bot_config);
+        state.test_bot = bot_init(state.match_shell_state->match_state, network_get_player_id(), bot_config);
     }
 #endif
 }
@@ -682,13 +682,13 @@ void game_test_update() {
             uint32_t turn_number = state.match_shell_state->match_timer / TURN_DURATION;
             MatchInput input;
             if (turn_number % TURN_OFFSET == 0) {
-                input = bot_get_turn_input(&state.match_shell_state->match_state, state.test_bot, state.match_shell_state->match_timer);
+                input = bot_get_turn_input(state.match_shell_state->match_state, state.test_bot, state.match_shell_state->match_timer);
                 match_shell_handle_bot_reservation_requests(state.match_shell_state, &state.test_bot);
             } 
             state.match_shell_state->input_queue.push_back(input);
 
             // Check for surrender
-            if (bot_should_surrender(&state.match_shell_state->match_state, state.test_bot, state.match_shell_state->match_timer)) {
+            if (bot_should_surrender(state.match_shell_state->match_state, state.test_bot, state.match_shell_state->match_timer)) {
                 network_send_chat("gg");
                 match_shell_leave_match(state.match_shell_state, false);
             }
