@@ -10,6 +10,7 @@ struct FixedQueue {
     uint32_t _size;
 
     FixedQueue() {
+        memset(data, 0, sizeof(data));
         tail = 0;
         _size = 0;
     }

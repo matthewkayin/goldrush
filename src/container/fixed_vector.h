@@ -9,6 +9,7 @@ struct FixedVector {
     uint32_t _size;
 
     FixedVector() {
+        memset(data, 0, sizeof(data));
         clear();
     }
 

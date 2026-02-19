@@ -9,6 +9,7 @@ struct Pool {
     uint32_t head;
 
     Pool() {
+        memset(data, 0, sizeof(data));
         for (uint32_t index = 0; index < capacity - 1; index++) {
             free_list[index] = index + 1;
         }

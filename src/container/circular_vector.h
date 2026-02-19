@@ -12,6 +12,7 @@ struct CircularVector {
     uint32_t _size;
 
     CircularVector() {
+        memset(data, 0, sizeof(data));
         tail = 0;
         _size = 0;
     }
