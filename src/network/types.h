@@ -16,6 +16,7 @@
 #define NETWORK_CHAT_BUFFER_SIZE 128
 #define NETWORK_SCANNER_PORT 6529
 #define NETWORK_BASE_PORT 6530
+#define NETWORK_CONNECTION_INFO_BUFFER_SIZE 128
 
 #ifdef GOLD_STEAM
     #define NETWORK_STEAM_LOBBY_PROPERTY_NAME "name"
@@ -44,22 +45,17 @@ struct NetworkConnectionInfoLan {
 };
 
 #ifdef GOLD_STEAM
+
 struct NetworkConnectionInfoSteam {
     char identity_str[SteamNetworkingIdentity::k_cchMaxString];
 };
-#endif
 
-union NetworkConnectionInfo {
-    NetworkConnectionInfoLan lan;
-#ifdef GOLD_STEAM
-    NetworkConnectionInfoSteam steam;
 #endif
-};
 
 struct NetworkLobby {
     char name[NETWORK_LOBBY_NAME_BUFFER_SIZE];
     uint8_t player_count;
-    NetworkConnectionInfo connection_info;
+    char connection_info[NETWORK_CONNECTION_INFO_BUFFER_SIZE];
 };
 
 struct NetworkLanLobbyInfo {
