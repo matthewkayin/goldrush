@@ -21,7 +21,7 @@ struct FixedQueue {
     }
 
     const T& front() const {
-        return data[0];
+        return data[wrap_index(0)];
     }
 
     uint32_t size() const {
