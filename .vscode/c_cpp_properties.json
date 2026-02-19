@@ -17,7 +17,8 @@
             "intelliSenseMode": "clang-x64",
             "compilerArgs": [
                 "-Wall",
-                "-Wextra"
+                "-Wextra",
+                "-march=x86-64-v2"
             ],
             "compileCommands": [
                 "${workspaceFolder}/compile_commands.json"

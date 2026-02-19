@@ -44,7 +44,7 @@ ifeq ($(OS),Windows_NT)
 	DIRECTORIES := \src $(subst $(DIR),,$(shell dir src /S /AD /B | findstr /i src)) # Get all directories under src.
 
 # ws2_32 and winmm are linked for enet
-	COMPILER_FLAGS += -Wno-missing-designated-field-initializers
+	COMPILER_FLAGS += -Wno-missing-designated-field-initializers -march=x86-64-v2
 	LINKER_FLAGS += -L$(LIB_DIR) -lSDL3 -lSDL3_ttf -luser32 -lws2_32 -lwinmm -lenet64 -lsteam_api64 -ldbghelp -llua51
 else
 	UNAME_S := $(shell uname -s)
@@ -52,13 +52,14 @@ else
 		BUILD_PLATFORM := macos
 		EXTENSION :=
 # Use -Wno-deprecated-declarations on MacOS because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)
-		COMPILER_FLAGS += -Wno-deprecated-declarations -mmacos-version-min=14.5
+		COMPILER_FLAGS += -Wno-deprecated-declarations -mmacos-version-min=14.5 -march=arm
 		LINKER_FLAGS += -Llib/macos -lenet -lluajit -lsteam_api -Flib/macos -framework SDL3 -framework SDL3_ttf
 		ifeq ($(RELEASE_VERSION),)
 			LINKER_FLAGS += -rpath ../lib/macos
 		endif
 	endif
 	ifeq ($(UNAME_S),Linux)
+		COMPILER_FLAGS += -march=x86-64-v2
 		BUILD_PLATFORM := linux
 		LINKER_FLAGS += -lSDL3 -lSDL3_ttf -ldl -Llib/linux64 -Wl,-rpath='$$ORIGIN',--enable-new-dtags -lenet -lluajit -lsteam_api
 	endif

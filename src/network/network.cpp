@@ -1145,8 +1145,7 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
             state.events.push((NetworkEvent) {
                 .type = NETWORK_EVENT_SERIALIZED_FRAME,
                 .serialized_frame = (NetworkEventSerializedFrame) {
-                    .state_buffer = state_buffer,
-                    .state_buffer_length = length
+                    .state_buffer = state_buffer
                 }
             });
             break;

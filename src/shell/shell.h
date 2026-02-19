@@ -331,7 +331,7 @@ void match_shell_leave_match(MatchShellState* state, bool exit_program);
 bool match_shell_has_next_checksums(const MatchShellState* state);
 bool match_shell_are_next_checksums_out_of_sync(const MatchShellState* state);
 #ifdef GOLD_DEBUG
-void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t incoming_state_buffer_length);
+void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer);
 #endif
 
 // Render

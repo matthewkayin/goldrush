@@ -30,13 +30,10 @@ STATIC_ASSERT(sizeof(Bot) == 16172ULL);
 #ifdef GOLD_DEBUG
 
 #define DESYNC_FILEPATH_BUFFER_SIZE 256
-const size_t DESYNC_BUFFER_CAPACITY = sizeof(MatchState) + (MAX_PLAYERS * sizeof(Bot));
 
 struct DesyncState {
     bool desync_debug = false;
     char desync_folder_path[DESYNC_FILEPATH_BUFFER_SIZE];
-    uint8_t* buffer;
-    size_t buffer_length;
 };
 static DesyncState state;
 
@@ -50,12 +47,6 @@ bool desync_init(const char* desync_foldername) {
 
     SDL_CreateDirectory(state.desync_folder_path);
 
-    state.buffer = (uint8_t*)malloc(DESYNC_BUFFER_CAPACITY);
-    if (state.buffer == NULL) {
-        log_error("Unable to malloc desync buffer.");
-        return false;
-    }
-
     return true;
 }
 
@@ -64,10 +55,13 @@ void desync_quit() {
         return;
     }
     SDL_RemovePath(state.desync_folder_path);
-    free(state.buffer);
 }
 
-void desync_write_file(uint32_t frame) {
+void desync_write_frame(uint8_t* data, uint32_t frame) {
+    if (!state.desync_debug) {
+        return;
+    }
+
     char desync_filepath[DESYNC_FILEPATH_BUFFER_SIZE];
     desync_get_filepath(desync_filepath, frame);
     FILE* desync_file = fopen(desync_filepath, "wb");
@@ -76,109 +70,35 @@ void desync_write_file(uint32_t frame) {
         return;
     }
 
-    fwrite(&state.buffer_length, 1, sizeof(state.buffer_length), desync_file);
-    fwrite(state.buffer, 1, state.buffer_length, desync_file);
+    fwrite(data, 1, DESYNC_BUFFER_SIZE, desync_file);
 
     fclose(desync_file);
-    log_debug("Wrote desync file %s", desync_filepath);
 }
 
-#endif
-
-struct ChecksumState {
-    uint32_t a;
-    uint32_t b;
-};
-
-ChecksumState desync_checksum_init() {
-    ChecksumState state;
-    state.a = 1;
-    state.b = 0;
-    return state;
-}
-
-void desync_checksum_add_block(ChecksumState& checksum, uint8_t* data, size_t length) {
-    const uint32_t MOD_ADLER = 65521;
-    for (size_t index = 0; index < length; index++) {
-        checksum.a = (checksum.a + data[index]) % MOD_ADLER;
-        checksum.b = (checksum.b + checksum.a) % MOD_ADLER;
+uint8_t* desync_read_frame(uint32_t frame_number) {
+    char desync_filepath[DESYNC_FILEPATH_BUFFER_SIZE];
+    desync_get_filepath(desync_filepath, frame_number);
+    FILE* desync_file = fopen(desync_filepath, "rb");
+    if (desync_file == NULL) {
+        log_error("desync file with path %s could not be opened.", desync_filepath);
+        return NULL;
     }
 
-    #ifdef GOLD_DEBUG
-        if (state.desync_debug) {
-            GOLD_ASSERT(state.buffer_length + length <= DESYNC_BUFFER_CAPACITY);
-            memcpy(state.buffer, data, length);
-            state.buffer_length += length;
-        }
-    #endif
-}
-
-void desync_checksum_add_circular_vector(ChecksumState& checksum, uint8_t* data, uint32_t tail, uint32_t size, uint32_t capacity, size_t element_size) {
-    desync_checksum_add_block(checksum, (uint8_t*)&size, sizeof(size));
-    if (tail + size > capacity) {
-        desync_checksum_add_block(checksum, data, ((tail + size) - capacity) * element_size);
-    }
-    desync_checksum_add_block(checksum, data + (tail * element_size), std::min(size, capacity - tail) * element_size);
-}
-
-uint32_t desync_checksum_compute_result(const ChecksumState& checksum) {
-    return (checksum.b << 16) | checksum.a;
-}
-
-uint32_t desync_compute_match_checksum(const MatchState* match_state, const Bot* bots, uint32_t frame) {
-    ZoneScoped;
-
-#ifdef GOLD_SIMD_CHECKSUM_TEST
-    adler32_test((uint8_t*)match_state, sizeof(MatchState) + (MAX_PLAYERS * sizeof(Bot)));
-#endif
-
-    return adler32((uint8_t*)match_state, sizeof(MatchState) + (MAX_PLAYERS * sizeof(Bot)));
-    /*
-    ChecksumState checksum = desync_checksum_init();
-#ifdef GOLD_DEBUG
-    state.buffer_length = 0;
-#endif
-
-    // Write to desync file
-#ifdef GOLD_DEBUG
-    if (state.desync_debug) {
-        desync_write_file(frame);
-    }
-#endif
-*/
-}
-
-uint32_t desync_get_checksum_frequency() {
-#ifdef GOLD_DEBUG
-    if (state.desync_debug) {
-        return 4U;
-    }
-#endif
-    return 60U;
-}
-
-#ifdef GOLD_DEBUG
-
-uint32_t desync_compute_buffer_checksum(uint8_t* data, size_t length) {
-    ChecksumState checksum = desync_checksum_init();
-    desync_checksum_add_block(checksum, data, length);
-    return desync_checksum_compute_result(checksum);
-}
-
-void desync_send_serialized_frame(uint32_t frame) {
-    size_t state_buffer_length;
-    uint8_t* state_buffer = desync_read_serialized_frame(frame, &state_buffer_length);
+    // Malloc and read into buffer, but leave room for the frame number and message type
+    uint8_t* state_buffer = (uint8_t*)malloc(DESYNC_STATE_BUFFER_LENGTH);
     if (state_buffer == NULL) {
-        return;
+        fclose(desync_file);
+        log_error("error mallocing desync state buffer.");
+        return NULL;
     }
+    memcpy(state_buffer + sizeof(uint8_t), &frame_number, sizeof(frame_number));
+    fread(state_buffer + sizeof(uint8_t) + sizeof(uint32_t), DESYNC_BUFFER_SIZE, 1, desync_file);
 
-    network_send_serialized_frame(state_buffer, state_buffer_length);
-    free(state_buffer);
-
-    log_info("DESYNC Sent serialized frame %u with size %llu", frame, state_buffer_length);
+    fclose(desync_file);
+    return state_buffer;
 }
 
-void desync_delete_serialized_frame(uint32_t frame) {
+void desync_delete_frame(uint32_t frame) {
     if (!state.desync_debug) {
         return;
     }
@@ -188,53 +108,34 @@ void desync_delete_serialized_frame(uint32_t frame) {
     SDL_RemovePath(desync_filepath);
 }
 
-uint8_t* desync_read_serialized_frame(uint32_t frame_number, size_t* state_buffer_length) {
-    char desync_filepath[DESYNC_FILEPATH_BUFFER_SIZE];
-    desync_get_filepath(desync_filepath, frame_number);
-    FILE* desync_file = fopen(desync_filepath, "rb");
-    if (desync_file == NULL) {
-        log_error("desync file with path %s could not be opened.", desync_filepath);
-        return NULL;
-    }
-
-    size_t frame_length;
-    fread(&frame_length, 1, sizeof(frame_length), desync_file);
-    *state_buffer_length = frame_length + sizeof(uint8_t) + sizeof(uint32_t);
-
-    // Malloc and read into buffer, but leave room for the frame number and message type
-    uint8_t* state_buffer = (uint8_t*)malloc(*state_buffer_length);
+void desync_send_frame(uint32_t frame) {
+    uint8_t* state_buffer = desync_read_frame(frame);
     if (state_buffer == NULL) {
-        fclose(desync_file);
-        log_error("error mallocing desync state buffer.");
-        return NULL;
+        return;
     }
-    memcpy(state_buffer + sizeof(uint8_t), &frame_number, sizeof(frame_number));
-    fread(state_buffer + sizeof(uint8_t) + sizeof(uint32_t), frame_length, 1, desync_file);
 
-    fclose(desync_file);
-    return state_buffer;
+    network_send_serialized_frame(state_buffer, DESYNC_STATE_BUFFER_LENGTH);
+    free(state_buffer);
+
+    log_info("DESYNC Sent frame %u", frame);
 }
 
 // Use this only when T is trivially copiable
 template <typename T, uint32_t _capacity>
 void desync_assert_fixed_vectors_equal(const FixedVector<T, _capacity>& vector_a, const FixedVector<T, _capacity>& vector_b) {
-    const typename FixedVector<T, _capacity>::InternalState* state_a = vector_a.get_internal_state();
-    const typename FixedVector<T, _capacity>::InternalState* state_b = vector_b.get_internal_state();
-    GOLD_ASSERT(state_a->size == state_b->size);
+    GOLD_ASSERT(vector_a._size == vector_b._size);
     for (size_t index = 0; index < _capacity; index++) {
-        GOLD_ASSERT(state_a->data[index] == state_b->data[index]);
+        GOLD_ASSERT(vector_a.data[index] == vector_b.data[index]);
     }
 }
 
 // Use this only when T is trivially copiable
 template <typename T, uint32_t _capacity>
 void desync_assert_fixed_queues_equal(const FixedQueue<T, _capacity>& queue_a, const FixedQueue<T, _capacity>& queue_b) {
-    const typename FixedQueue<T, _capacity>::InternalState* state_a = queue_a.get_internal_state();
-    const typename FixedQueue<T, _capacity>::InternalState* state_b = queue_b.get_internal_state();
-    GOLD_ASSERT(state_a->size == state_b->size);
-    GOLD_ASSERT(state_a->tail == state_b->tail);
+    GOLD_ASSERT(queue_a._size == queue_b._size);
+    GOLD_ASSERT(queue_a.tail == queue_b.tail);
     for (size_t index = 0; index < _capacity; index++) {
-        GOLD_ASSERT(state_a->data[index] == state_b->data[index]);
+        GOLD_ASSERT(queue_a.data[index] == queue_b.data[index]);
     }
 }
 
@@ -258,23 +159,10 @@ void desync_assert_targets_equal(const Target& target_a, const Target& target_b)
     GOLD_ASSERT(target_a.build.building_type == target_b.build.building_type);
 }
 
-struct DesyncCompareState {
-    uint8_t* state_buffer_a;
-    uint8_t* state_buffer_b;
-    size_t state_buffer_offset;
-};
-
-void desync_compare_block(DesyncCompareState& compare_state, size_t length) {
-    GOLD_ASSERT(memcmp(compare_state.state_buffer_a + compare_state.state_buffer_offset, compare_state.state_buffer_b + compare_state.state_buffer_offset, length) == 0);
-    for (size_t index = 0; index < length; index++) {
-    }
-}
-
 void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
     const MatchState* state_a = (MatchState*)state_buffer_a;
     const MatchState* state_b = (MatchState*)state_buffer_b;
 
-    /*
     // LCG seed
     GOLD_ASSERT(state_a->lcg_seed == state_b->lcg_seed);
 
@@ -366,15 +254,13 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
     }
 
     // Entities
-    const IdArray<Entity, MATCH_MAX_ENTITIES>::InternalState* entities_a = state_a->entities.get_internal_state();
-    const IdArray<Entity, MATCH_MAX_ENTITIES>::InternalState* entities_b = state_b->entities.get_internal_state();
-    GOLD_ASSERT(entities_a->size == entities_b->size);
-    GOLD_ASSERT(entities_a->next_id == entities_b->next_id);
+    GOLD_ASSERT(state_a->entities._size == state_b->entities._size);
+    GOLD_ASSERT(state_a->entities.next_id == state_b->entities.next_id);
     for (size_t entity_index = 0; entity_index < MATCH_MAX_ENTITIES; entity_index++) {
-        const Entity& entity_a = entities_a->data[entity_index];
-        const Entity& entity_b = entities_b->data[entity_index];
+        const Entity& entity_a = state_a->entities.data[entity_index];
+        const Entity& entity_b = state_b->entities.data[entity_index];
 
-        GOLD_ASSERT(entities_a->ids[entity_index] == entities_b->ids[entity_index]);
+        GOLD_ASSERT(state_a->entities.ids[entity_index] == state_b->entities.ids[entity_index]);
 
         GOLD_ASSERT(entity_a.type == entity_b.type);
         GOLD_ASSERT(entity_a.mode == entity_b.mode);
@@ -393,7 +279,6 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
         GOLD_ASSERT(entity_a.timer == entity_b.timer);
         GOLD_ASSERT(entity_a.energy_regen_timer == entity_b.energy_regen_timer);
         GOLD_ASSERT(entity_a.health_regen_timer == entity_b.health_regen_timer);
-        GOLD_ASSERT(entity_a.health_regen_timer == entity_b.health_regen_timer);
 
         desync_assert_animations_equal(entity_a.animation, entity_b.animation);
 
@@ -404,28 +289,19 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
         GOLD_ASSERT(entity_a.goldmine_id == entity_b.goldmine_id);
         GOLD_ASSERT(entity_a.gold_held == entity_b.gold_held);
 
+        // Target 
         desync_assert_targets_equal(entity_a.target, entity_b.target);
-
-        // Target queue
-        const FixedQueue<Target, TARGET_QUEUE_CAPACITY>::InternalState* target_queue_a = entity_a.target_queue.get_internal_state();
-        const FixedQueue<Target, TARGET_QUEUE_CAPACITY>::InternalState* target_queue_b = entity_b.target_queue.get_internal_state();
-        GOLD_ASSERT(target_queue_a->size == target_queue_b->size);
-        GOLD_ASSERT(target_queue_a->tail == target_queue_b->tail);
-        for (size_t index = 0; index < TARGET_QUEUE_CAPACITY; index++) {
-            desync_assert_targets_equal(target_queue_a->data[index], target_queue_b->data[index]);
-        }
+        GOLD_ASSERT(entity_a.target_queue_index == entity_b.target_queue_index);
 
         // Path
-        desync_assert_fixed_vectors_equal(entity_a.path, entity_b.path);
+        GOLD_ASSERT(entity_a.path_index == entity_b.path_index);
         GOLD_ASSERT(entity_a.pathfind_attempts == entity_b.pathfind_attempts);
 
         // Building queue
-        const FixedVector<BuildingQueueItem, BUILDING_QUEUE_SIZE>::InternalState* building_queue1 = entity_a.queue.get_internal_state();
-        const FixedVector<BuildingQueueItem, BUILDING_QUEUE_SIZE>::InternalState* building_queue2 = entity_b.queue.get_internal_state();
-        GOLD_ASSERT(building_queue1->size == building_queue2->size);
+        GOLD_ASSERT(entity_a.queue._size == entity_b.queue._size);
         for (size_t index = 0; index < BUILDING_QUEUE_SIZE; index++) {
-            const BuildingQueueItem& item1 = building_queue1->data[index];
-            const BuildingQueueItem& item2 = building_queue2->data[index];
+            const BuildingQueueItem& item1 = entity_a.queue.data[index];
+            const BuildingQueueItem& item2 = entity_b.queue.data[index];
 
             GOLD_ASSERT(item1.type == item2.type);
             // This assertion also covers item.upgrade
@@ -446,17 +322,41 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
         desync_assert_animations_equal(entity_a.bleed_animation, entity_b.bleed_animation);
     }
     for (EntityId entity_id = 0; entity_id < ID_MAX; entity_id++) {
-        GOLD_ASSERT(entities_a->id_to_index[entity_id] == entities_b->id_to_index[entity_id]);
+        GOLD_ASSERT(state_a->entities.id_to_index[entity_id] == state_b->entities.id_to_index[entity_id]);
     }
+
+    // Path pool
+    for (uint32_t index = 0; index < MATCH_MAX_UNITS; index++) {
+        desync_assert_fixed_vectors_equal(state_a->entity_paths.data[index], state_b->entity_paths.data[index]);
+    }
+    for (uint32_t index = 0; index < MATCH_MAX_UNITS; index++) {
+        GOLD_ASSERT(state_a->entity_paths.free_list[index] == state_b->entity_paths.free_list[index]);
+    }
+    GOLD_ASSERT(state_a->entity_paths.head == state_b->entity_paths.head);
+
+    // Target queue pool
+    for (uint32_t index = 0; index < MATCH_MAX_UNITS; index++) {
+        const TargetQueue& queue_a = state_a->entity_target_queues.data[index];
+        const TargetQueue& queue_b = state_b->entity_target_queues.data[index];
+
+        GOLD_ASSERT(queue_a._size == queue_b._size);
+        GOLD_ASSERT(queue_a.tail == queue_b.tail);
+        for (uint32_t queue_index = 0; queue_index < TARGET_QUEUE_CAPACITY; queue_index++) {
+            desync_assert_targets_equal(queue_a.data[queue_index], queue_b.data[queue_index]);
+        }
+    }
+    for (uint32_t index = 0; index < MATCH_MAX_UNITS; index++) {
+        GOLD_ASSERT(state_a->entity_target_queues.free_list[index] == state_b->entity_target_queues.free_list[index]);
+    }
+    GOLD_ASSERT(state_a->entity_target_queues.head == state_b->entity_target_queues.head);
 
     // Particles
     {
-        const CircularVector<Particle, MATCH_MAX_PARTICLES>::InternalState* particles_a = state_a->particles.get_internal_state();
-        const CircularVector<Particle, MATCH_MAX_PARTICLES>::InternalState* particles_b = state_a->particles.get_internal_state();
-        GOLD_ASSERT(particles_a->size == particles_b->size);
+        GOLD_ASSERT(state_a->particles._size == state_b->particles._size);
+        GOLD_ASSERT(state_a->particles.tail == state_b->particles.tail);
         for (size_t index = 0; index < MATCH_MAX_PARTICLES; index++) {
-            const Particle& particle_a = particles_a->data[index];
-            const Particle& particle_b = particles_b->data[index];
+            const Particle& particle_a = state_a->particles.data[index];
+            const Particle& particle_b = state_b->particles.data[index];
 
             GOLD_ASSERT(particle_a.layer == particle_b.layer);
             GOLD_ASSERT(particle_a.sprite == particle_b.sprite);
@@ -468,12 +368,11 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
 
     // Projectiles
     {
-        const CircularVector<Projectile, MATCH_MAX_PROJECTILES>::InternalState* projectiles_a = state_a->projectiles.get_internal_state();
-        const CircularVector<Projectile, MATCH_MAX_PROJECTILES>::InternalState* projectiles_b = state_b->projectiles.get_internal_state();
-        GOLD_ASSERT(projectiles_a->size == projectiles_b->size);
+        GOLD_ASSERT(state_a->projectiles._size == state_b->projectiles._size);
+        GOLD_ASSERT(state_a->projectiles.tail == state_b->projectiles.tail);
         for (size_t index = 0; index < MATCH_MAX_PROJECTILES; index++) {
-            const Projectile& projectile_a = projectiles_a->data[index];
-            const Projectile& projectile_b = projectiles_b->data[index];
+            const Projectile& projectile_a = state_a->projectiles.data[index];
+            const Projectile& projectile_b = state_b->projectiles.data[index];
 
             GOLD_ASSERT(projectile_a.type == projectile_b.type);
             GOLD_ASSERT(projectile_a.position == projectile_b.position);
@@ -483,12 +382,11 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
 
     // Fires
     {
-        const CircularVector<Fire, MATCH_MAX_FIRES>::InternalState* fires_a = state_a->fires.get_internal_state();
-        const CircularVector<Fire, MATCH_MAX_FIRES>::InternalState* fires_b = state_b->fires.get_internal_state();
-        GOLD_ASSERT(fires_a->size == fires_b->size);
+        GOLD_ASSERT(state_a->fires._size == state_b->fires._size);
+        GOLD_ASSERT(state_a->fires.tail == state_b->fires.tail);
         for (size_t index = 0; index < MATCH_MAX_FIRES; index++) {
-            const Fire& fire_a = fires_a->data[index];
-            const Fire& fire_b = fires_b->data[index];
+            const Fire& fire_a = state_a->fires.data[index];
+            const Fire& fire_b = state_b->fires.data[index];
 
             GOLD_ASSERT(fire_a.cell == fire_b.cell);
             GOLD_ASSERT(fire_a.source == fire_b.source);
@@ -504,12 +402,11 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
 
     // For reveals
     {
-        const CircularVector<FogReveal, MATCH_MAX_FOG_REVEALS>::InternalState* fog_reveals_a = state_a->fog_reveals.get_internal_state();
-        const CircularVector<FogReveal, MATCH_MAX_FOG_REVEALS>::InternalState* fog_reveals_b = state_b->fog_reveals.get_internal_state();
-        GOLD_ASSERT(fog_reveals_a->size == fog_reveals_b->size);
+        GOLD_ASSERT(state_a->fog_reveals._size == state_b->fog_reveals._size);
+        GOLD_ASSERT(state_a->fog_reveals.tail == state_b->fog_reveals.tail);
         for (size_t index = 0; index < MATCH_MAX_FOG_REVEALS; index++) {
-            const FogReveal& fog_reveal_a = fog_reveals_a->data[index];
-            const FogReveal& fog_reveal_b = fog_reveals_b->data[index];
+            const FogReveal& fog_reveal_a = state_a->fog_reveals.data[index];
+            const FogReveal& fog_reveal_b = state_b->fog_reveals.data[index];
 
             GOLD_ASSERT(fog_reveal_a.team == fog_reveal_b.team);
             GOLD_ASSERT(fog_reveal_a.cell == fog_reveal_b.cell);
@@ -540,13 +437,11 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
 
     // Events
     {
-        const FixedQueue<MatchEvent, MATCH_MAX_EVENTS>::InternalState* events_a = state_a->events.get_internal_state();
-        const FixedQueue<MatchEvent, MATCH_MAX_EVENTS>::InternalState* events_b = state_b->events.get_internal_state();
-        GOLD_ASSERT(events_a->size == events_b->size);
-        GOLD_ASSERT(events_a->tail == events_b->tail);
+        GOLD_ASSERT(state_a->events._size == state_b->events._size);
+        GOLD_ASSERT(state_a->events.tail == state_b->events.tail);
         for (size_t index = 0; index < MATCH_MAX_EVENTS; index++) {
-            const MatchEvent& event_a = events_a->data[index];
-            const MatchEvent& event_b = events_b->data[index];
+            const MatchEvent& event_a = state_a->events.data[index];
+            const MatchEvent& event_b = state_b->events.data[index];
 
             GOLD_ASSERT(memcmp(&event_a, &event_b, sizeof(MatchEvent)) == 0);
         }
@@ -585,13 +480,11 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
 
         // Reservation requests
         {
-            const FixedQueue<BotReservationRequest, BOT_MAX_RESERVATION_REQUESTS>::InternalState* reservation_requests_a = bot_a.reservation_requests.get_internal_state();
-            const FixedQueue<BotReservationRequest, BOT_MAX_RESERVATION_REQUESTS>::InternalState* reservation_requests_b = bot_b.reservation_requests.get_internal_state();
-            GOLD_ASSERT(reservation_requests_a->size == reservation_requests_b->size);
-            GOLD_ASSERT(reservation_requests_a->tail == reservation_requests_b->tail);
+            GOLD_ASSERT(bot_a.reservation_requests._size == bot_b.reservation_requests._size);
+            GOLD_ASSERT(bot_a.reservation_requests.tail == bot_b.reservation_requests.tail);
             for (size_t index = 0; index < BOT_MAX_RESERVATION_REQUESTS; index++) {
-                const BotReservationRequest& request_a = reservation_requests_a->data[index];
-                const BotReservationRequest& request_b = reservation_requests_b->data[index];
+                const BotReservationRequest& request_a = bot_a.reservation_requests.data[index];
+                const BotReservationRequest& request_b = bot_b.reservation_requests.data[index];
 
                 GOLD_ASSERT(memcmp(&request_a, &request_b, sizeof(BotReservationRequest)) == 0);
             }
@@ -603,12 +496,10 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
 
         // Desired squads
         {
-            const FixedVector<BotDesiredSquad, BOT_MAX_DESIRED_SQUADS>::InternalState* desired_squads_a = bot_a.desired_squads.get_internal_state();
-            const FixedVector<BotDesiredSquad, BOT_MAX_DESIRED_SQUADS>::InternalState* desired_squads_b = bot_b.desired_squads.get_internal_state();
-            GOLD_ASSERT(desired_squads_a->size == desired_squads_b->size);
+            GOLD_ASSERT(bot_a.desired_squads._size == bot_b.desired_squads._size);
             for (size_t index = 0; index < BOT_MAX_DESIRED_SQUADS; index++) {
-                const BotDesiredSquad& squad_a = desired_squads_a->data[index];
-                const BotDesiredSquad& squad_b = desired_squads_b->data[index];
+                const BotDesiredSquad& squad_a = bot_a.desired_squads.data[index];
+                const BotDesiredSquad& squad_b = bot_b.desired_squads.data[index];
 
                 GOLD_ASSERT(memcmp(&squad_a, &squad_b, sizeof(BotDesiredSquad)) == 0);
             }
@@ -623,12 +514,10 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
 
         // Squads
         {
-            const FixedVector<BotSquad, BOT_MAX_SQUADS>::InternalState* squads_a = bot_a.squads.get_internal_state();
-            const FixedVector<BotSquad, BOT_MAX_SQUADS>::InternalState* squads_b = bot_b.squads.get_internal_state();
-            GOLD_ASSERT(squads_a->size == squads_b->size);
+            GOLD_ASSERT(bot_a.squads._size == bot_b.squads._size);
             for (size_t index = 0; index < BOT_MAX_SQUADS; index++) {
-                const BotSquad& squad_a = squads_a->data[index];
-                const BotSquad& squad_b = squads_b->data[index];
+                const BotSquad& squad_a = bot_a.squads.data[index];
+                const BotSquad& squad_b = bot_b.squads.data[index];
 
                 GOLD_ASSERT(memcmp(&squad_a, &squad_b, sizeof(BotSquad)) == 0);
             }
@@ -638,18 +527,24 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
 
         // Base info
         {
-            const FixedVector<BotBaseInfo, BOT_MAX_BASE_INFO>::InternalState* base_info_array_a = bot_a.base_info.get_internal_state();
-            const FixedVector<BotBaseInfo, BOT_MAX_BASE_INFO>::InternalState* base_info_array_b = bot_b.base_info.get_internal_state();
-            GOLD_ASSERT(base_info_array_a->size == base_info_array_b->size);
+            GOLD_ASSERT(bot_a.base_info._size == bot_b.base_info._size);
             for (size_t index = 0; index < BOT_MAX_BASE_INFO; index++) {
-                const BotBaseInfo& base_info_a = base_info_array_a->data[index];
-                const BotBaseInfo& base_info_b = base_info_array_b->data[index];
+                const BotBaseInfo& base_info_a = bot_a.base_info.data[index];
+                const BotBaseInfo& base_info_b = bot_b.base_info.data[index];
 
                 GOLD_ASSERT(memcmp(&base_info_a, &base_info_b, sizeof(BotBaseInfo)) == 0);
             }
         }
     }
-        */
 }
 
 #endif
+
+uint32_t desync_get_checksum_frequency() {
+#ifdef GOLD_DEBUG
+    if (state.desync_debug) {
+        return 4U;
+    }
+#endif
+    return 60U;
+}

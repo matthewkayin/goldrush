@@ -140,7 +140,6 @@ struct NetworkEventChecksum {
 
 struct NetworkEventSerializedFrame {
     uint8_t* state_buffer;
-    size_t state_buffer_length;
 };
 
 #ifdef GOLD_STEAM

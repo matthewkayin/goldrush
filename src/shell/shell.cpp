@@ -7,6 +7,7 @@
 #include "match/upgrade.h"
 #include "shell/desync.h"
 #include "profile/profile.h"
+#include "util/adler32.h"
 #include <algorithm>
 
 // Status
@@ -554,7 +555,7 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
         }
     #ifdef GOLD_DEBUG
         case NETWORK_EVENT_SERIALIZED_FRAME: {
-            match_shell_handle_serialized_frame(event.serialized_frame.state_buffer, event.serialized_frame.state_buffer_length);
+            match_shell_handle_serialized_frame(event.serialized_frame.state_buffer);
             free(event.serialized_frame.state_buffer);
         }
     #endif
@@ -1064,16 +1065,20 @@ void match_shell_update(MatchShellState* state) {
 
     // Compute checksum
     if (!state->replay_mode && state->match_timer % desync_get_checksum_frequency() == 0) {
-        uint32_t checksum = desync_compute_match_checksum(&state->match_state, state->bots, state->match_timer);
-        log_debug("Checksum for frame %u is %u", state->match_timer, checksum);
+        uint32_t checksum = adler32_simd((uint8_t*)&state->match_state, DESYNC_BUFFER_SIZE);
+        desync_write_frame((uint8_t*)&state->match_state, state->match_timer);
         network_send_checksum(checksum);
         state->checksums[network_get_player_id()].push(checksum);
+
+    #ifdef GOLD_SIMD_CHECKSUM_TEST
+        adler32_test((uint8_t*)&state->match_state, DESYNC_BUFFER_SIZE);
+    #endif
     }
 
     // Compare checksums
     if (match_shell_has_next_checksums(state)) {
         if (match_shell_are_next_checksums_out_of_sync(state)) {
-            desync_send_serialized_frame(state->next_checksum_frame);
+            desync_send_frame(state->next_checksum_frame);
             state->mode = MATCH_SHELL_MODE_DESYNC;
 
             return;
@@ -1084,7 +1089,7 @@ void match_shell_update(MatchShellState* state) {
                     state->checksums[player_id].pop();
                 }
             }
-            desync_delete_serialized_frame(state->next_checksum_frame);
+            desync_delete_frame(state->next_checksum_frame);
             state->next_checksum_frame += desync_get_checksum_frequency();
         }
     }
@@ -2961,22 +2966,20 @@ bool match_shell_are_next_checksums_out_of_sync(const MatchShellState* state) {
 
 #ifdef GOLD_DEBUG
 
-void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t incoming_state_buffer_length) {
+void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer) {
     uint32_t frame;
     memcpy(&frame, incoming_state_buffer + sizeof(uint8_t), sizeof(frame));
-    log_info("DESYNC Received serialized frame %u with size %llu", frame, incoming_state_buffer_length);
+    log_info("DESYNC Received serialized frame %u.", frame);
 
-    size_t state_buffer_length;
-    uint8_t* state_buffer = desync_read_serialized_frame(frame, &state_buffer_length);
+    uint8_t* state_buffer = desync_read_frame(frame);
     if (state_buffer == NULL) {
         log_error("match_shell_handle_serialized_frame could not read serialized frame.");
         return;
     }
 
-    size_t header_size = sizeof(uint8_t) + sizeof(uint32_t);
-    uint32_t checksum = desync_compute_buffer_checksum(state_buffer + header_size, state_buffer_length - header_size);
-    uint32_t checksum2 = desync_compute_buffer_checksum(incoming_state_buffer + header_size, incoming_state_buffer_length - header_size);
-    log_info("DESYNC Comparing serialized / incoming frame %u. size %llu / %llu. checksum %u / %u", frame, state_buffer_length - header_size, incoming_state_buffer_length - header_size, checksum, checksum2);
+    uint32_t checksum = adler32_simd(state_buffer + DESYNC_STATE_BUFFER_HEADER_SIZE, DESYNC_STATE_BUFFER_LENGTH - DESYNC_STATE_BUFFER_HEADER_SIZE);
+    uint32_t checksum2 = adler32_simd(incoming_state_buffer + DESYNC_STATE_BUFFER_HEADER_SIZE, DESYNC_STATE_BUFFER_LENGTH - DESYNC_STATE_BUFFER_HEADER_SIZE);
+    log_info("DESYNC Comparing serialized / incoming frame %u. checksum %u / %u", frame, checksum, checksum2);
     desync_compare_frames(state_buffer + sizeof(uint8_t) + sizeof(uint32_t), incoming_state_buffer + sizeof(uint8_t) + sizeof(uint32_t));
     free(state_buffer);
     log_info("DESYNC Finished comparing frames.");
@@ -3341,18 +3344,18 @@ void match_shell_render(const MatchShellState* state) {
                 (state->replay_mode || entity.player_id == network_get_player_id())) {
             if (entity.target_queue_index != ENTITY_TARGET_QUEUE_INDEX_NONE) {
                 // Render flag for entity's current target
-                ivec2 queued_target_position = match_shell_get_queued_target_position(state, entity.target);
-                if (queued_target_position.x != -1) {
-                    queue_render_rally_flag(queued_target_position, entity.player_id);
+                ivec2 target_position = match_shell_get_queued_target_position(state, entity.target);
+                if (target_position.x != -1) {
+                    queue_render_rally_flag(target_position, entity.player_id);
                 }
 
                 // Render flag for queued targets
                 const TargetQueue* entity_target_queue = state->match_state.entity_target_queues.get(entity.target_queue_index);
                 for (uint32_t target_queue_index = 0; target_queue_index < entity_target_queue->size(); target_queue_index++) {
                     const Target& target = (*entity_target_queue)[target_queue_index];
-                    ivec2 queued_target_position = match_shell_get_queued_target_position(state, target);
-                    if (queued_target_position.x != -1) {
-                        queue_render_rally_flag(queued_target_position, entity.player_id);
+                    ivec2 target_queue_target_position = match_shell_get_queued_target_position(state, target);
+                    if (target_queue_target_position.x != -1) {
+                        queue_render_rally_flag(target_queue_target_position, entity.player_id);
                     }
                 }
             }

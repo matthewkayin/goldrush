@@ -2662,7 +2662,6 @@ void entity_pathfind(MatchState* state, Entity& entity, ivec2 to, uint32_t optio
     entity.path_index = state->entity_paths.reserve();
     MapPath* entity_path = state->entity_paths.get(entity.path_index);
     map_pathfind(state->map, entity_data.cell_layer, entity.cell, to, entity_data.cell_size, options, ignore_cells, entity_path);
-    log_debug("entity_pathfind %u", entity_path->size());
 
     if (entity_path->empty()) {
         entity_path_clear(state, entity);
