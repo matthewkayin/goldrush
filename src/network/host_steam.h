@@ -14,6 +14,9 @@ public:
     bool is_initialized_successfully() const override;
     NetworkBackend get_backend() const override;
 
+    void open_lobby(const char* lobby_name, NetworkLobbyPrivacy privacy) override;
+    void close_lobby() override;
+
     bool connect(void* connection_info) override;
     void buffer_connection_info(void* buffer) const override;
 
@@ -24,7 +27,6 @@ public:
     void disconnect_peer(uint16_t peer_id, bool gently) override;
 
     size_t buffer_peer_connection_info(uint16_t peer_id, void* buffer) const override;
-    void* parse_connection_info(void* buffer) const override;
 
     void send(uint16_t peer_id, void* data, size_t length) override;
     void broadcast(void* data, size_t length) override;
@@ -37,6 +39,13 @@ private:
     HSteamNetPollGroup host_poll_group;
     HSteamNetConnection host_peers[MAX_PLAYERS - 1];
     uint16_t host_peer_count;
+    uint8_t host_lobby_player_count;
+    CSteamID host_lobby_id;
+
+    void update_lobby_player_count();
+
+    STEAM_CALLBACK(NetworkHostSteam, on_lobby_created, LobbyCreated_t);
+    STEAM_CALLBACK(NetworkHostSteam, on_connection_status_changed, SteamNetConnectionStatusChangedCallback_t);
 };
 
 #endif

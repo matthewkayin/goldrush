@@ -2,11 +2,6 @@
 
 #include "core/logger.h"
 
-struct NetworkHostLanConnectionInfo {
-    char ip[NETWORK_IP_BUFFER_SIZE];
-    uint16_t port;
-};
-
 NetworkHostLan::NetworkHostLan() {
     ENetAddress address;
     address.host = ENET_HOST_ANY;
@@ -26,14 +21,21 @@ NetworkHostLan::NetworkHostLan() {
         return;
     }
 
+    host_listener_socket = ENET_SOCKET_NULL;
+
     log_info("Created LAN host.");
 }
 
 NetworkHostLan::~NetworkHostLan() {
-    log_info("Destroying LAN host.");
     if (host != NULL) {
         enet_host_destroy(host);
     }
+    if (host_listener_socket != ENET_SOCKET_NULL) {
+        enet_socket_shutdown(host_listener_socket, ENET_SOCKET_SHUTDOWN_READ_WRITE);
+        enet_socket_destroy(host_listener_socket);
+    }
+    
+    log_info("Destroyed LAN host.");
 }
 
 bool NetworkHostLan::is_initialized_successfully() const {
@@ -44,8 +46,56 @@ NetworkBackend NetworkHostLan::get_backend() const {
     return NETWORK_BACKEND_LAN;
 }
 
+void NetworkHostLan::open_lobby(const char* lobby_name, NetworkLobbyPrivacy privacy) {
+    set_lobby_name(lobby_name);
+
+    if (privacy == NETWORK_LOBBY_PRIVACY_SINGLEPLAYER) {
+        host_events.push((NetworkHostEvent) {
+            .type = NETWORK_HOST_EVENT_LOBBY_CREATE_SUCCESS
+        });
+        log_info("LAN host opened singleplayer lobby.");
+        return;
+    }
+
+    host_listener_socket = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
+    if (host_listener_socket == ENET_SOCKET_NULL) {
+        log_error("LAN host failed to create listener socket.");
+        host_events.push((NetworkHostEvent) {
+            .type = NETWORK_HOST_EVENT_LOBBY_CREATE_FAILED
+        });
+        return;
+    }
+
+    enet_socket_set_option(host_listener_socket, ENET_SOCKOPT_REUSEADDR, 1);
+
+    ENetAddress listener_address;
+    listener_address.host = ENET_HOST_ANY;
+    listener_address.port = NETWORK_SCANNER_PORT;
+    if (enet_socket_bind(host_listener_socket, &listener_address) != 0) {
+        log_error("LAN host failed to bind listener socket.");
+        host_events.push((NetworkHostEvent) {
+            .type = NETWORK_HOST_EVENT_LOBBY_CREATE_FAILED
+        });
+        return;
+    }
+
+    host_events.push((NetworkHostEvent) {
+        .type = NETWORK_HOST_EVENT_LOBBY_CREATE_SUCCESS
+    });
+
+    log_info("LAN host opened lobby.");
+}
+
+void NetworkHostLan::close_lobby() {
+    if (host_listener_socket != ENET_SOCKET_NULL) {
+        enet_socket_shutdown(host_listener_socket, ENET_SOCKET_SHUTDOWN_READ_WRITE);
+        enet_socket_destroy(host_listener_socket);
+        host_listener_socket = ENET_SOCKET_NULL;
+    }
+}
+
 bool NetworkHostLan::connect(void* p_connection_info) {
-    NetworkHostLanConnectionInfo* connection_info = (NetworkHostLanConnectionInfo*)p_connection_info;
+    NetworkConnectionInfoLan* connection_info = (NetworkConnectionInfoLan*)p_connection_info;
     log_info("Connecting to host %s:%u", connection_info->ip, connection_info->port);
 
     ENetAddress host_address;
@@ -62,7 +112,7 @@ bool NetworkHostLan::connect(void* p_connection_info) {
 }
 
 void NetworkHostLan::buffer_connection_info(void* buffer) const {
-    NetworkHostLanConnectionInfo connection_info;
+    NetworkConnectionInfoLan connection_info;
     enet_address_set_host_ip(&host->address, connection_info.ip);
     connection_info.port = host->address.port;
 
@@ -100,7 +150,7 @@ void NetworkHostLan::disconnect_peer(uint16_t peer_id, bool gently) {
 }
 
 size_t NetworkHostLan::buffer_peer_connection_info(uint16_t peer_id, void* buffer) const {
-    NetworkHostLanConnectionInfo connection_info;
+    NetworkConnectionInfoLan connection_info;
     memset(&connection_info, 0, sizeof(connection_info));
     enet_address_get_host_ip(&host->peers[peer_id].address, (char*)connection_info.ip, NETWORK_IP_BUFFER_SIZE);
     connection_info.port = host->peers[peer_id].address.port;
