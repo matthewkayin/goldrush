@@ -1,8 +1,9 @@
 #include "network.h"
 
-#include "network/host.h"
 #include "network/host_lan.h"
 #include "network/host_steam.h"
+#include "network/scanner_lan.h"
+#include "network/scanner_steam.h"
 #include "core/logger.h"
 #include "core/asserts.h"
 #include <enet/enet.h>
@@ -19,19 +20,11 @@ struct NetworkState {
     NetworkStatus status;
 
     INetworkHost* host;
-    ENetSocket lan_scanner;
-#ifdef GOLD_STEAM
-    CSteamID steam_lobby_id;
-    CSteamID steam_invite_lobby_id;
-    uint8_t steam_lobby_player_count;
-#endif
+    INetworkScanner* scanner;
 
     NetworkPlayer players[MAX_PLAYERS];
     uint8_t player_id;
     uint8_t match_settings[MATCH_SETTING_COUNT];
-
-    std::queue<NetworkEvent> events;
-    std::vector<NetworkLobby> lobbies;
 
     char username[NETWORK_PLAYER_NAME_BUFFER_SIZE];
     char lobby_name[NETWORK_LOBBY_NAME_BUFFER_SIZE];
@@ -47,24 +40,20 @@ void network_set_players_not_ready();
 void network_handle_message(uint16_t peer_id, uint8_t* data, size_t length);
 
 bool network_init() {
-#ifdef GOLD_STEAM
-    SteamNetworkingUtils()->InitRelayNetworkAccess();
-    SteamAPI_ManualDispatch_Init();
-#endif
-
     if (enet_initialize() != 0) {
         log_error("Error initializing enet.");
         return false;
     }
 
 #ifdef GOLD_STEAM
+    SteamNetworkingUtils()->InitRelayNetworkAccess();
     strncpy(state.username, SteamFriends()->GetPersonaName(), NETWORK_PLAYER_NAME_BUFFER_SIZE);
 #else
     state.username[0] = '\0';
 #endif
 
-    state.host = NULL;
-    state.lan_scanner = ENET_SOCKET_NULL;
+    state.host = nullptr;
+    state.scanner = nullptr;
 #ifdef GOLD_STEAM
     state.steam_invite_lobby_id.Clear();
 #endif

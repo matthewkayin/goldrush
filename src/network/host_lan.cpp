@@ -3,6 +3,8 @@
 #include "core/logger.h"
 
 NetworkHostLan::NetworkHostLan() {
+    memset(host_lobby_name, 0, sizeof(host_lobby_name));
+
     ENetAddress address;
     address.host = ENET_HOST_ANY;
     address.port = NETWORK_BASE_PORT;
@@ -47,7 +49,7 @@ NetworkBackend NetworkHostLan::get_backend() const {
 }
 
 void NetworkHostLan::open_lobby(const char* lobby_name, NetworkLobbyPrivacy privacy) {
-    set_lobby_name(lobby_name);
+    strncpy(host_lobby_name, lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
 
     if (privacy == NETWORK_LOBBY_PRIVACY_SINGLEPLAYER) {
         host_events.push((NetworkHostEvent) {

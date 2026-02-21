@@ -3,8 +3,17 @@
 #ifdef GOLD_STEAM
 
 #include "core/logger.h"
+#include "core/asserts.h"
+#include "network/network.h"
+
+#define NETWORK_STEAM_LOBBY_PROPERTY_NAME "name"
+#define NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY "host_identity"
+#define NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT "player_count"
 
 NetworkHostSteam::NetworkHostSteam() {
+    memset(host_lobby_name, 0, sizeof(host_lobby_name));
+    host_lobby_id.Clear();
+
     host_listen_socket = SteamNetworkingSockets()->CreateListenSocketP2P(0, 0, NULL);
     host_poll_group = SteamNetworkingSockets()->CreatePollGroup();
     host_peer_count = 0;
@@ -26,7 +35,7 @@ NetworkBackend NetworkHostSteam::get_backend() const {
 }
 
 void NetworkHostSteam::open_lobby(const char* lobby_name, NetworkLobbyPrivacy privacy) {
-    set_lobby_name(lobby_name);
+    strncpy(host_lobby_name, lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
 
     ELobbyType steam_lobby_type = privacy == NETWORK_LOBBY_PRIVACY_PUBLIC
         ? k_ELobbyTypePublic
@@ -37,6 +46,7 @@ void NetworkHostSteam::open_lobby(const char* lobby_name, NetworkLobbyPrivacy pr
 
 void NetworkHostSteam::close_lobby() {
     SteamMatchmaking()->LeaveLobby(host_lobby_id);
+    host_lobby_id.Clear();
 }
 
 bool NetworkHostSteam::connect(void* connection_info) {
@@ -119,6 +129,10 @@ void NetworkHostSteam::flush() {
 }
 
 void NetworkHostSteam::service() {
+    if (host_lobby_id.IsValid() && host_lobby_player_count != network_get_player_count()) {
+        update_lobby_player_count();
+    }
+
     SteamNetworkingMessage_t* messages[32];
     int message_count = SteamNetworkingSockets()->ReceiveMessagesOnPollGroup(host_poll_group, messages, 32);
     for (int message_index = 0; message_index < message_count; message_index++) {
@@ -155,7 +169,9 @@ void NetworkHostSteam::destroy_packet(NetworkHostPacket* packet) {
 }
 
 void NetworkHostSteam::update_lobby_player_count() {
-
+    host_lobby_player_count = network_get_player_count();
+    char buffer[2] = { (char)host_lobby_player_count, '\0' };
+    SteamMatchmaking()->SetLobbyData(host_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT, buffer);
 }
 
 void NetworkHostSteam::on_lobby_created(LobbyCreated_t* lobby_created) {
@@ -170,7 +186,7 @@ void NetworkHostSteam::on_lobby_created(LobbyCreated_t* lobby_created) {
 
     // Set steam lobby property `name`
     host_lobby_id = lobby_created->m_ulSteamIDLobby;
-    SteamMatchmaking()->SetLobbyData(host_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_NAME, get_lobby_name());
+    SteamMatchmaking()->SetLobbyData(host_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_NAME, host_lobby_name);
 
     // Set steam lobby property `host_identity`
     NetworkConnectionInfoSteam connection_info;
@@ -205,12 +221,12 @@ void NetworkHostSteam::on_connection_status_changed(SteamNetConnectionStatusChan
         // Otherwise, they reached out to us. 
         // Do we have enough space in the peer list to accept them?
         // If we don't, it should mean that we're the host and the lobby is full.
-        // TODO: replace this logic with a check on network_get_player_count() so that we can account for bots taking up lobby space
-        if (host_peer_count == MAX_PLAYERS - 1) {
-            log_debug("Peer count is full. Rejecting.");
+        if (network_get_player_count() == MAX_PLAYERS) {
+            log_debug("Lobby is full. Rejecting.");
             SteamNetworkingSockets()->CloseConnection(callback->m_hConn, 0, "", false);
             return;
         }
+        GOLD_ASSERT(host_peer_count < MAX_PLAYERS - 1);
 
         // If we do, accept the connection
         log_debug("Accepted connection.");

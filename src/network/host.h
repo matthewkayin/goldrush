@@ -67,10 +67,9 @@ public:
 
     virtual void destroy_packet(NetworkHostPacket* packet) = 0;
 
-    const char* get_lobby_name() const;
-    void set_lobby_name(const char* value);
-
     bool poll_events(NetworkHostEvent* event);
+
+    const char* get_lobby_name() const;
 protected:
     std::queue<NetworkHostEvent> host_events;
     char host_lobby_name[NETWORK_LOBBY_NAME_BUFFER_SIZE];
