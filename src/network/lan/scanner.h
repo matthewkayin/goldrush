@@ -1,6 +1,6 @@
 #pragma once
 
-#include "network/scanner.h"
+#include "network/interface/scanner.h"
 #include <enet/enet.h>
 
 class NetworkScannerLan : public INetworkScanner {

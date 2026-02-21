@@ -4,7 +4,7 @@
 
 #ifdef GOLD_STEAM
 
-#include "network/scanner.h"
+#include "network/interface/scanner.h"
 #include <steam/steam_api.h>
 
 class NetworkScannerSteam : public INetworkScanner {

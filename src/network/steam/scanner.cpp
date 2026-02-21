@@ -1,4 +1,4 @@
-#include "scanner_steam.h"
+#include "scanner.h"
 
 #ifdef GOLD_STEAM
 

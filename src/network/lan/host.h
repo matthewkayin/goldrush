@@ -1,6 +1,6 @@
 #pragma once
 
-#include "network/host.h"
+#include "network/interface/host.h"
 #include <enet/enet.h>
 
 STATIC_ASSERT(NETWORK_CONNECTION_INFO_BUFFER_SIZE >= sizeof(NetworkConnectionInfoLan));

@@ -1,4 +1,4 @@
-#include "host_steam.h"
+#include "host.h"
 
 #ifdef GOLD_STEAM
 

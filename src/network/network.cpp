@@ -1,9 +1,9 @@
 #include "network.h"
 
-#include "network/host_lan.h"
-#include "network/host_steam.h"
-#include "network/scanner_lan.h"
-#include "network/scanner_steam.h"
+#include "network/lan/host.h"
+#include "network/lan/scanner.h"
+#include "network/steam/host.h"
+#include "network/steam/scanner.h"
 #include "core/logger.h"
 #include "core/asserts.h"
 #include <enet/enet.h>

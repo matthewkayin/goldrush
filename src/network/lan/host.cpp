@@ -1,6 +1,7 @@
-#include "host_lan.h"
+#include "host.h"
 
 #include "core/logger.h"
+#include "network/network.h"
 
 NetworkHostLan::NetworkHostLan() {
     memset(host_lobby_name, 0, sizeof(host_lobby_name));
@@ -170,6 +171,36 @@ void NetworkHostLan::flush() {
 }
 
 void NetworkHostLan::service() {
+    // Listen on listener socket
+    if (host_listener_socket != ENET_SOCKET_NULL) {
+        ENetSocketSet set;
+        ENET_SOCKETSET_EMPTY(set);
+        ENET_SOCKETSET_ADD(set, host_listener_socket);
+        while (enet_socketset_select(host_listener_socket, &set, NULL, 0) > 0) {
+            ENetAddress receive_address;
+            ENetBuffer receive_buffer;
+            char buffer[128];
+            receive_buffer.data = &buffer;
+            receive_buffer.dataLength = sizeof(buffer);
+            if (enet_socket_receive(host_listener_socket, &receive_address, &receive_buffer, 1) <= 0) {
+                continue;
+            }
+
+            // Tell the client about this lobby
+            NetworkLanLobbyInfo lobby_info;
+            strncpy(lobby_info.name, host_lobby_name, sizeof(lobby_info.name));
+            lobby_info.port = host->address.port;
+            lobby_info.player_count = network_get_player_count();
+
+            ENetBuffer response_buffer;
+            response_buffer.data = &lobby_info;
+            response_buffer.dataLength = sizeof(lobby_info);
+            enet_socket_send(host_listener_socket, &receive_address, &response_buffer, 1);
+            log_debug("Network LAN host sent lobby info. Lobby name %s player count %u port %u", lobby_info.name, lobby_info.player_count, lobby_info.port);
+        }
+    }
+
+    // Service host
     ENetEvent enet_event;
     if (enet_host_service(host, &enet_event, 0) > 0) {
         switch (enet_event.type) {

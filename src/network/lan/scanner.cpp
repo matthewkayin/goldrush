@@ -1,4 +1,4 @@
-#include "scanner_lan.h"
+#include "scanner.h"
 
 #include "network/types.h"
 #include "core/logger.h"

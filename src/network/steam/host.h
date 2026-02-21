@@ -4,7 +4,7 @@
 
 #ifdef GOLD_STEAM
 
-#include "network/host.h"
+#include "network/interface/host.h"
 #include <steam/steam_api.h>
 
 STATIC_ASSERT(NETWORK_CONNECTION_INFO_BUFFER_SIZE >= SteamNetworkingIdentity::k_cchMaxString);
