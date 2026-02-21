@@ -379,7 +379,7 @@ void NetworkState::on_steam_lobby_data_update(LobbyDataUpdate_t* lobby_data_upda
 
     NetworkEvent event;
     event.type = NETWORK_EVENT_STEAM_INVITE;
-    strncpy(event.steam_invite.connection_info.data, SteamMatchmaking()->GetLobbyData(state->steam_invite_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY), sizeof(event.steam_invite.connection_info.data));
+    strncpy(event.steam_invite.connection_info.steam.identity_str, SteamMatchmaking()->GetLobbyData(state->steam_invite_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY), sizeof(event.steam_invite.connection_info.steam.identity_str));
     state->events.push(event);
     state->steam_invite_lobby_id.Clear();
 

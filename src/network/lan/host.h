@@ -3,8 +3,6 @@
 #include "network/interface/host.h"
 #include <enet/enet.h>
 
-STATIC_ASSERT(NETWORK_CONNECTION_INFO_BUFFER_SIZE >= sizeof(NetworkConnectionInfoLan));
-
 class NetworkHostLan : public INetworkHost {
 public:
     NetworkHostLan();

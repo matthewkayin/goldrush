@@ -46,10 +46,10 @@ void NetworkHostSteam::close_lobby() {
 }
 
 bool NetworkHostSteam::connect(const NetworkConnectionInfo& connection_info) {
-    log_info("Connecting to host with identity %s", (char*)connection_info.data);
+    log_info("Connecting to host with identity %s", (char*)connection_info.steam.identity_str);
 
     SteamNetworkingIdentity identity;
-    identity.ParseString(connection_info.data);
+    identity.ParseString(connection_info.steam.identity_str);
 
     HSteamNetConnection connection = SteamNetworkingSockets()->ConnectP2P(identity, 0, 0, NULL);
     SteamNetworkingSockets()->SetConnectionPollGroup(connection, host_poll_group);
@@ -77,19 +77,18 @@ void NetworkHostSteam::set_peer_player_id(uint16_t peer_id, uint8_t player_id) {
 }
 
 NetworkConnectionInfo NetworkHostSteam::get_peer_connection_info(uint16_t peer_id) const {
-    NetworkConnectionInfo result;
-    memset(result.data, 0, sizeof(result.data));
+    NetworkConnectionInfo connection_info;
 
-    SteamNetConnectionInfo_t connection_info;
-    if (!SteamNetworkingSockets()->GetConnectionInfo(host_peers[peer_id], &connection_info)) {
+    SteamNetConnectionInfo_t steam_connection_info;
+    if (!SteamNetworkingSockets()->GetConnectionInfo(host_peers[peer_id], &steam_connection_info)) {
         log_warn("Network Steam host tried to get_peer_connection_info on a peer whom we are not connected to.");
         GOLD_ASSERT(false);
-        return result;
+        return connection_info;
     }
 
-    connection_info.m_identityRemote.ToString(result.data, sizeof(result.data));
+    steam_connection_info.m_identityRemote.ToString(connection_info.steam.identity_str, sizeof(connection_info.steam.identity_str));
 
-    return result;
+    return connection_info;
 }
 
 void NetworkHostSteam::disconnect_peers() {

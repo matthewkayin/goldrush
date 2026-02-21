@@ -7,8 +7,6 @@
 #include "network/interface/host.h"
 #include <steam/steam_api.h>
 
-STATIC_ASSERT(NETWORK_CONNECTION_INFO_BUFFER_SIZE >= SteamNetworkingIdentity::k_cchMaxString);
-
 class NetworkHostSteam : public INetworkHost {
 public:
     NetworkHostSteam();

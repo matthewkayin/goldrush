@@ -6,6 +6,8 @@
 
 #ifdef GOLD_STEAM
 
+#include <steam/steam_api.h>
+
 #define NETWORK_STEAM_LOBBY_PROPERTY_NAME "name"
 #define NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY "host_identity"
 #define NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT "player_count"
@@ -20,7 +22,6 @@
 #define NETWORK_CHAT_BUFFER_SIZE 128
 #define NETWORK_SCANNER_PORT 6529
 #define NETWORK_BASE_PORT 6530
-#define NETWORK_CONNECTION_INFO_BUFFER_SIZE 128
 
 enum NetworkBackend {
     NETWORK_BACKEND_LAN,
@@ -41,8 +42,19 @@ struct NetworkConnectionInfoLan {
     uint16_t port;
 };
 
-struct NetworkConnectionInfo {
-    char data[NETWORK_CONNECTION_INFO_BUFFER_SIZE];
+#ifdef GOLD_STEAM
+
+struct NetworkConnectionInfoSteam {
+    char identity_str[SteamNetworkingIdentity::k_cchMaxString];
+};
+
+#endif
+
+union NetworkConnectionInfo {
+    NetworkConnectionInfoLan lan;
+#ifdef GOLD_DEBUG
+    NetworkConnectionInfoSteam steam;
+#endif
 };
 
 struct NetworkLobby {

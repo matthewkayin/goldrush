@@ -47,28 +47,25 @@ void NetworkScannerLan::service() {
     while (enet_socketset_select(scanner_socket, &set, NULL, 0) > 0) {
         ENetAddress receive_address;
         ENetBuffer receive_buffer;
-        char buffer[128];
+        NetworkLanLobbyInfo lobby_info;
 
-        receive_buffer.data = &buffer;
-        receive_buffer.dataLength = sizeof(buffer);
+        receive_buffer.data = &lobby_info;
+        receive_buffer.dataLength = sizeof(lobby_info);
 
         if (enet_socket_receive(scanner_socket, &receive_address, &receive_buffer, 1) <= 0) {
             continue;
         }
 
         // A server told us about a lobby
-        NetworkLanLobbyInfo* lobby_info = (NetworkLanLobbyInfo*)buffer;
 
         // Create a new lobby entry to remember
         NetworkLobby lobby;
-        strncpy(lobby.name, lobby_info->name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
-        lobby.player_count = lobby_info->player_count;
+        strncpy(lobby.name, lobby_info.name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
+        lobby.player_count = lobby_info.player_count;
 
-        // Buffer connnection info
-        memset(&lobby.connection_info, 0, sizeof(lobby.connection_info));
-        NetworkConnectionInfoLan* lobby_connection_info = (NetworkConnectionInfoLan*)lobby.connection_info.data;
-        enet_address_get_host_ip(&receive_address, lobby_connection_info->ip, NETWORK_IP_BUFFER_SIZE);
-        lobby_connection_info->port = lobby_info->port;
+        // Set connnection info
+        enet_address_get_host_ip(&receive_address, lobby.connection_info.lan.ip, NETWORK_IP_BUFFER_SIZE);
+        lobby.connection_info.lan.port = lobby_info.port;
 
         // Filter by search query and add to lobby list
         if (strlen(scanner_lobby_name_query) == 0 || strstr(lobby.name, scanner_lobby_name_query) != NULL) {

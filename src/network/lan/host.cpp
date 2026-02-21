@@ -97,13 +97,12 @@ void NetworkHostLan::close_lobby() {
     }
 }
 
-bool NetworkHostLan::connect(const NetworkConnectionInfo& p_connection_info) {
-    NetworkConnectionInfoLan* connection_info = (NetworkConnectionInfoLan*)p_connection_info.data;
-    log_info("Connecting to host %s:%u", connection_info->ip, connection_info->port);
+bool NetworkHostLan::connect(const NetworkConnectionInfo& connection_info) {
+    log_info("Connecting to host %s:%u", connection_info.lan.ip, connection_info.lan.port);
 
     ENetAddress host_address;
-    host_address.port = connection_info->port;
-    enet_address_set_host_ip(&host_address, connection_info->ip);
+    host_address.port = connection_info.lan.port;
+    enet_address_set_host_ip(&host_address, connection_info.lan.ip);
 
     ENetPeer* host_peer = enet_host_connect(host, &host_address, 1, 0);
     if (host_peer == NULL) {
@@ -133,14 +132,11 @@ void NetworkHostLan::set_peer_player_id(uint16_t peer_id, uint8_t player_id) {
 }
 
 NetworkConnectionInfo NetworkHostLan::get_peer_connection_info(uint16_t peer_id) const {
-    NetworkConnectionInfo result;
-    memset(result.data, 0, sizeof(result.data));
+    NetworkConnectionInfo connection_info;
+    enet_address_get_host_ip(&host->peers[peer_id].address, connection_info.lan.ip, NETWORK_IP_BUFFER_SIZE);
+    connection_info.lan.port = host->peers[peer_id].address.port;
 
-    NetworkConnectionInfoLan* connection_info = (NetworkConnectionInfoLan*)result.data;
-    enet_address_get_host_ip(&host->peers[peer_id].address, connection_info->ip, NETWORK_IP_BUFFER_SIZE);
-    connection_info->port = host->peers[peer_id].address.port;
-
-    return result;
+    return connection_info;
 }
 
 void NetworkHostLan::disconnect_peers() {
