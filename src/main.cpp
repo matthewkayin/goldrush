@@ -259,6 +259,10 @@ int gold_main(int argc, char** argv) {
         }
         frames++;
 
+    #ifdef GOLD_STEAM
+        SteamAPI_RunCallbacks();
+    #endif
+
         // Update
         while (update_accumulator >= UPDATE_DURATION) {
             update_accumulator -= UPDATE_DURATION;

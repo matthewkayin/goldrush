@@ -303,7 +303,7 @@ void network_open_lobby(const char* lobby_name, NetworkLobbyPrivacy privacy) {
     state->players[0].status = NETWORK_PLAYER_STATUS_HOST;
     state->players[0].team = 0;
 
-    log_info("Network %u opened lobby.", state->backend);
+    log_info("Network opened lobby.");
 }
 
 void network_join_lobby(const NetworkConnectionInfo& connection_info) {
