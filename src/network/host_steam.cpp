@@ -6,10 +6,6 @@
 #include "core/asserts.h"
 #include "network/network.h"
 
-#define NETWORK_STEAM_LOBBY_PROPERTY_NAME "name"
-#define NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY "host_identity"
-#define NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT "player_count"
-
 NetworkHostSteam::NetworkHostSteam() {
     memset(host_lobby_name, 0, sizeof(host_lobby_name));
     host_lobby_id.Clear();
@@ -49,11 +45,11 @@ void NetworkHostSteam::close_lobby() {
     host_lobby_id.Clear();
 }
 
-bool NetworkHostSteam::connect(void* connection_info) {
-    log_info("Connecting to host with identity %s", (char*)connection_info);
+bool NetworkHostSteam::connect(const NetworkConnectionInfo& connection_info) {
+    log_info("Connecting to host with identity %s", (char*)connection_info.data);
 
     SteamNetworkingIdentity identity;
-    identity.ParseString((char*)connection_info);
+    identity.ParseString(connection_info.data);
 
     HSteamNetConnection connection = SteamNetworkingSockets()->ConnectP2P(identity, 0, 0, NULL);
     SteamNetworkingSockets()->SetConnectionPollGroup(connection, host_poll_group);
@@ -62,12 +58,6 @@ bool NetworkHostSteam::connect(void* connection_info) {
 
     log_debug("Steam hots now has peer with connection %u. Peer count %u", host_peers[host_peer_count], host_peer_count);
     return true;
-}
-
-void NetworkHostSteam::buffer_connection_info(void* buffer) const {
-    SteamNetworkingIdentity identity;
-    SteamNetworkingSockets()->GetIdentity(&identity);
-    identity.ToString((char*)buffer, NETWORK_CONNECTION_INFO_BUFFER_SIZE);
 }
 
 uint16_t NetworkHostSteam::get_peer_count() const {
@@ -86,30 +76,27 @@ void NetworkHostSteam::set_peer_player_id(uint16_t peer_id, uint8_t player_id) {
     SteamNetworkingSockets()->SetConnectionUserData(host_peers[peer_id], player_id);
 }
 
-bool NetworkHostSteam::is_peer_connected(uint16_t peer_id) const {
+NetworkConnectionInfo NetworkHostSteam::get_peer_connection_info(uint16_t peer_id) const {
+    NetworkConnectionInfo result;
+    memset(result.data, 0, sizeof(result.data));
+
     SteamNetConnectionInfo_t connection_info;
     if (!SteamNetworkingSockets()->GetConnectionInfo(host_peers[peer_id], &connection_info)) {
-        return false;
-    }
-    return connection_info.m_eState == k_ESteamNetworkingConnectionState_Connected;
-}
-
-void NetworkHostSteam::disconnect_peer(uint16_t peer_id, bool gently) {
-    SteamNetworkingSockets()->CloseConnection(host_peers[peer_id], 0, "", false);
-    host_peers[peer_id] = host_peers[host_peer_count - 1];
-    host_peer_count--;
-    log_debug("Disconnected peer. peer count %u", host_peer_count);
-}
-
-size_t NetworkHostSteam::buffer_peer_connection_info(uint16_t peer_id, void* buffer) const {
-    SteamNetConnectionInfo_t connection_info;
-    if (!SteamNetworkingSockets()->GetConnectionInfo(host_peers[peer_id], &connection_info)) {
-        return 0;
+        log_warn("Network Steam host tried to get_peer_connection_info on a peer whom we are not connected to.");
+        GOLD_ASSERT(false);
+        return result;
     }
 
-    uint64_t steam_id = connection_info.m_identityRemote.GetSteamID64();
-    memcpy(buffer, &steam_id, sizeof(steam_id));
-    return sizeof(steam_id);
+    connection_info.m_identityRemote.ToString(result.data, sizeof(result.data));
+
+    return result;
+}
+
+void NetworkHostSteam::disconnect_peers() {
+    for (uint16_t peer_id = 0; peer_id < host_peer_count; peer_id++) {
+        SteamNetworkingSockets()->CloseConnection(host_peers[peer_id], 0, "", false);
+    }
+    host_peer_count = 0;
 }
 
 void NetworkHostSteam::send(uint16_t peer_id, void* data, size_t length) {
@@ -189,11 +176,11 @@ void NetworkHostSteam::on_lobby_created(LobbyCreated_t* lobby_created) {
     SteamMatchmaking()->SetLobbyData(host_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_NAME, host_lobby_name);
 
     // Set steam lobby property `host_identity`
-    NetworkConnectionInfoSteam connection_info;
+    char identity_str[SteamNetworkingIdentity::k_cchMaxString];
     SteamNetworkingIdentity identity;
     SteamNetworkingSockets()->GetIdentity(&identity);
-    identity.ToString(connection_info.identity_str, sizeof(connection_info.identity_str));
-    SteamMatchmaking()->SetLobbyData(host_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY, connection_info.identity_str);
+    identity.ToString(identity_str, sizeof(identity_str));
+    SteamMatchmaking()->SetLobbyData(host_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY, identity_str);
 
     update_lobby_player_count();
 
@@ -279,7 +266,11 @@ void NetworkHostSteam::on_connection_status_changed(SteamNetConnectionStatusChan
                     .player_id = get_peer_player_id(peer_id)
                 }
             });
-            disconnect_peer(peer_id, false);
+
+            // Disconnect peer
+            SteamNetworkingSockets()->CloseConnection(host_peers[peer_id], 0, "", false);
+            host_peers[peer_id] = host_peers[host_peer_count - 1];
+            host_peer_count--;
         } else {
             SteamNetworkingSockets()->CloseConnection(callback->m_hConn, 0, "", false);
         }

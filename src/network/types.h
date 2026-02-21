@@ -5,7 +5,11 @@
 #include <cstdint>
 
 #ifdef GOLD_STEAM
-    #include <steam/steam_api.h>
+
+#define NETWORK_STEAM_LOBBY_PROPERTY_NAME "name"
+#define NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY "host_identity"
+#define NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT "player_count"
+
 #endif
 
 #define NETWORK_INPUT_BUFFER_SIZE 1024
@@ -29,8 +33,7 @@ enum NetworkStatus {
     NETWORK_STATUS_OFFLINE,
     NETWORK_STATUS_CONNECTING,
     NETWORK_STATUS_HOST,
-    NETWORK_STATUS_CONNECTED,
-    NETWORK_STATUS_DISCONNECTING
+    NETWORK_STATUS_CONNECTED
 };
 
 struct NetworkConnectionInfoLan {
@@ -38,18 +41,14 @@ struct NetworkConnectionInfoLan {
     uint16_t port;
 };
 
-#ifdef GOLD_STEAM
-
-struct NetworkConnectionInfoSteam {
-    char identity_str[SteamNetworkingIdentity::k_cchMaxString];
+struct NetworkConnectionInfo {
+    char data[NETWORK_CONNECTION_INFO_BUFFER_SIZE];
 };
-
-#endif
 
 struct NetworkLobby {
     char name[NETWORK_LOBBY_NAME_BUFFER_SIZE];
     uint8_t player_count;
-    char connection_info[NETWORK_CONNECTION_INFO_BUFFER_SIZE];
+    NetworkConnectionInfo connection_info;
 };
 
 struct NetworkLanLobbyInfo {
@@ -193,6 +192,11 @@ struct NetworkMessageWelcome {
     char server_username[NETWORK_PLAYER_NAME_BUFFER_SIZE];
     char lobby_name[NETWORK_LOBBY_NAME_BUFFER_SIZE];
     uint8_t match_settings[MATCH_SETTING_COUNT];
+};
+
+struct NetworkMessageNewPlayer {
+    const uint8_t type = NETWORK_MESSAGE_NEW_PLAYER;
+    NetworkConnectionInfo connection_info;
 };
 
 struct NetworkMessageGreetClient {

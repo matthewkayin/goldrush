@@ -96,8 +96,8 @@ void NetworkHostLan::close_lobby() {
     }
 }
 
-bool NetworkHostLan::connect(void* p_connection_info) {
-    NetworkConnectionInfoLan* connection_info = (NetworkConnectionInfoLan*)p_connection_info;
+bool NetworkHostLan::connect(const NetworkConnectionInfo& p_connection_info) {
+    NetworkConnectionInfoLan* connection_info = (NetworkConnectionInfoLan*)p_connection_info.data;
     log_info("Connecting to host %s:%u", connection_info->ip, connection_info->port);
 
     ENetAddress host_address;
@@ -111,14 +111,6 @@ bool NetworkHostLan::connect(void* p_connection_info) {
     }
 
     return true;
-}
-
-void NetworkHostLan::buffer_connection_info(void* buffer) const {
-    NetworkConnectionInfoLan connection_info;
-    enet_address_set_host_ip(&host->address, connection_info.ip);
-    connection_info.port = host->address.port;
-
-    memcpy(buffer, &connection_info, sizeof(connection_info));
 }
 
 uint16_t NetworkHostLan::get_peer_count() const {
@@ -139,25 +131,28 @@ void NetworkHostLan::set_peer_player_id(uint16_t peer_id, uint8_t player_id) {
     host->peers[peer_id].data = player_id_ptr;
 }
 
-bool NetworkHostLan::is_peer_connected(uint16_t peer_id) const {
-    return host->peers[peer_id].state == ENET_PEER_STATE_CONNECTED;
+NetworkConnectionInfo NetworkHostLan::get_peer_connection_info(uint16_t peer_id) const {
+    NetworkConnectionInfo result;
+    memset(result.data, 0, sizeof(result.data));
+
+    NetworkConnectionInfoLan* connection_info = (NetworkConnectionInfoLan*)result.data;
+    enet_address_get_host_ip(&host->peers[peer_id].address, connection_info->ip, NETWORK_IP_BUFFER_SIZE);
+    connection_info->port = host->peers[peer_id].address.port;
+
+    return result;
 }
 
-void NetworkHostLan::disconnect_peer(uint16_t peer_id, bool gently) {
-    if (gently) {
-        enet_peer_disconnect(&host->peers[peer_id], 0);
-    } else {
+void NetworkHostLan::disconnect_peers() {
+    for (uint16_t peer_id = 0; peer_id < host->peerCount; peer_id++) {
+        if (host->peers[peer_id].state == ENET_PEER_STATE_CONNECTED) {
+            enet_peer_disconnect(&host->peers[peer_id], 0);
+        }
+    }
+    enet_host_flush(host);
+
+    for (uint16_t peer_id = 0; peer_id < host->peerCount; peer_id++) {
         enet_peer_reset(&host->peers[peer_id]);
     }
-}
-
-size_t NetworkHostLan::buffer_peer_connection_info(uint16_t peer_id, void* buffer) const {
-    NetworkConnectionInfoLan connection_info;
-    memset(&connection_info, 0, sizeof(connection_info));
-    enet_address_get_host_ip(&host->peers[peer_id].address, (char*)connection_info.ip, NETWORK_IP_BUFFER_SIZE);
-    connection_info.port = host->peers[peer_id].address.port;
-    memcpy(buffer, &connection_info, sizeof(connection_info));
-    return sizeof(connection_info);
 }
 
 void NetworkHostLan::send(uint16_t peer_id, void* data, size_t length) {

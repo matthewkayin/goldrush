@@ -11,13 +11,10 @@ bool INetworkHost::poll_events(NetworkHostEvent* event) {
     return true;
 }
 
-uint8_t INetworkHost::get_player_count() const {
-    uint8_t player_count = 0;
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (host_players[player_id].status != NETWORK_PLAYER_STATUS_NONE) {
-            player_count++;
-        }
-    }
+const char* INetworkHost::get_lobby_name() const {
+    return host_lobby_name;
+}
 
-    return player_count;
+void INetworkHost::set_lobby_name(const char* value) {
+    strncpy(host_lobby_name, value, sizeof(host_lobby_name));
 }

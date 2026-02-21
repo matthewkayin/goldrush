@@ -2,16 +2,17 @@
 
 #include "types.h"
 
+// Init
 bool network_init();
 void network_quit();
 
-void network_set_backend(NetworkBackend backend);
 NetworkBackend network_get_backend();
+void network_set_backend(NetworkBackend backend);
 const char* network_get_username();
 
+// Non-steam set username
 #ifndef GOLD_STEAM
 void network_set_username(const char* value);
-bool network_is_username_set();
 #endif
 
 NetworkStatus network_get_status();
@@ -20,22 +21,29 @@ const NetworkPlayer& network_get_player(uint8_t player_id);
 uint8_t network_get_player_id();
 uint8_t network_get_player_count();
 
+// Service
+
 void network_service();
 bool network_poll_events(NetworkEvent* event);
 void network_cleanup_event(const NetworkEvent& event);
 void network_disconnect();
 
+// Lobbies
+
 void network_search_lobbies(const char* query);
 size_t network_get_lobby_count();
 const NetworkLobby& network_get_lobby(size_t index);
 void network_open_lobby(const char* lobby_name, NetworkLobbyPrivacy privacy);
-void network_join_lobby(NetworkConnectionInfo connection_info);
+void network_join_lobby(const NetworkConnectionInfo& connection_info);
+const char* network_get_lobby_name();
 
 #ifdef GOLD_STEAM
+#include <steam/steam_api.h>
 void network_steam_accept_invite(CSteamID lobby_id);
 #endif
 
-const char* network_get_lobby_name();
+// Messages
+
 void network_send_chat(const char* message);
 void network_set_player_ready(bool ready);
 void network_set_player_color(uint8_t player_id, uint8_t color);

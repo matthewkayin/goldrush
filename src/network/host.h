@@ -42,23 +42,19 @@ struct NetworkHostEvent {
 
 class INetworkHost {
 public:
-    ~INetworkHost() {};
+    virtual ~INetworkHost() = default;
     virtual bool is_initialized_successfully() const = 0;
     virtual NetworkBackend get_backend() const = 0;
 
     virtual void open_lobby(const char* lobby_name, NetworkLobbyPrivacy privacy) = 0;
     virtual void close_lobby() = 0;
-
-    virtual bool connect(void* connection_info) = 0;
-    virtual void buffer_connection_info(void* connection_info) const = 0;
+    virtual bool connect(const NetworkConnectionInfo& connection_info) = 0;
 
     virtual uint16_t get_peer_count() const = 0;
     virtual uint8_t get_peer_player_id(uint16_t peer_id) const = 0;
     virtual void set_peer_player_id(uint16_t peer_id, uint8_t player_id) = 0;
-    virtual bool is_peer_connected(uint16_t peer_id) const = 0;
-    virtual void disconnect_peer(uint16_t peer_id, bool gently) = 0;
-
-    virtual size_t buffer_peer_connection_info(uint16_t peer_id, void* buffer) const = 0;
+    virtual NetworkConnectionInfo get_peer_connection_info(uint16_t peer_id) const = 0;
+    virtual void disconnect_peers() = 0;
 
     virtual void send(uint16_t peer_id, void* data, size_t length) = 0;
     virtual void broadcast(void* data, size_t length) = 0;
@@ -70,6 +66,7 @@ public:
     bool poll_events(NetworkHostEvent* event);
 
     const char* get_lobby_name() const;
+    void set_lobby_name(const char* value);
 protected:
     std::queue<NetworkHostEvent> host_events;
     char host_lobby_name[NETWORK_LOBBY_NAME_BUFFER_SIZE];

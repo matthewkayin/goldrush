@@ -65,8 +65,8 @@ void NetworkScannerLan::service() {
         lobby.player_count = lobby_info->player_count;
 
         // Buffer connnection info
-        memset(lobby.connection_info, 0, sizeof(lobby.connection_info));
-        NetworkConnectionInfoLan* lobby_connection_info = (NetworkConnectionInfoLan*)lobby.connection_info;
+        memset(&lobby.connection_info, 0, sizeof(lobby.connection_info));
+        NetworkConnectionInfoLan* lobby_connection_info = (NetworkConnectionInfoLan*)lobby.connection_info.data;
         enet_address_get_host_ip(&receive_address, lobby_connection_info->ip, NETWORK_IP_BUFFER_SIZE);
         lobby_connection_info->port = lobby_info->port;
 

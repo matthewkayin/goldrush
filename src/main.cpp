@@ -221,14 +221,14 @@ int gold_main(int argc, char** argv) {
         // Check for Steam lobby invite
     #ifdef GOLD_STEAM
         uint64_t steam_invite_id = 0;
-        char* steam_invite_id_str;
-        if (gold_get_argv(argc, argv, "+connect_lobby", NULL)) {
+        const char* steam_invite_id_str;
+        if (gold_get_argv(argc, argv, "+connect_lobby", &steam_invite_id_str)) {
             steam_invite_id = std::stoull(steam_invite_id_str);
         }
         if (steam_invite_id != 0) {
             network_set_backend(NETWORK_BACKEND_STEAM);
             CSteamID steam_id;
-            steam_id.SetFromUint64(params.menu.steam_invite_id);
+            steam_id.SetFromUint64(steam_invite_id);
             network_steam_accept_invite(steam_id);
             log_info("Launching with steam_invite_id %u", steam_invite_id);
         }
@@ -373,7 +373,9 @@ int gold_main(int argc, char** argv) {
                     if (editor_requests_playtest()) {
                         network_set_backend(NETWORK_BACKEND_LAN);
                         network_open_lobby("Test Game", NETWORK_LOBBY_PRIVACY_SINGLEPLAYER);
+                    #ifndef GOLD_STEAM
                         network_set_username("Player");
+                    #endif
                         state.match_shell_state = match_shell_init_from_scenario(editor_get_scenario(), editor_get_scenario_script_path().c_str());
                         if (state.match_shell_state == nullptr) {
                             network_disconnect();
