@@ -192,7 +192,6 @@ void NetworkHostLan::service() {
             response_buffer.data = &lobby_info;
             response_buffer.dataLength = sizeof(lobby_info);
             enet_socket_send(host_listener_socket, &receive_address, &response_buffer, 1);
-            log_debug("Network LAN host sent lobby info. Lobby name %s player count %u port %u", lobby_info.name, lobby_info.player_count, lobby_info.port);
         }
     }
 

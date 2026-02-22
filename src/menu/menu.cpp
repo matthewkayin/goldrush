@@ -400,7 +400,10 @@ void menu_update(MenuState* state) {
         // Lobby list search and top buttons
         ui_begin_row(state->ui, ivec2(44, 4), 4);
             ui_text_input(state->ui, "Search: ", ivec2(300, 24), &state->lobby_search_query, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
-            if (ui_sprite_button(state->ui, SPRITE_UI_BUTTON_REFRESH, false, false)) {
+            const bool pressed_enter_on_search = 
+                input_is_action_just_pressed(INPUT_ACTION_ENTER) && 
+                input_is_text_input_active();
+            if (ui_sprite_button(state->ui, SPRITE_UI_BUTTON_REFRESH, false, false) || pressed_enter_on_search) {
                 network_search_lobbies(state->lobby_search_query.c_str());
                 state->lobbylist_page = 0;
                 state->lobbylist_item_selected = MENU_ITEM_NONE;
