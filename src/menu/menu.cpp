@@ -206,7 +206,7 @@ void menu_handle_network_event(MenuState* state, NetworkEvent event) {
             menu_set_mode(state, MENU_MODE_LOAD_MATCH_COUNTDOWN);
             return;
         }
-        #ifdef GOLD_STEAM
+    #ifdef GOLD_STEAM
         case NETWORK_EVENT_STEAM_INVITE: {
             log_info("Menu received steam invite invite");
             if (state->mode == MENU_MODE_LOBBY) {
@@ -221,7 +221,7 @@ void menu_handle_network_event(MenuState* state, NetworkEvent event) {
             menu_set_mode(state, MENU_MODE_CONNECTING);
             return;
         }
-        #endif
+    #endif
         default:
             return;
     }

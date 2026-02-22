@@ -250,6 +250,7 @@ void NetworkHostSteam::on_connection_status_changed(SteamNetConnectionStatusChan
     // Connection has been rejected or closed by the remote host
     if (callback->m_info.m_eState == k_ESteamNetworkingConnectionState_ClosedByPeer || 
             callback->m_info.m_eState == k_ESteamNetworkingConnectionState_ProblemDetectedLocally) {
+        // Determine peer_id to remove
         uint16_t peer_id;
         for (peer_id = 0; peer_id < host_peer_count; peer_id++) {
             if (callback->m_hConn == host_peers[peer_id]) {
@@ -257,22 +258,28 @@ void NetworkHostSteam::on_connection_status_changed(SteamNetConnectionStatusChan
             }
         }
 
-        // If we know who this is, so post an event. 
-        if (peer_id != host_peer_count) {
-            host_events.push((NetworkHostEvent) {
-                .type = NETWORK_HOST_EVENT_DISCONNECTED,
-                .disconnected = (NetworkHostEventDisconnected) {
-                    .player_id = get_peer_player_id(peer_id)
-                }
-            });
+        // Post an event
+        // If we pass PLAYER_NONE, the network will usually ignore the disconnection event
+        // However it is useful to pass the event because this might represent a failure to 
+        // disconnect to a lobby, so the event can trigger the client to back out to menu
+        const uint8_t disconnected_player_id = peer_id != host_peer_count
+            ? get_peer_player_id(peer_id)
+            : PLAYER_NONE;
+        host_events.push((NetworkHostEvent) {
+            .type = NETWORK_HOST_EVENT_DISCONNECTED,
+            .disconnected = (NetworkHostEventDisconnected) {
+                .player_id = disconnected_player_id
+            }
+        });
 
-            // Disconnect peer
-            SteamNetworkingSockets()->CloseConnection(host_peers[peer_id], 0, "", false);
+        // If we know who this is, remove them
+        if (peer_id != host_peer_count) {
             host_peers[peer_id] = host_peers[host_peer_count - 1];
             host_peer_count--;
-        } else {
-            SteamNetworkingSockets()->CloseConnection(callback->m_hConn, 0, "", false);
         }
+
+        // Disconnect 
+        SteamNetworkingSockets()->CloseConnection(callback->m_hConn, 0, "", false);
     }
 }
 

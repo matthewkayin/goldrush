@@ -182,9 +182,7 @@ void network_service() {
                         state->events.push((NetworkEvent) {
                             .type = NETWORK_EVENT_LOBBY_CONNECTION_FAILED
                         });
-                    }
 
-                    if (state->status == NETWORK_STATUS_CONNECTING) {
                         network_destroy_host();
                         state->status = NETWORK_STATUS_OFFLINE;
                         break;
@@ -524,6 +522,7 @@ void network_begin_load_match_countdown() {
 
 void network_begin_loading_match(int32_t lcg_seed, const Noise* noise) {
     // It should be fine to call close_lobby() because network_begin_loading_match() is only called on the match host side
+    state->host->close_lobby();
 
     // Set all players to NOT_READY so that they can re-ready themselves once they enter the match
     network_set_players_not_ready();
