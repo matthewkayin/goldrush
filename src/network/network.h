@@ -13,6 +13,7 @@ const char* network_get_username();
 // Non-steam set username
 #ifndef GOLD_STEAM
 void network_set_username(const char* value);
+bool network_is_username_set();
 #endif
 
 NetworkStatus network_get_status();

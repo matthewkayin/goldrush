@@ -99,6 +99,10 @@ void network_set_username(const char* value) {
     strncpy(state->username, value, NETWORK_PLAYER_NAME_BUFFER_SIZE - 1);
 }
 
+bool network_is_username_set() {
+    return state->username[0] != '\0';
+}
+
 #endif
 
 NetworkStatus network_get_status() {
