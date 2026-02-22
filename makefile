@@ -52,7 +52,7 @@ else
 		BUILD_PLATFORM := macos
 		EXTENSION :=
 # Use -Wno-deprecated-declarations on MacOS because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)
-		COMPILER_FLAGS += -Wno-deprecated-declarations -mmacos-version-min=14.5 -march=arm
+		COMPILER_FLAGS += -Wno-deprecated-declarations -mmacos-version-min=14.5
 		LINKER_FLAGS += -Llib/macos -lenet -lluajit -lsteam_api -Flib/macos -framework SDL3 -framework SDL3_ttf
 		ifeq ($(RELEASE_VERSION),)
 			LINKER_FLAGS += -rpath ../lib/macos

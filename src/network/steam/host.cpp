@@ -56,7 +56,7 @@ bool NetworkHostSteam::connect(const NetworkConnectionInfo& connection_info) {
     host_peers[host_peer_count] = connection;
     host_peer_count++;
 
-    log_debug("Steam hots now has peer with connection %u. Peer count %u", host_peers[host_peer_count], host_peer_count);
+    log_debug("Steam host now has peer with connection %u. Peer count %u", host_peers[host_peer_count], host_peer_count);
     return true;
 }
 
