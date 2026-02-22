@@ -1,5 +1,6 @@
 #pragma once
 
+#include "defines.h"
 #include "match/noise.h"
 #include "core/match_setting.h"
 #include <cstdint>
@@ -52,7 +53,7 @@ struct NetworkConnectionInfoSteam {
 
 union NetworkConnectionInfo {
     NetworkConnectionInfoLan lan;
-#ifdef GOLD_DEBUG
+#ifdef GOLD_STEAM
     NetworkConnectionInfoSteam steam;
 #endif
 };
@@ -144,9 +145,11 @@ struct NetworkEventSerializedFrame {
 };
 
 #ifdef GOLD_STEAM
-    struct NetworkEventSteamInvite {
-        NetworkConnectionInfo connection_info;
-    };
+
+struct NetworkEventSteamInvite {
+    NetworkConnectionInfo connection_info;
+};
+
 #endif
 
 struct NetworkEvent {

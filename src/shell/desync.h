@@ -25,7 +25,7 @@ void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2);
 #define desync_write_frame(data, frame)
 #define desync_read_frame(frame_number)
 #define desync_delete_frame(frame)
-#define send_send_frame(frame)
+#define desync_send_frame(frame)
 #define desync_compare_frames(state_buffer, state_buffer2)
 
 #endif
