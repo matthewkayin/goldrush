@@ -176,6 +176,11 @@
             "name": "Run Both Test Hosts",
             "configurations": ["Run Test Host", "Run Test Join"],
             "stopAll": true
+        },
+        {
+            "name": "Run Both Desync Hosts",
+            "configurations": ["Run Desync Host", "Run Desync Join"],
+            "stopAll": true
         }
     ]
 }

@@ -24,8 +24,8 @@ STATIC_ASSERT(sizeof(EntityCount) == 88ULL);
 STATIC_ASSERT(sizeof(BotSquadType) == 4ULL);
 STATIC_ASSERT(sizeof(BotDesiredSquad) == 92ULL);
 STATIC_ASSERT(sizeof(BotBaseInfo) == 220);
-STATIC_ASSERT(sizeof(MatchState) == 2549964ULL);
-STATIC_ASSERT(sizeof(Bot) == 16172ULL);
+STATIC_ASSERT(sizeof(MatchState) == 2435284ULL);
+STATIC_ASSERT(sizeof(Bot) == 19748ULL);
 
 #ifdef GOLD_DEBUG
 
@@ -242,8 +242,8 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         GOLD_ASSERT(state_a->remembered_entities[player_id].size() == state_b->remembered_entities[player_id].size());
         for (size_t index = 0; index < MATCH_MAX_REMEMBERED_ENTITIES; index++) {
-            const RememberedEntity& entity_a = state_a->remembered_entities[player_id][index];
-            const RememberedEntity& entity_b = state_b->remembered_entities[player_id][index];
+            const RememberedEntity& entity_a = state_a->remembered_entities[player_id].data[index];
+            const RememberedEntity& entity_b = state_b->remembered_entities[player_id].data[index];
 
             GOLD_ASSERT(entity_a.entity_id == entity_b.entity_id);
             GOLD_ASSERT(entity_a.type == entity_b.type);
@@ -255,7 +255,6 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
 
     // Entities
     GOLD_ASSERT(state_a->entities._size == state_b->entities._size);
-    GOLD_ASSERT(state_a->entities.next_id == state_b->entities.next_id);
     for (size_t entity_index = 0; entity_index < MATCH_MAX_ENTITIES; entity_index++) {
         const Entity& entity_a = state_a->entities.data[entity_index];
         const Entity& entity_b = state_b->entities.data[entity_index];
@@ -324,6 +323,7 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
     for (EntityId entity_id = 0; entity_id < ID_MAX; entity_id++) {
         GOLD_ASSERT(state_a->entities.id_to_index[entity_id] == state_b->entities.id_to_index[entity_id]);
     }
+    desync_assert_fixed_queues_equal(state_a->entities.available_ids, state_b->entities.available_ids);
 
     // Path pool
     for (uint32_t index = 0; index < MATCH_MAX_UNITS; index++) {
@@ -478,17 +478,8 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
         desync_assert_fixed_vectors_equal(bot_a.entities_to_scout, bot_b.entities_to_scout);
         desync_assert_fixed_vectors_equal(bot_a.entities_assumed_to_be_scouted, bot_b.entities_assumed_to_be_scouted);
 
-        // Reservation requests
-        {
-            GOLD_ASSERT(bot_a.reservation_requests._size == bot_b.reservation_requests._size);
-            GOLD_ASSERT(bot_a.reservation_requests.tail == bot_b.reservation_requests.tail);
-            for (size_t index = 0; index < BOT_MAX_RESERVATION_REQUESTS; index++) {
-                const BotReservationRequest& request_a = bot_a.reservation_requests.data[index];
-                const BotReservationRequest& request_b = bot_b.reservation_requests.data[index];
-
-                GOLD_ASSERT(memcmp(&request_a, &request_b, sizeof(BotReservationRequest)) == 0);
-            }
-        }
+        // Bot entity reservation
+        GOLD_ASSERT(memcmp(bot_a.entity_reserved_bitset, bot_b.entity_reserved_bitset, sizeof(bot_a.entity_reserved_bitset)));
 
         GOLD_ASSERT(bot_a.unit_comp == bot_b.unit_comp);
         GOLD_ASSERT(memcmp(&bot_a.desired_buildings, &bot_b.desired_buildings, sizeof(EntityCount)) == 0);

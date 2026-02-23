@@ -87,7 +87,7 @@ struct Bot {
     FixedVector<EntityId, BOT_MAX_ENTITIES_ASSUMED_TO_BE_SCOUTED> entities_assumed_to_be_scouted;
 
     // Reservations
-    FixedQueue<BotReservationRequest, BOT_MAX_RESERVATION_REQUESTS> reservation_requests;
+    uint32_t entity_reserved_bitset[ID_MAX / sizeof(uint32_t)];
 
     // Production
     BotUnitComp unit_comp;
@@ -219,13 +219,14 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_timer);
 EntityList bot_determine_entities_to_scout(const MatchState& state, const Bot& bot);
 void bot_assume_entity_is_scouted(Bot& bot, EntityId entity_id);
 void bot_prune_entities_assumed_to_be_scouted_list(const MatchState& state, Bot& bot);
-bool bot_release_scout(const MatchState& state, Bot& bot);
+void bot_release_scout(Bot& bot);
 bool bot_should_scout(const Bot& bot, uint32_t match_timer);
 
 // Entity Reservation
 
-bool bot_reserve_entity(Bot& bot, EntityId entity_id);
-bool bot_release_entity(Bot& bot, EntityId entity_id);
+bool bot_is_entity_reserved(const Bot& bot, EntityId entity_id);
+void bot_reserve_entity(Bot& bot, EntityId entity_id);
+void bot_release_entity(Bot& bot, EntityId entity_id);
 
 // Entity Type Util
 
@@ -238,7 +239,7 @@ EntityType bot_get_building_which_researches(uint32_t upgrade);
 EntityCount bot_count_in_progress_entities(const MatchState& state, const Bot& bot);
 EntityCount bot_count_unreserved_entities(const MatchState& state, const Bot& bot);
 EntityCount bot_count_unreserved_army(const MatchState& state, const Bot& bot);
-bool bot_is_entity_unreserved_army(const Bot& bot, const Entity& entity);
+bool bot_is_entity_unreserved_army(const Bot& bot, const Entity& entity, EntityId entity_id);
 EntityCount bot_count_available_production_buildings(const MatchState& state, const Bot& bot);
 int bot_score_unreserved_army(const MatchState& state, const Bot& bot);
 int bot_score_allied_army(const MatchState& state, const Bot& bot);

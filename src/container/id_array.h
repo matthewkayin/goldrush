@@ -2,6 +2,7 @@
 
 #include "defines.h"
 #include "core/asserts.h"
+#include "container/fixed_queue.h"
 #include <cstdint>
 
 template <typename T, size_t capacity>
@@ -9,8 +10,7 @@ struct IdArray {
     T data[capacity];
     EntityId ids[capacity];
     uint16_t id_to_index[ID_MAX];
-    // id_to_index is not 4-byte aligned and the position of next_id serves as padding
-    EntityId next_id;
+    FixedQueue<uint16_t, ID_MAX> available_ids;
     uint32_t _size;
 
     IdArray() {
@@ -21,7 +21,9 @@ struct IdArray {
         for (uint32_t id = 0; id < ID_MAX; id++) {
             id_to_index[id] = (uint16_t)INDEX_INVALID;
         }
-        next_id = 0;
+        for (uint16_t entity_id = 0; entity_id < ID_MAX; entity_id++) {
+            available_ids.push(entity_id);
+        }
         _size = 0;
     }
 
@@ -65,9 +67,8 @@ struct IdArray {
     EntityId push_back(const T& value) {
         GOLD_ASSERT(_size < capacity);
 
-        EntityId id = next_id;
-        GOLD_ASSERT(next_id < ID_MAX - 1);
-        next_id++;
+        EntityId id = available_ids.front();
+        available_ids.pop();
         id_to_index[id] = _size;
         ids[_size] = id;
         data[_size] = value;
@@ -92,5 +93,6 @@ struct IdArray {
         // this is done after so that if we end up "pop and swapping" with the last element, 
         // we still remove the mapping
         id_to_index[id] = INDEX_INVALID;
+        available_ids.push(id);
     }
 };

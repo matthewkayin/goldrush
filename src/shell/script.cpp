@@ -1810,7 +1810,7 @@ static int script_bot_reserve_entity(lua_State* lua_state) {
         script_error(lua_state, "Bot tried to reserve an entity (%u) that it didn't own.", entity_id);
     }
 
-    entity_set_flag(state->match_state.entities[entity_index], ENTITY_FLAG_IS_RESERVED, true);
+    bot_reserve_entity(state->bots[player_id], entity_id);
 
     return 0;
 }
@@ -1834,7 +1834,7 @@ static int script_bot_release_entity(lua_State* lua_state) {
         script_error(lua_state, "Bot tried to reserve an entity (%u) that it didn't own.", entity_id);
     }
 
-    entity_set_flag(state->match_state.entities[entity_index], ENTITY_FLAG_IS_RESERVED, false);
+    bot_release_entity(state->bots[player_id], entity_id);
 
     return 0;
 }

@@ -686,12 +686,11 @@ void game_test_update() {
                 state.match_shell_state->match_state.players[network_get_player_id()].active &&
                 state.match_shell_state->input_queue.empty()) {
             uint32_t turn_number = state.match_shell_state->match_timer / TURN_DURATION;
-            MatchInput input;
             if (turn_number % TURN_OFFSET == 0) {
+                MatchInput input;
                 input = bot_get_turn_input(state.match_shell_state->match_state, state.test_bot, state.match_shell_state->match_timer);
-                match_shell_handle_bot_reservation_requests(state.match_shell_state, &state.test_bot);
+                state.match_shell_state->input_queue.push_back(input);
             } 
-            state.match_shell_state->input_queue.push_back(input);
 
             // Check for surrender
             if (bot_should_surrender(state.match_shell_state->match_state, state.test_bot, state.match_shell_state->match_timer)) {

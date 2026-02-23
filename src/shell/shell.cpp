@@ -963,7 +963,6 @@ void match_shell_update(MatchShellState* state) {
             if (state->inputs[player_id].empty()) {
                 MatchInput bot_input = bot_get_turn_input(state->match_state, state->bots[player_id], state->match_timer);
                 state->inputs[player_id].push({ bot_input });
-                match_shell_handle_bot_reservation_requests(state, &state->bots[player_id]);
 
                 // Buffer empty inputs. This way the bot can always assume that all its inputs have been applied when deciding on the next one
                 for (uint32_t index = 0; index < TURN_OFFSET - 1; index++) {
@@ -2237,14 +2236,6 @@ uint32_t match_shell_update_displayed_gold_amount(uint32_t current_displayed_val
         return current_displayed_value + step;
     } else {
         return current_displayed_value - step;
-    }
-}
-
-void match_shell_handle_bot_reservation_requests(MatchShellState* state, Bot* bot) {
-    while (!bot->reservation_requests.empty()) {
-        BotReservationRequest request = bot->reservation_requests.front();
-        bot->reservation_requests.pop();
-        entity_set_flag(state->match_state.entities.get_by_id(request.entity_id), ENTITY_FLAG_IS_RESERVED, request.value);
     }
 }
 

@@ -37,6 +37,7 @@ Bot bot_empty() {
     Bot bot;
 
     memset(&bot.config, 0, sizeof(bot.config));
+    memset(&bot.entity_reserved_bitset, 0, sizeof(bot.entity_reserved_bitset));
     bot.player_id = PLAYER_NONE;
     bot.padding = 0;
 
@@ -330,9 +331,7 @@ void bot_strategy_update(const MatchState& state, Bot& bot) {
             log_debug("BOT %u strategy_update, reinforcing existing squad", bot.player_id);
             for (uint32_t reinforcements_index = 0; reinforcements_index < reinforcements.size(); reinforcements_index++) {
                 EntityId entity_id = reinforcements[reinforcements_index];
-                if (bot_reserve_entity(bot, entity_id)) {
-                    bot.squads[attack_squad_index].entity_list.push_back(entity_id);
-                }
+                bot_reserve_entity(bot, entity_id);
             }
 
             return;
@@ -603,13 +602,13 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
     // Otherwise the area is undefended, so let's see what we can do
 
     // Check to see if we have any unreserved units ot create a defense squad with
-    EntityList unreserved_army = match_find_entities(state, [&bot](const Entity& entity, EntityId /*entity_id*/) {
+    EntityList unreserved_army = match_find_entities(state, [&bot](const Entity& entity, EntityId entity_id) {
         return entity_is_unit(entity.type) &&
             entity.type != ENTITY_MINER &&
             entity.type != ENTITY_WAGON &&
             entity_is_selectable(entity) &&
             entity.player_id == bot.player_id &&
-            !entity_check_flag(entity, ENTITY_FLAG_IS_RESERVED);
+            !bot_is_entity_reserved(bot, entity_id);
     });
     int unreserved_army_score = bot_score_entity_list(state, bot, unreserved_army);
     if (!unreserved_army.empty()) {
@@ -684,11 +683,11 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
     }
 
     // Finally, if we're really desperate, use workers to attack
-    EntityList workers = match_find_entities(state, [&state, &bot, &location](const Entity& entity, EntityId /*entity_id*/) {
+    EntityList workers = match_find_entities(state, [&state, &bot, &location](const Entity& entity, EntityId entity_id) {
         return entity.type == ENTITY_MINER &&
             entity_can_be_given_orders(state, entity) &&
             entity.player_id == bot.player_id &&
-            !entity_check_flag(entity, ENTITY_FLAG_IS_RESERVED) &&
+            !bot_is_entity_reserved(bot, entity_id) &&
             ivec2::manhattan_distance(entity.cell, location) < BOT_NEAR_DISTANCE;
     });
     if (should_defend_with_workers && !workers.empty()) {
@@ -1177,7 +1176,7 @@ EntityId bot_find_nearest_idle_worker(const MatchState& state, const Bot& bot, i
                      (entity.mode == MODE_UNIT_MOVE &&
                         entity.target.type == TARGET_CELL)) &&
                     entity_id != bot.scout_id &&
-                    !entity_check_flag(entity, ENTITY_FLAG_IS_RESERVED);
+                    !bot_is_entity_reserved(bot, entity_id);
         },
         .compare = match_compare_closest_manhattan_distance_to(cell)
     });
@@ -1835,9 +1834,7 @@ int bot_add_squad(Bot& bot, BotAddSquadParams params) {
 
     for (uint32_t entity_list_index = 0; entity_list_index < params.entity_list.size(); entity_list_index++) {
         EntityId entity_id = params.entity_list[entity_list_index];
-        if (bot_reserve_entity(bot, entity_id)) {
-            squad.entity_list.push_back(entity_id);
-        }
+        bot_reserve_entity(bot, entity_id);
     }
     if (squad.entity_list.empty()) {
         log_warn("BOT %u no entities could be reserved. Skipping squad creation.", bot.player_id);
@@ -1864,12 +1861,7 @@ void bot_squad_dissolve(Bot& bot, BotSquad& squad) {
     }
 
     while (!squad.entity_list.empty()) {
-        if (bot_release_entity(bot, squad.entity_list.back())) {
-            squad.entity_list.pop_back();
-        } else {
-            log_warn("BOT %u could not dissolve squad %u completely", bot.player_id, squad.id);
-            break;
-        }
+        bot_release_entity(bot, squad.entity_list.back());
     }
 }
 
@@ -1882,11 +1874,7 @@ bool bot_squad_remove_entity_by_id(Bot& bot, BotSquad& squad, EntityId entity_id
         }
     }
 
-    if (!bot_release_entity(bot, entity_id)) {
-        log_warn("BOT %u squad %u remove_entity_by_id, not enough reservation space to release entity.", bot.player_id, squad.id);
-        return false;
-    }
-
+    bot_release_entity(bot, entity_id);
     squad.entity_list.remove_at_unordered(index);
 
     return true;
@@ -2855,9 +2843,7 @@ MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, B
         input.move.entity_ids[input.move.entity_count] = squad.entity_list.back();
         input.move.entity_count++;
 
-        if (!bot_release_entity(bot, squad.entity_list.back())) {
-            break;
-        }
+        bot_release_entity(bot, squad.entity_list.back());
         squad.entity_list.pop_back();
 
         if (input.move.entity_count == SELECTION_LIMIT) {
@@ -2905,7 +2891,7 @@ EntityList bot_create_entity_list_from_entity_count(const MatchState& state, con
         // Filter down to only bot-owned, unreserved units
         if (entity.player_id != bot.player_id ||
                 !entity_is_selectable(entity) ||
-                entity_check_flag(entity, ENTITY_FLAG_IS_RESERVED)) {
+                bot_is_entity_reserved(bot, entity_id)) {
             continue;
         }
 
@@ -3465,13 +3451,13 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_timer) {
 
         // Find a scout
         bot.scout_id = match_find_best_entity(state, (MatchFindBestEntityParams) {
-            .filter = [&bot](const Entity& entity, EntityId /*entity_id*/) {
+            .filter = [&bot](const Entity& entity, EntityId entity_id) {
                 return entity.player_id == bot.player_id &&
                     (entity.type == ENTITY_WAGON || entity.type == ENTITY_MINER) &&
                     entity.garrison_id == ID_NULL &&
                     !(entity.target.type == TARGET_BUILD || entity.target.type == TARGET_REPAIR || entity.target.type == TARGET_UNLOAD) &&
                     entity.garrisoned_units.empty() &&
-                    !entity_check_flag(entity, ENTITY_FLAG_IS_RESERVED);
+                    !bot_is_entity_reserved(bot, entity_id);
             },
             .compare = [](const Entity&a, const Entity& b) {
                 if (a.type == ENTITY_WAGON && b.type != ENTITY_WAGON) {
@@ -3513,9 +3499,7 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_timer) {
     // Finish scout
     if (bot.entities_to_scout.empty()) {
         EntityId scout_id = bot.scout_id;
-        if (!bot_release_scout(state, bot)) {
-            return (MatchInput) { .type = MATCH_INPUT_NONE };
-        }
+        bot_release_scout(bot);
 
         bot.last_scout_time = match_timer;
         log_debug("BOT %u scout, finish scout", bot.player_id);
@@ -3671,15 +3655,12 @@ void bot_prune_entities_assumed_to_be_scouted_list(const MatchState& state, Bot&
     }
 }
 
-bool bot_release_scout(const MatchState& state, Bot& bot) {
-    if (entity_check_flag(state.entities.get_by_id(bot.scout_id), ENTITY_FLAG_IS_RESERVED)) {
-        if (!bot_release_entity(bot, bot.scout_id)) {
-            return false;
-        }
+void bot_release_scout(Bot& bot) {
+    if (bot_is_entity_reserved(bot, bot.scout_id)) {
+        bot_release_entity(bot, bot.scout_id);
     }
 
     bot.scout_id = ID_NULL;
-    return true;
 }
 
 bool bot_should_scout(const Bot& bot, uint32_t match_timer) {
@@ -3701,30 +3682,18 @@ bool bot_should_scout(const Bot& bot, uint32_t match_timer) {
 
 // ENTITY RESERVATION
 
-bool bot_reserve_entity(Bot& bot, EntityId entity_id) {
-    if (bot.reservation_requests.is_full()) {
-        log_warn("BOT %u: could not reserve entity %u. Reservation requests list is full.", bot.player_id, entity_id);
-        return false;
-    }
-    bot.reservation_requests.push((BotReservationRequest) {
-        .entity_id = entity_id,
-        .value = true
-    });
-    log_debug("BOT %u: reserved entity %u", bot.player_id, entity_id);
-    return true;
+bool bot_is_entity_reserved(const Bot& bot, EntityId entity_id) {
+    return bitset_check(bot.entity_reserved_bitset, (uint32_t)entity_id);
 }
 
-bool bot_release_entity(Bot& bot, EntityId entity_id) {
-    if (bot.reservation_requests.is_full()) {
-        log_warn("BOT %u: could not release entity %u. Reservation requests list is full.", bot.player_id, entity_id);
-        return false;
-    }
-    bot.reservation_requests.push((BotReservationRequest) {
-        .entity_id = entity_id,
-        .value = false
-    });
+void bot_reserve_entity(Bot& bot, EntityId entity_id) {
+    bitset_set(bot.entity_reserved_bitset, (uint32_t)entity_id, true);
+    log_debug("BOT %u: reserved entity %u", bot.player_id, entity_id);
+}
+
+void bot_release_entity(Bot& bot, EntityId entity_id) {
+    bitset_set(bot.entity_reserved_bitset, (uint32_t)entity_id, false);
     log_debug("BOT %u: released entity %u", bot.player_id, entity_id);
-    return true;
 }
 
 // ENTITY TYPE UTILS
@@ -3823,10 +3792,11 @@ EntityCount bot_count_unreserved_entities(const MatchState& state, const Bot& bo
 
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         const Entity& entity = state.entities[entity_index];
+        const EntityId entity_id = state.entities.get_id_of(entity_index);
 
         if (entity.player_id == bot.player_id &&
                 entity.health != 0 &&
-                !entity_check_flag(entity, ENTITY_FLAG_IS_RESERVED)) {
+                !bot_is_entity_reserved(bot, entity_id)) {
             count[entity.type]++;
         }
     }
@@ -3839,8 +3809,9 @@ EntityCount bot_count_unreserved_army(const MatchState& state, const Bot& bot) {
 
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         const Entity& entity = state.entities[entity_index];
+        const EntityId entity_id = state.entities.get_id_of(entity_index);
 
-        if (bot_is_entity_unreserved_army(bot, entity)) {
+        if (bot_is_entity_unreserved_army(bot, entity, entity_id)) {
             count[entity.type]++;
         }
     }
@@ -3848,7 +3819,7 @@ EntityCount bot_count_unreserved_army(const MatchState& state, const Bot& bot) {
     return count;
 }
 
-bool bot_is_entity_unreserved_army(const Bot& bot, const Entity& entity) {
+bool bot_is_entity_unreserved_army(const Bot& bot, const Entity& entity, EntityId entity_id) {
     if (!entity_is_unit(entity.type) ||
             entity.type == ENTITY_MINER ||
             (entity.type == ENTITY_WAGON && bot.desired_army_ratio[ENTITY_WAGON] == 0)) {
@@ -3857,7 +3828,7 @@ bool bot_is_entity_unreserved_army(const Bot& bot, const Entity& entity) {
 
     return entity.player_id == bot.player_id && 
         entity.health != 0 &&
-        !entity_check_flag(entity, ENTITY_FLAG_IS_RESERVED);
+        !bot_is_entity_reserved(bot, entity_id);
 }
 
 EntityCount bot_count_available_production_buildings(const MatchState& state, const Bot& bot) {
@@ -3879,8 +3850,9 @@ int bot_score_unreserved_army(const MatchState& state, const Bot& bot) {
     int score = 0;
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         const Entity& entity = state.entities[entity_index];
+        const EntityId entity_id = state.entities.get_id_of(entity_index);
 
-        if (bot_is_entity_unreserved_army(bot, entity)) {
+        if (bot_is_entity_unreserved_army(bot, entity, entity_id)) {
             score += bot_score_entity(state, bot, entity);
         }
     }
@@ -4027,12 +3999,12 @@ MatchInput bot_repair_building(const MatchState& state, const Bot& bot, EntityId
 }
 
 MatchInput bot_rein_in_stray_units(const MatchState& state, const Bot& bot) {
-    EntityList stray_units = match_find_entities(state, [&state, &bot](const Entity& entity, EntityId /*entity_id*/) {
+    EntityList stray_units = match_find_entities(state, [&state, &bot](const Entity& entity, EntityId entity_id) {
         // Filter down to owned, unreserved units
         if (!entity_is_unit(entity.type) ||
                 !entity_is_selectable(entity) ||
                 entity.player_id != bot.player_id ||
-                entity_check_flag(entity, ENTITY_FLAG_IS_RESERVED)) {
+                bot_is_entity_reserved(bot, entity_id)) {
             return false;
         }
 
@@ -4083,7 +4055,6 @@ MatchInput bot_rein_in_stray_units(const MatchState& state, const Bot& bot) {
 }
 
 MatchInput bot_update_building_rally_point(const MatchState& state, const Bot& bot, EntityId building_id) {
-    
     const Entity& building = state.entities.get_by_id(building_id);
 
     ivec2 rally_point = bot_choose_building_rally_point(state, bot, building);
@@ -4190,12 +4161,12 @@ bool bot_is_rally_cell_valid(const MatchState& state, ivec2 rally_cell, int rall
 }
 
 MatchInput bot_unload_unreserved_carriers(const MatchState& state, const Bot& bot) {
-    EntityId carrier_id = match_find_entity(state, [&bot](const Entity& carrier, EntityId /*carrier_id*/) {
+    EntityId carrier_id = match_find_entity(state, [&bot](const Entity& carrier, EntityId carrier_id) {
         return carrier.player_id == bot.player_id &&
                 entity_is_selectable(carrier) &&
                 !carrier.garrisoned_units.empty() &&
                 carrier.target.type == TARGET_NONE &&
-                !entity_check_flag(carrier, ENTITY_FLAG_IS_RESERVED);
+                !bot_is_entity_reserved(bot, carrier_id);
     });
     if (carrier_id == ID_NULL) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
