@@ -15,6 +15,7 @@
 #define BOT_MAX_BASE_INFO 32
 #define BOT_MAX_SQUADS 32
 #define BOT_MAX_DESIRED_SQUADS 8
+#define BOT_ENTITY_RESERVED_BITSET_SIZE (ID_MAX / 32)
 
 const int BOT_SQUAD_ID_NULL = -1;
 
@@ -87,7 +88,7 @@ struct Bot {
     FixedVector<EntityId, BOT_MAX_ENTITIES_ASSUMED_TO_BE_SCOUTED> entities_assumed_to_be_scouted;
 
     // Reservations
-    uint32_t entity_reserved_bitset[ID_MAX / sizeof(uint32_t)];
+    uint32_t entity_reserved_bitset[BOT_ENTITY_RESERVED_BITSET_SIZE];
 
     // Production
     BotUnitComp unit_comp;
