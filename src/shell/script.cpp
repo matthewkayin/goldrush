@@ -73,6 +73,7 @@ static int script_entity_get_gold_cost(lua_State* lua_state);
 // Bot
 static int script_bot_add_squad(lua_State* lua_state);
 static int script_bot_squad_exists(lua_State* lua_state);
+static int script_bot_get_entity_squad_id(lua_State* lua_state);
 static int script_bot_set_config_flag(lua_State* lua_state);
 static int script_bot_reserve_entity(lua_State* lua_state);
 static int script_bot_release_entity(lua_State* lua_state);
@@ -132,6 +133,7 @@ static const luaL_reg GOLD_FUNCS[] = {
     // Bot
     { "bot_add_squad", script_bot_add_squad },
     { "bot_squad_exists", script_bot_squad_exists },
+    { "bot_get_entity_squad_id", script_bot_get_entity_squad_id },
     { "bot_set_config_flag", script_bot_set_config_flag },
     { "bot_reserve_entity", script_bot_reserve_entity },
     { "bot_release_entity", script_bot_release_entity },
@@ -1755,6 +1757,48 @@ static int script_bot_squad_exists(lua_State* lua_state) {
     }
 
     lua_pushboolean(lua_state, result);
+
+    return 1;
+}
+
+// Gets the Squad ID of the squad that the entity is a part of
+// Returns nil if the entity is not part of a squad
+// @param entity_id number
+// @return number | nil
+static int script_bot_get_entity_squad_id(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 1);
+
+    const MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    EntityId entity_id = (EntityId)lua_tonumber(lua_state, 1);
+    uint32_t entity_index = script_validate_entity_id(lua_state, state, entity_id);
+
+    uint8_t player_id = state->match_state.entities[entity_index].player_id;
+    const Bot& bot = state->bots[player_id];
+
+    uint32_t squad_index;
+    for (squad_index = 0; squad_index < bot.squads.size(); squad_index++) {
+        const BotSquad& squad = bot.squads[squad_index];
+
+        bool squad_has_entity = false;
+        for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entity_list.size(); squad_entity_index++) {
+            if (squad.entity_list[squad_entity_index] == entity_id) {
+                squad_has_entity = true;
+                break;
+            }
+        } 
+
+        if (squad_has_entity) {
+            break;
+        }
+    }
+
+    if (squad_index < bot.squads.size()) {
+        lua_pushnumber(lua_state, bot.squads[squad_index].id);
+    } else {
+        lua_pushnil(lua_state);
+    }
 
     return 1;
 }

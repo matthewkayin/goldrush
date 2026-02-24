@@ -9,11 +9,19 @@ local OBJECTIVE_DEFEAT_BANDITS = "Destroy the Bandit's Base"
 
 local ENEMY_BANDITS_PLAYER_ID = 1
 
+local bandits_near_goldmine_squad_id = nil
+local has_highlighted_goldmine = false
 local bandit_attack_squad_id = nil
 local has_given_two_saloon_hint = false
+local has_given_bunker_hint = false
 local has_handled_bandits_defeated = false
 
 function scenario_init()
+    bandits_near_goldmine_squad_id = scenario.bot_get_entity_squad_id(scenario.constants.BANDIT_SQUATTER)
+    if bandits_near_goldmine_squad_id == nil then
+        error("Could not find bandit squatter squad.")
+    end
+
     actions.run(function ()
         actions.wait(2.0)
         objectives.announce_new_objective(OBJECTIVE_FIND_GOLDMINE)
@@ -22,7 +30,8 @@ function scenario_init()
                 description = "Find a Goldmine"
             },
             complete_fn = function ()
-                return scenario.entity_is_visible_to_player(scenario.constants.GOLDMINE2)
+                return has_highlighted_goldmine and
+                    not scenario.bot_squad_exists(ENEMY_BANDITS_PLAYER_ID, bandits_near_goldmine_squad_id)
             end
         })
     end)
@@ -30,6 +39,12 @@ end
 
 function scenario_update()
     objectives.update()
+
+    -- Highlight goldmine
+    if not has_highlighted_goldmine and scenario.entity_is_visible_to_player(scenario.constants.GOLDMINE) then
+        scenario.highlight_entity(scenario.constants.GOLDMINE)
+        has_highlighted_goldmine = true
+    end
 
     if objectives.current_objective ~= OBJECTIVE_DEFEAT_BANDITS and
             scenario.player_is_defeated(ENEMY_BANDITS_PLAYER_ID) and
@@ -69,14 +84,25 @@ function scenario_update()
     end
 
     -- Two saloons hint
-    if objectives.current_objective == OBJECTIVE_ESTABLISH_BASE and 
-            scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.COWBOY) >= 1 and
-            not has_given_two_saloon_hint then
+    if not has_given_two_saloon_hint and
+            objectives.current_objective == OBJECTIVE_ESTABLISH_BASE and
+            scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.COWBOY) >= 1 then
         actions.run(function ()
             actions.wait(1.0)
             scenario.hint("You can build more saloons to hire more cowboys at once.")
         end)
         has_given_two_saloon_hint = true
+    end
+
+    -- Bunker hint
+    if not has_given_bunker_hint and
+            objectives.current_objective == OBJECTIVE_ESTABLISH_BASE and
+            scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.BUNKER) >= 1 then
+        actions.run(function ()
+            actions.wait(1.0)
+            scenario.hint("Garrison your cowboys inside the bunker for better defense.")
+        end)
+        has_given_bunker_hint = true
     end
 
     actions.update()
@@ -85,8 +111,12 @@ end
 function on_objectives_complete()
     if objectives.current_objective == OBJECTIVE_FIND_GOLDMINE then
         actions.run(function ()
-            scenario.highlight_entity(scenario.constants.GOLDMINE2)
             objectives.announce_objectives_complete()
+            actions.wait(2.0)
+            scenario.chat(scenario.CHAT_COLOR_WHITE, "", "Seems there's bandits in these parts.")
+            actions.wait(1.0)
+            scenario.chat(scenario.CHAT_COLOR_WHITE, "", "You best establish a base. They may attack again soon.")
+            actions.wait(1.0)
             objectives.announce_new_objective(OBJECTIVE_BUILD_HALL)
             objectives.add_objective({
                 objective = {
@@ -115,20 +145,20 @@ function on_objectives_complete()
             })
             objectives.add_objective({
                 objective = {
-                    description = "Build a Saloon"
+                    description = "Hire 6 Cowboys"
                 },
                 complete_fn = function ()
-                    return scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.SALOON) >= 1
+                    return scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.COWBOY) >= 6
                 end
             })
             objectives.add_objective({
                 objective = {
-                    description = "Hire 6 Cowboys",
-                    entity_type = scenario.entity_type.COWBOY,
-                    counter_target = 6
+                    description = "Build a Bunker",
+                    entity_type = scenario.entity_type.BUNKER,
+                    counter_target = 1
                 },
                 complete_fn = function ()
-                    return scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.COWBOY) >= 6
+                    return scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.BUNKER) >= 1
                 end
             })
         end)
@@ -139,8 +169,8 @@ function on_objectives_complete()
             -- Bandit attack
             bandit_attack_squad_id = squad_util.spawn_harass_squad({
                 player_id = ENEMY_BANDITS_PLAYER_ID,
-                spawn_cell = scenario.constants.BANDIT_ATTACK_SPAWN_CELL,
-                target_cell = scenario.constants.BANDIT_ATTACK_TARGET_CELL,
+                spawn_cell = scenario.constants.HARASS_SPAWN_CELL,
+                target_cell = scenario.constants.HARASS_TARGET_CELL,
                 entity_types = {
                     scenario.entity_type.BANDIT,
                     scenario.entity_type.BANDIT,
@@ -150,7 +180,7 @@ function on_objectives_complete()
 
             scenario.play_sound(scenario.sound.ALERT_BELL)
             scenario.fog_reveal({
-                cell = scenario.constants.BANDIT_ATTACK_SPAWN_CELL,
+                cell = scenario.constants.HARASS_SPAWN_CELL,
                 cell_size = 1,
                 sight = 9,
                 duration = 3.0
