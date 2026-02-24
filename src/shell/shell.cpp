@@ -139,6 +139,7 @@ MatchShellState* match_shell_base_init() {
     state->mode = MATCH_SHELL_MODE_NONE;
     state->ui = ui_init();
     state->options_menu.mode = OPTIONS_MENU_CLOSED;
+    state->menu_help_page = 0;
 
     // Simulation timers
     state->match_timer = 0;
@@ -621,7 +622,7 @@ void match_shell_update(MatchShellState* state) {
             state->camera_mode = CAMERA_MODE_FREE;
         }
 
-        state->ui.input_enabled = state->options_menu.mode == OPTIONS_MENU_CLOSED;
+        state->ui.input_enabled = state->options_menu.mode == OPTIONS_MENU_CLOSED && state->mode != MATCH_SHELL_MODE_HELP;
         ui_frame_rect(state->ui, state->mode == MATCH_SHELL_MODE_DESYNC ? DESYNC_MENU_RECT : MENU_RECT);
 
         const char* header_text = match_shell_get_menu_header_text(state);
@@ -664,6 +665,9 @@ void match_shell_update(MatchShellState* state) {
                 if (ui_button(state->ui, "Options", button_size, true)) {
                     state->options_menu = options_menu_open();
                 }
+                if (ui_button(state->ui, "Help", button_size, true)) {
+                    state->mode = MATCH_SHELL_MODE_HELP;
+                }
                 if (ui_button(state->ui, "Back", button_size, true)) {
                     state->mode = MATCH_SHELL_MODE_NONE;
                 }
@@ -696,6 +700,10 @@ void match_shell_update(MatchShellState* state) {
 
         if (state->options_menu.mode != OPTIONS_MENU_CLOSED) {
             options_menu_update(state->options_menu, state->ui);
+        }
+
+        if (state->mode == MATCH_SHELL_MODE_HELP) {
+            match_shell_help_update(state);
         }
     }
     
@@ -2258,7 +2266,8 @@ bool match_shell_is_in_menu(const MatchShellState* state) {
             state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP ||
             state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY ||
             state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT || 
-            state->mode == MATCH_SHELL_MODE_DESYNC;
+            state->mode == MATCH_SHELL_MODE_DESYNC ||
+            state->mode == MATCH_SHELL_MODE_HELP;
 }
 
 bool match_shell_is_in_hotkey_submenu(const MatchShellState* state) {

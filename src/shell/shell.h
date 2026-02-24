@@ -59,7 +59,8 @@ enum MatchShellMode {
     MATCH_SHELL_MODE_MATCH_OVER_DEFEAT,
     MATCH_SHELL_MODE_LEAVE_MATCH,
     MATCH_SHELL_MODE_EXIT_PROGRAM,
-    MATCH_SHELL_MODE_DESYNC
+    MATCH_SHELL_MODE_DESYNC,
+    MATCH_SHELL_MODE_HELP
 };
 
 enum CameraMode {
@@ -126,17 +127,18 @@ struct MatchShellState {
     MatchShellMode mode;
     UI ui;
     OptionsMenuState options_menu;
+    uint8_t menu_help_page;
+
+    // Simulation timers
+    bool match_over_is_victory;
+    bool is_paused;
+    uint32_t match_timer;
+    uint32_t disconnect_timer;
+    uint32_t match_over_timer;
 
     // Match state and bots (synced state)
     MatchState match_state;
     Bot bots[MAX_PLAYERS];
-
-    // Simulation timers
-    uint32_t match_timer;
-    uint32_t disconnect_timer;
-    uint32_t match_over_timer;
-    bool match_over_is_victory;
-    bool is_paused;
 
     // Inputs
     std::queue<std::vector<MatchInput>> inputs[MAX_PLAYERS];
@@ -311,6 +313,9 @@ bool match_shell_has_pressed_idle_miner_button();
 
 // Menu
 const char* match_shell_get_menu_header_text(const MatchShellState* state);
+
+// Help
+void match_shell_help_update(MatchShellState* state);
 
 // Fire
 bool match_shell_is_fire_on_screen(const MatchShellState* state);
