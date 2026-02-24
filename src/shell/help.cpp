@@ -14,7 +14,7 @@ static const Rect HELP_MENU_RECT = (Rect) {
     .h = 292
 };
 
-const uint8_t MENU_HELP_PAGE_COUNT = 20;
+const uint8_t MENU_HELP_PAGE_COUNT = 17;
 
 void match_shell_help_update(MatchShellState* state) {
     state->ui.input_enabled = true;
@@ -144,6 +144,121 @@ void match_shell_help_update(MatchShellState* state) {
                 ui_text(state->ui, FONT_HACK_GOLD, "Repairing a building costs gold.");
                 ui_text(state->ui, FONT_HACK_GOLD, "");
                 ui_text(state->ui, FONT_HACK_GOLD, "Repairing an in-progress building makes it finish faster.");
+                break;
+            }
+            case 8: {
+                ui_text(state->ui, FONT_HACK_GOLD, "-- Building Queues --");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "To hire a new unit or research an upgrade, select a");
+                ui_text(state->ui, FONT_HACK_GOLD, "building and choose the unit or upgrade from the buttons");
+                ui_text(state->ui, FONT_HACK_GOLD, "in the bottom-right. This will add the unit or upgrade to");
+                ui_text(state->ui, FONT_HACK_GOLD, "the building's queue. Clicking on a building queue item will");
+                ui_text(state->ui, FONT_HACK_GOLD, "cancel the item and give you a full refund.");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "If you have multiple buildings selected of the same type,");
+                ui_text(state->ui, FONT_HACK_GOLD, "then hiring or researching will automatically add the item");
+                ui_text(state->ui, FONT_HACK_GOLD, "to the building which has the shortest queue.");
+                break;
+            }
+            case 9: {
+                ui_text(state->ui, FONT_HACK_GOLD, "-- Rally Points --");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "With one or more unit-producing buildings selected, right");
+                ui_text(state->ui, FONT_HACK_GOLD, "click on the ground to set a rally point. New units will");
+                ui_text(state->ui, FONT_HACK_GOLD, "walk to the rally point one they are finished.");
+                break;
+            }
+            case 10: {
+                ui_text(state->ui, FONT_HACK_GOLD, "-- Target Queue --");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "Hold Shift while giving orders to a unit to add that");
+                ui_text(state->ui, FONT_HACK_GOLD, "order to the unit's target queue. Use this to queue");
+                ui_text(state->ui, FONT_HACK_GOLD, "up multiple orders in succession.");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "For example, if you select a unit, hold shift, and");
+                ui_text(state->ui, FONT_HACK_GOLD, "right click on points A, B, and C on the map, then");
+                ui_text(state->ui, FONT_HACK_GOLD, "the unit will walk first to A, then to B, then to C.");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "This is especially useful for using Pyros to lay landmines.");
+                break;
+            }
+            case 11: {
+                ui_text(state->ui, FONT_HACK_GOLD, "-- Garrison --");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "Wagons and Bunkers are two units that can carry other units");
+                ui_text(state->ui, FONT_HACK_GOLD, "inside them. Select a unit and right click a Wagon or Bunker");
+                ui_text(state->ui, FONT_HACK_GOLD, "to garrison that unit inside the carrier.");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "Some units, such as the Cannoneer, cannot garrison inside");
+                ui_text(state->ui, FONT_HACK_GOLD, "carrier units.");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "To ungarrison from a Bunker, select it and click the Unload");
+                ui_text(state->ui, FONT_HACK_GOLD, "button. To ungarrison from a Wagon, select the it, click");
+                ui_text(state->ui, FONT_HACK_GOLD, "Unload, then left click on the place to unload your units.");
+                break;
+            }
+            case 12: {
+                ui_text(state->ui, FONT_HACK_GOLD, "-- Accuracy --");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "Ranged units have an accuracy which determines their chance");
+                ui_text(state->ui, FONT_HACK_GOLD, "to hit. If they miss, they will do no damage and you will");
+                ui_text(state->ui, FONT_HACK_GOLD, "hear a ricochet sound effect.");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "Note that if a Cannonneer misses, it will still deal splash");
+                ui_text(state->ui, FONT_HACK_GOLD, "damage at the firing location.");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "Units attacking from the lowground to the highground have");
+                ui_text(state->ui, FONT_HACK_GOLD, "a disadvantage. They will shoot at 1/2 of their original");
+                ui_text(state->ui, FONT_HACK_GOLD, "accuracy.");
+                break;
+            }
+            case 13: {
+                ui_text(state->ui, FONT_HACK_GOLD, "-- Control Groups --");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "With a group of units selected, press " PLATFORM_CTRL_STR " + a number key");
+                ui_text(state->ui, FONT_HACK_GOLD, "to assign the selected units to the control group of that");
+                ui_text(state->ui, FONT_HACK_GOLD, "number.");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "Once a control group is set, press a number key to select");
+                ui_text(state->ui, FONT_HACK_GOLD, "the units in that control group. Double tap the number key");
+                ui_text(state->ui, FONT_HACK_GOLD, "to center your camera on the units in the control group.");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "With a group of units selected, press Shift + a number key");
+                ui_text(state->ui, FONT_HACK_GOLD, "to add the selected units to the control group of that");
+                ui_text(state->ui, FONT_HACK_GOLD, "number.");
+                break;
+            }
+            case 14: {
+                ui_text(state->ui, FONT_HACK_GOLD, "-- Camera Hotkeys --");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "Press Shift + <F1-F6> to assign a camera hotkey. Then press");
+                ui_text(state->ui, FONT_HACK_GOLD, "<F1-F6> to snap your camera back to where it was when you");
+                ui_text(state->ui, FONT_HACK_GOLD, "originally set the hotkey.");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "For example, Pressing Shift + F1 will save your current");
+                ui_text(state->ui, FONT_HACK_GOLD, "camera position into F1. You can then press F1 to snap your");
+                ui_text(state->ui, FONT_HACK_GOLD, "camera back to the saved position.");
+                break;
+            }
+            case 15: {
+                ui_text(state->ui, FONT_HACK_GOLD, "-- Minimap and Alerts --");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "The minimap in the bottom-left corner shows you a mini");
+                ui_text(state->ui, FONT_HACK_GOLD, "picture of the entire map. You can use this to view unit");
+                ui_text(state->ui, FONT_HACK_GOLD, "movements on a larger scale");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "Sometimes the minimap will show you alerts of important");
+                ui_text(state->ui, FONT_HACK_GOLD, "events (like a building finishing).");
+                ui_text(state->ui, FONT_HACK_GOLD, "Alerts are always accompanied by a sound and appear in the");
+                ui_text(state->ui, FONT_HACK_GOLD, "minimap as a colored rectangle that narrows in on a point.");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "Press Space to snap your camera to the most recent alert.");
+                break;
+            }
+            case 16: {
+                ui_text(state->ui, FONT_HACK_GOLD, "That's all!");
+                ui_text(state->ui, FONT_HACK_GOLD, "");
+                ui_text(state->ui, FONT_HACK_GOLD, "I hope you enjoy the game!");
                 break;
             }
         }

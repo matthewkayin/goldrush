@@ -20,15 +20,7 @@ static const uint32_t MATCH_OVER_TIMER_NOT_STARTED = UINT32_MAX;
 // Menu
 static const ivec2 MENU_BUTTON_POSITION = ivec2(1, 1);
 static const int MENU_WIDTH = 150;
-static const Rect MENU_RECT = (Rect) {
-    .x = (SCREEN_WIDTH / 2) - (MENU_WIDTH / 2), .y = 64,
-    .w = MENU_WIDTH, .h = 144
-};
 static const int DESYNC_MENU_WIDTH = 166;
-static const Rect DESYNC_MENU_RECT = (Rect) {
-    .x = (SCREEN_WIDTH / 2) - (DESYNC_MENU_WIDTH / 2), .y = 64,
-    .w = DESYNC_MENU_WIDTH, .h = 144
-};
 
 // Chat
 static const size_t CHAT_MAX_LENGTH = 64;
@@ -622,8 +614,25 @@ void match_shell_update(MatchShellState* state) {
             state->camera_mode = CAMERA_MODE_FREE;
         }
 
+        const int menu_width = state->mode == MATCH_SHELL_MODE_DESYNC ? DESYNC_MENU_WIDTH : MENU_WIDTH;
+        const int menu_height = 
+            (state->mode == MATCH_SHELL_MODE_MENU ||
+            state->mode == MATCH_SHELL_MODE_MENU_SURRENDER ||
+            state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP) 
+                ? 168
+                : 144;
+        const int menu_y = 
+            (state->mode == MATCH_SHELL_MODE_MENU ||
+            state->mode == MATCH_SHELL_MODE_MENU_SURRENDER ||
+            state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP) 
+                ? 48
+                : 64;
+        static const Rect MENU_RECT = (Rect) {
+            .x = (SCREEN_WIDTH / 2) - (menu_width / 2), .y = menu_y,
+            .w = menu_width, .h = menu_height
+        };
         state->ui.input_enabled = state->options_menu.mode == OPTIONS_MENU_CLOSED && state->mode != MATCH_SHELL_MODE_HELP;
-        ui_frame_rect(state->ui, state->mode == MATCH_SHELL_MODE_DESYNC ? DESYNC_MENU_RECT : MENU_RECT);
+        ui_frame_rect(state->ui, MENU_RECT);
 
         const char* header_text = match_shell_get_menu_header_text(state);
         ivec2 text_size = render_get_text_size(FONT_WESTERN8_GOLD, header_text);
