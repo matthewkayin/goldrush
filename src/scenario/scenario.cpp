@@ -446,7 +446,7 @@ Scenario* scenario_open_file(const char* json_path, std::string* script_short_pa
         scenario_bake_map(scenario, false);
 
         // Decorations
-        Json* decorations_json = json_array();
+        Json* decorations_json = json_object_get(scenario_json, "decorations");
         for (size_t index = 0; index < decorations_json->array.length; index++) {
             Json* decoration_json = json_array_get(decorations_json, index);
             uint16_t decoration_hframe = (uint16_t)json_object_get_number(decoration_json, "hframe");
