@@ -501,6 +501,8 @@ void network_add_bot() {
 
     state->host->broadcast(&message, sizeof(message));
     state->host->flush();
+
+    log_debug("Network added bot %u", bot_player_id);
 }
 
 void network_remove_bot(uint8_t player_id) {

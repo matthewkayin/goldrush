@@ -1835,12 +1835,9 @@ int bot_add_squad(Bot& bot, BotAddSquadParams params) {
     for (uint32_t entity_list_index = 0; entity_list_index < params.entity_list.size(); entity_list_index++) {
         EntityId entity_id = params.entity_list[entity_list_index];
         bot_reserve_entity(bot, entity_id);
+        squad.entity_list.push_back(params.entity_list[entity_list_index]);
     }
-    if (squad.entity_list.empty()) {
-        log_warn("BOT %u no entities could be reserved. Skipping squad creation.", bot.player_id);
-        return BOT_SQUAD_ID_NULL;
-    }
-    log_debug("BOT %u --- end squad create ---");
+    log_debug("BOT %u | end squad create", bot.player_id);
 
     bot.squads.push_back(squad);
     bot.next_squad_id++;

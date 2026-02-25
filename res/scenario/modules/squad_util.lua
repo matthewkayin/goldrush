@@ -17,7 +17,7 @@ function squad_util.spawn_harass_squad(params)
         player_id = params.player_id,
         type = scenario.bot_squad_type.ATTACK,
         target_cell = params.target_cell,
-        entities = entity_ids
+        entity_list = entity_ids
     })
 
     scenario.queue_match_input({

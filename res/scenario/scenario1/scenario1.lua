@@ -11,6 +11,7 @@ local ENEMY_BANDITS_PLAYER_ID = 1
 
 local bandits_near_goldmine_squad_id = nil
 local has_highlighted_goldmine = false
+local has_bandit_attacked = false
 local bandit_attack_squad_id = nil
 local has_given_two_saloon_hint = false
 local has_given_bunker_hint = false
@@ -64,6 +65,17 @@ function scenario_update()
         on_objectives_complete()
     end
 
+    -- Trigger backup harass
+    if not has_bandit_attacked and
+            objectives.current_objective == OBJECTIVE_ESTABLISH_BASE and
+            scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.HARASS_TRIGGER_CELL, 2) then
+        has_bandit_attacked = true
+        objectives.clear_objectives()
+        actions.run(function ()
+            bandit_attack_at_cell(scenario.constants.HARASS_SPAWN_CELL2)
+        end)
+    end
+
     -- Handle bandit attack defeated
     if bandit_attack_squad_id ~= nil and not scenario.bot_squad_exists(ENEMY_BANDITS_PLAYER_ID, bandit_attack_squad_id) then
         bandit_attack_squad_id = nil
@@ -114,9 +126,9 @@ function on_objectives_complete()
             objectives.announce_objectives_complete()
             actions.wait(2.0)
             scenario.chat(scenario.CHAT_COLOR_WHITE, "", "Seems there's bandits in these parts.")
-            actions.wait(1.0)
+            actions.wait(2.0)
             scenario.chat(scenario.CHAT_COLOR_WHITE, "", "You best establish a base. They may attack again soon.")
-            actions.wait(1.0)
+            actions.wait(3.0)
             objectives.announce_new_objective(OBJECTIVE_BUILD_HALL)
             objectives.add_objective({
                 objective = {
@@ -145,7 +157,9 @@ function on_objectives_complete()
             })
             objectives.add_objective({
                 objective = {
-                    description = "Hire 6 Cowboys"
+                    description = "Hire 6 Cowboys",
+                    entity_type = scenario.entity_type.COWBOY,
+                    counter_target = 6
                 },
                 complete_fn = function ()
                     return scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.COWBOY) >= 6
@@ -153,9 +167,7 @@ function on_objectives_complete()
             })
             objectives.add_objective({
                 objective = {
-                    description = "Build a Bunker",
-                    entity_type = scenario.entity_type.BUNKER,
-                    counter_target = 1
+                    description = "Build a Bunker"
                 },
                 complete_fn = function ()
                     return scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.BUNKER) >= 1
@@ -165,31 +177,7 @@ function on_objectives_complete()
     elseif objectives.current_objective == OBJECTIVE_ESTABLISH_BASE then
         actions.run(function ()
             objectives.announce_objectives_complete()
-
-            -- Bandit attack
-            bandit_attack_squad_id = squad_util.spawn_harass_squad({
-                player_id = ENEMY_BANDITS_PLAYER_ID,
-                spawn_cell = scenario.constants.HARASS_SPAWN_CELL,
-                target_cell = scenario.constants.HARASS_TARGET_CELL,
-                entity_types = {
-                    scenario.entity_type.BANDIT,
-                    scenario.entity_type.BANDIT,
-                    scenario.entity_type.BANDIT
-                }
-            })
-
-            scenario.play_sound(scenario.sound.ALERT_BELL)
-            scenario.fog_reveal({
-                cell = scenario.constants.HARASS_SPAWN_CELL,
-                cell_size = 1,
-                sight = 9,
-                duration = 3.0
-            })
-            local previous_camera_cell = scenario.get_camera_centered_cell()
-            actions.camera_pan(scenario.constants.BANDIT_ATTACK_SPAWN_CELL, 0.75)
-            scenario.chat(scenario.CHAT_COLOR_WHITE, "", "Bandits are attacking! Defend yourself!")
-            actions.hold_camera(2.0)
-            actions.camera_pan(previous_camera_cell, 0.75)
+            bandit_attack_at_cell(scenario.constants.HARASS_SPAWN_CELL)
         end)
     elseif objectives.current_objective == OBJECTIVE_DEFEAT_BANDITS and not has_handled_bandits_defeated then
         has_handled_bandits_defeated = true
@@ -199,4 +187,31 @@ function on_objectives_complete()
             scenario.set_match_over_victory()
         end)
     end
+end
+
+function bandit_attack_at_cell(cell)
+    bandit_attack_squad_id = squad_util.spawn_harass_squad({
+        player_id = ENEMY_BANDITS_PLAYER_ID,
+        spawn_cell = cell,
+        target_cell = scenario.constants.HARASS_TARGET_CELL,
+        entity_types = {
+            scenario.entity_type.BANDIT,
+            scenario.entity_type.BANDIT,
+            scenario.entity_type.BANDIT
+        }
+    })
+
+    scenario.play_sound(scenario.sound.ALERT_BELL)
+    scenario.fog_reveal({
+        cell = cell,
+        cell_size = 1,
+        sight = 9,
+        duration = 3.0
+    })
+
+    local previous_camera_cell = scenario.get_camera_centered_cell()
+    actions.camera_pan(cell, 0.75)
+    scenario.chat(scenario.CHAT_COLOR_WHITE, "", "Bandits are attacking! Defend yourself!")
+    actions.hold_camera(2.0)
+    actions.camera_pan(previous_camera_cell, 0.75)
 end

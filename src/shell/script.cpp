@@ -1655,7 +1655,7 @@ static int script_entity_get_player_who_controls_goldmine(lua_State* lua_state) 
 
 // Spawns an enemy squad. The entities table should be an array of entity types.
 // Returns the squad ID of the created squad, or SQUAD_ID_NULL if no squad was created.
-// @param params { player_id: number, type: number, target_cell: ivec2, entities: table }
+// @param params { player_id: number, type: number, target_cell: ivec2, entity_list: table }
 // @return number 
 static int script_bot_add_squad(lua_State* lua_state) {
     const int arg_types[] = { LUA_TTABLE };

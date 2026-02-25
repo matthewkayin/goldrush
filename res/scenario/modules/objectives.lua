@@ -27,6 +27,11 @@ function objectives.announce_objectives_failed()
     scenario.clear_objectives()
 end
 
+function objectives.clear_objectives()
+    objectives.current_objective = nil
+    scenario.clear_objectives()
+end
+
 function objectives.add_objective(params)
     local index = scenario.add_objective(params.objective)
     table.insert(objectives.objectives, {

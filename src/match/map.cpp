@@ -2091,9 +2091,12 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
     static const int EXPLORED_INDEX_NOT_EXPLORED = -1;
     static const int EXPLORED_INDEX_IGNORE_CELL = -2;
 
+    // Always clear the path because paths are grabbed from a pool
+    // so they may contain garbage data that we don't want to re-use
+    path->clear();
+
     // Don't bother pathing to the unit's cell
     if (from == to) {
-        path->clear();
         return;
     }
 
@@ -2319,7 +2322,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
             ? full_path.size() - path->capacity()
             : 0;
 
-    path->clear();
+    // path->clear() is caused at the start of the function
     for (uint32_t full_path_index = full_path_start_index; full_path_index < full_path.size(); full_path_index++) {
         path->push_back(full_path[full_path_index]);
     }

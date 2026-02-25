@@ -271,7 +271,7 @@ function builder_state_update(builder_state)
             player_id = ENEMY_PLAYER_ID,
             type = scenario.bot_squad_type.DEFEND,
             target_cell = builder.cell,
-            entities = squad_entity_ids
+            entity_list = squad_entity_ids
         })
 
         builder_state_release(builder_state)
