@@ -789,7 +789,7 @@ void script_validate_player_id(lua_State* lua_state, const MatchShellState* stat
         script_error(lua_state, "player_id is 0, but it must be a bot.");
     }
     if (bitflag_check(options, SCRIPT_VALIDATE_PLAYER_IS_ACTIVE) && !state->match_state.players[player_id].active) {
-        script_error(lua_state, "player %u is inactive.");
+        script_error(lua_state, "player %u is inactive.", player_id);
     }
 }
 
@@ -1987,6 +1987,11 @@ static int script_queue_match_input(lua_State* lua_state) {
             lua_pop(lua_state, 1);
 
             script_queue_match_input_get_entity_ids(lua_state, &input.move.entity_count, input.move.entity_ids);
+            break;
+        }
+        case MATCH_INPUT_STOP: {
+            script_queue_match_input_get_entity_ids(lua_state, &input.stop.entity_count, input.stop.entity_ids);
+
             break;
         }
         case MATCH_INPUT_BUILD: {

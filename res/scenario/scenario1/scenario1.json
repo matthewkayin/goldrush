@@ -18716,8 +18716,7 @@
 				"Cowboy",
 				"Town Hall",
 				"House",
-				"Saloon",
-				"Bunker"
+				"Saloon"
 			]
 		},
 		{
@@ -18837,12 +18836,12 @@
 			}
 		},
 		{
-			"type": "Cowboy",
-			"player_id": 0,
+			"type": "Bandit",
+			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 47,
-				"y": 8
+				"x": 31,
+				"y": 78
 			}
 		},
 		{
@@ -18882,12 +18881,12 @@
 			}
 		},
 		{
-			"type": "Cowboy",
-			"player_id": 0,
+			"type": "Bandit",
+			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 51,
-				"y": 8
+				"x": 32,
+				"y": 76
 			}
 		},
 		{
@@ -18904,74 +18903,20 @@
 			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 24,
-				"y": 31
-			}
-		},
-		{
-			"type": "Bandit",
-			"player_id": 1,
-			"gold_held": 0,
-			"cell": {
-				"x": 25,
-				"y": 32
-			}
-		},
-		{
-			"type": "Bandit",
-			"player_id": 1,
-			"gold_held": 0,
-			"cell": {
-				"x": 32,
-				"y": 76
-			}
-		},
-		{
-			"type": "Bandit",
-			"player_id": 1,
-			"gold_held": 0,
-			"cell": {
-				"x": 31,
-				"y": 78
-			}
-		},
-		{
-			"type": "Bandit",
-			"player_id": 1,
-			"gold_held": 0,
-			"cell": {
 				"x": 37,
 				"y": 85
-			}
-		},
-		{
-			"type": "Cowboy",
-			"player_id": 0,
-			"gold_held": 0,
-			"cell": {
-				"x": 49,
-				"y": 8
 			}
 		}
 	],
 	"squads": [
 		{
-			"name": "squatters",
-			"player_id": 1,
-			"type": "Defend",
-			"entities": [
-				16,
-				17
-			]
-		},
-		{
 			"name": "by_bunker",
 			"player_id": 1,
 			"type": "Defend",
 			"entities": [
-				19,
-				18,
-				20
+				9,
+				14,
+				16
 			]
 		},
 		{
@@ -19002,8 +18947,8 @@
 			"type": "Defend",
 			"entities": [
 				12,
-				10,
-				13
+				13,
+				10
 			]
 		}
 	],
@@ -19036,19 +18981,6 @@
 				"x": 23,
 				"y": 30
 			}
-		},
-		{
-			"name": "ENTITY_RETURN_CELL",
-			"type": "Cell",
-			"cell": {
-				"x": 15,
-				"y": 34
-			}
-		},
-		{
-			"name": "BANDIT_SQUATTER",
-			"type": "Entity",
-			"entity_index": 16
 		}
 	]
 }
