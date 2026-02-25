@@ -183,41 +183,33 @@ function scenario.set_match_over_defeat() end
 --- Checks if the player has been defeated.
 --- @param player_id number
 --- @return boolean 
-function scenario.player_is_defeated(player_id) end
+function scenario.is_player_defeated(player_id) end
 
 --- Returns the specified player's gold count
 --- @param player_id number
 --- @return number
-function scenario.player_get_gold(player_id) end
+function scenario.get_player_gold(player_id) end
 
 --- Returns the total number of gold mined by the specified player this match
 --- @param player_id number
 --- @return number
-function scenario.player_get_gold_mined_total(player_id) end
+function scenario.get_player_gold_mined_total(player_id) end
 
 --- Returns the number of entities controlled by the player of a given type.
 --- @param player_id number
 --- @param entity_type number
 --- @return number
-function scenario.player_get_entity_count(player_id, entity_type) end
+function scenario.get_player_entity_count(player_id, entity_type) end
 
---- Returns the number of bunkers controlled by the player that have 4 cowboys in them.
---- @param player_id number
---- @return number
-function scenario.player_get_full_bunker_count(player_id) end
+--- Sends a chat message
+--- @param message string
+function scenario.chat(message) end
 
---- Returns true if the specified player has an entity near the cell within the given distance
---- @param player_id number
---- @param cell ivec2
---- @param distance number
---- @return boolean
-function scenario.player_has_entity_near_cell(player_id, cell, distance) end
-
---- Sends a chat message.
---- @param color number
+--- Sends a chat message with a colored prefix
+--- @param prefix_color number
 --- @param prefix string
 --- @param message string
-function scenario.chat(color, prefix, message) end
+function scenario.chat_prefixed(prefix_color, prefix, message) end
 
 --- Sends a hint message.
 --- @param message string
@@ -282,43 +274,60 @@ function scenario.set_global_objective_counter(value, max_value) end
 --- Returns true if the specified entity is visible to the player.
 --- @param entity_id number
 --- @return boolean
-function scenario.entity_is_visible_to_player(entity_id) end
+function scenario.is_entity_visible_to_player(entity_id) end
 
 --- Highlights the specified entity.
 --- @param entity_id number
 function scenario.highlight_entity(entity_id) end
 
---- Returns a table of information about the specified entity, or nil if the entity does not exist
+--- Populates the entity table with info about the entity
+--- Returns true if successful or false if the entity did not exist
 --- @param entity_id number
---- @return table
-function scenario.entity_get_info(entity_id) end
+--- @param entity table
+--- @return boolean
+function scenario.get_entity_by_id(entity_id, entity) end
+
+--- Populates the entity table with info about the entity
+--- This should only be called with a valid entity index
+--- @param entity_index number
+--- @param entity table
+function scenario.get_entity_by_index(entity_index, entity) end
+
+--- Returns the number of entities in the game
+--- @return number
+function scenario.get_entity_count() end
+
+--- Returns the ID of the entity at the provided index
+--- @param entity_index number
+--- @return number
+function scenario.get_entity_id_of(entity_index) end
 
 --- Returns the gold cost of the specified entity type
 --- @param entity_type number
 --- @return number
-function scenario.entity_get_gold_cost(entity_type) end
+function scenario.get_entity_gold_cost(entity_type) end
 
 --- If no cell is found, returns nil, but this should be rare.
 --- @param entity_type number
 --- @param spawn_cell ivec2
 --- @return ivec2|nil
-function scenario.entity_find_spawn_cell(entity_type, spawn_cell) end
+function scenario.find_entity_spawn_cell(entity_type, spawn_cell) end
 
 --- Creates a new entity. Returns the ID of the newly created entity
 --- @param entity_type number
 --- @param cell ivec2
 --- @param player_id number
 --- @return number
-function scenario.entity_create(entity_type, cell, player_id) end
+function scenario.create_entity(entity_type, cell, player_id) end
 
 --- Returns the ID of the player who controls the specified goldmine
 --- @param goldmine_id number
 --- @return number
-function scenario.entity_get_player_who_controls_goldmine(goldmine_id) end
+function scenario.get_player_who_controls_goldmine(goldmine_id) end
 
 --- Spawns an enemy squad. The entities table should be an array of entity types.
 --- Returns the squad ID of the created squad, or SQUAD_ID_NULL if no squad was created.
---- @param params { player_id: number, type: number, target_cell: ivec2, entities: table }
+--- @param params { player_id: number, type: number, target_cell: ivec2, entity_list: table }
 --- @return number 
 function scenario.bot_add_squad(params) end
 

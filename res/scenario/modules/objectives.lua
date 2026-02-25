@@ -6,7 +6,7 @@ objectives.objectives = {}
 
 function objectives.announce_new_objective(title)
     scenario.play_sound(scenario.sound.UI_CLICK)
-    scenario.chat(scenario.CHAT_COLOR_GOLD, "New Objective:", title)
+    scenario.chat_prefixed(scenario.CHAT_COLOR_GOLD, "New Objective:", title)
     actions.wait(2.0)
     objectives.current_objective = title
 end
@@ -14,7 +14,7 @@ end
 function objectives.announce_objectives_complete()
     objectives.current_objective = nil
     scenario.play_sound(scenario.sound.OBJECTIVE_COMPLETE)
-    scenario.chat(scenario.CHAT_COLOR_GOLD, "Objective Complete", "")
+    scenario.chat_prefixed(scenario.CHAT_COLOR_GOLD, "Objective Complete", "")
     actions.wait(3.0)
     scenario.clear_objectives()
 end
@@ -22,7 +22,7 @@ end
 function objectives.announce_objectives_failed()
     objectives.current_objective = nil
     scenario.play_sound(scenario.sound.UI_CLICK)
-    scenario.chat(scenario.CHAT_COLOR_GOLD, "Objective Failed", "")
+    scenario.chat_prefixed(scenario.CHAT_COLOR_GOLD, "Objective Failed", "")
     actions.wait(3.0)
     scenario.clear_objectives()
 end

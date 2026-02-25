@@ -18660,13 +18660,6 @@
 			}
 		},
 		{
-			"hframe": 3,
-			"cell": {
-				"x": 15,
-				"y": 83
-			}
-		},
-		{
 			"hframe": 4,
 			"cell": {
 				"x": 73,
@@ -19045,11 +19038,11 @@
 			}
 		},
 		{
-			"name": "HARASS_TRIGGER_CELL",
+			"name": "ENTITY_RETURN_CELL",
 			"type": "Cell",
 			"cell": {
-				"x": 12,
-				"y": 64
+				"x": 15,
+				"y": 34
 			}
 		},
 		{

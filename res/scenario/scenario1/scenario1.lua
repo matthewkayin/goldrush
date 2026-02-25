@@ -1,18 +1,25 @@
 local actions = require("actions")
 local objectives = require("objectives")
 local squad_util = require("squad_util")
+local entity_util = require("entity_util")
+local ivec2 = require("ivec2")
 
 local OBJECTIVE_FIND_GOLDMINE = "Find a Goldmine"
-local OBJECTIVE_BUILD_HALL = "Build a Town Hall"
 local OBJECTIVE_ESTABLISH_BASE = "Establish a Base"
 local OBJECTIVE_DEFEAT_BANDITS = "Destroy the Bandit's Base"
 
 local ENEMY_BANDITS_PLAYER_ID = 1
 
+local BANDIT_ATTACK_WARNING_NOT_GIVEN = 0
+local BANDIT_ATTACK_WARNING_GIVEN = 1
+local BANDIT_ATTACK_SENT = 2
+
 local bandits_near_goldmine_squad_id = nil
 local has_highlighted_goldmine = false
-local has_bandit_attacked = false
+
+local bandit_attack_state = BANDIT_ATTACK_WARNING_NOT_GIVEN
 local bandit_attack_squad_id = nil
+
 local has_given_two_saloon_hint = false
 local has_given_bunker_hint = false
 local has_handled_bandits_defeated = false
@@ -42,19 +49,19 @@ function scenario_update()
     objectives.update()
 
     -- Highlight goldmine
-    if not has_highlighted_goldmine and scenario.entity_is_visible_to_player(scenario.constants.GOLDMINE) then
+    if not has_highlighted_goldmine and scenario.is_entity_visible_to_player(scenario.constants.GOLDMINE) then
         scenario.highlight_entity(scenario.constants.GOLDMINE)
         has_highlighted_goldmine = true
     end
 
     if objectives.current_objective ~= OBJECTIVE_DEFEAT_BANDITS and
-            scenario.player_is_defeated(ENEMY_BANDITS_PLAYER_ID) and
+            scenario.is_player_defeated(ENEMY_BANDITS_PLAYER_ID) and
             not has_handled_bandits_defeated then
         has_handled_bandits_defeated = true
         actions.run(function ()
             scenario.clear_objectives()
             actions.wait(3.0)
-            scenario.chat(scenario.CHAT_COLOR_WHITE, "", "Not much for following directions, are you?")
+            scenario.chat("Not much for following directions, are you?")
             actions.wait(3.0)
             objectives.announce_objectives_complete()
             scenario.set_match_over_victory()
@@ -65,10 +72,29 @@ function scenario_update()
         on_objectives_complete()
     end
 
-    -- Trigger backup harass
+    -- Bandit atttack management
+    if bandit_attack_state ~= BANDIT_ATTACK_SENT then
+        local entities_out_of_line = entity_util.find_entities(function (entity)
+            return entity.player_id == scenario.PLAYER_ID and
+                ivec2.manhattan_distance(entity.cell, scenario.constants.HARASS_SPAWN_CELL) <= 3
+        end)
+        if #entities_out_of_line ~= 0 then
+            scenario.log("Stopping units", entities_out_of_line)
+            scenario.queue_match_input({
+                player_id = scenario.PLAYER_ID,
+                type = scenario.match_input_type.STOP,
+                entity_ids = entities_out_of_line
+            })
+            actions.run(function ()
+                actions.camera_pan(scenario.constants.HARASS_TRIGGER_CELL)
+                scenario.chat("Careful now, partner. You best not leave your base undefended.")
+                actions.hold_camera(2.0)
+            end)
+        end
+    end
     if not has_bandit_attacked and
             objectives.current_objective == OBJECTIVE_ESTABLISH_BASE and
-            scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.HARASS_TRIGGER_CELL, 2) then
+            entity_util.player_has_entity_near_cell(scenario.constants.HARASS_TRIGGER_CELL, 2) then
         has_bandit_attacked = true
         objectives.clear_objectives()
         actions.run(function ()
@@ -81,7 +107,7 @@ function scenario_update()
         bandit_attack_squad_id = nil
         actions.run(function ()
             actions.wait(3.0)
-            scenario.chat(scenario.CHAT_COLOR_WHITE, "", "Those bandits must have a hideout nearby...")
+            scenario.chat("Those bandits must have a hideout nearby...")
             actions.wait(3.0)
             objectives.announce_new_objective(OBJECTIVE_DEFEAT_BANDITS)
             objectives.add_objective({
@@ -89,7 +115,7 @@ function scenario_update()
                     description = OBJECTIVE_DEFEAT_BANDITS
                 },
                 complete_fn = function ()
-                    return scenario.player_is_defeated(ENEMY_BANDITS_PLAYER_ID)
+                    return scenario.is_player_defeated(ENEMY_BANDITS_PLAYER_ID)
                 end
             })
         end)
@@ -98,7 +124,7 @@ function scenario_update()
     -- Two saloons hint
     if not has_given_two_saloon_hint and
             objectives.current_objective == OBJECTIVE_ESTABLISH_BASE and
-            scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.COWBOY) >= 1 then
+            scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.COWBOY) >= 1 then
         actions.run(function ()
             actions.wait(1.0)
             scenario.hint("You can build more saloons to hire more cowboys at once.")
@@ -109,7 +135,7 @@ function scenario_update()
     -- Bunker hint
     if not has_given_bunker_hint and
             objectives.current_objective == OBJECTIVE_ESTABLISH_BASE and
-            scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.BUNKER) >= 1 then
+            scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.BUNKER) >= 1 then
         actions.run(function ()
             actions.wait(1.0)
             scenario.hint("Garrison your cowboys inside the bunker for better defense.")
@@ -125,9 +151,9 @@ function on_objectives_complete()
         actions.run(function ()
             objectives.announce_objectives_complete()
             actions.wait(2.0)
-            scenario.chat(scenario.CHAT_COLOR_WHITE, "", "Seems there's bandits in these parts.")
+            scenario.chat("Seems there's bandits in these parts.")
             actions.wait(2.0)
-            scenario.chat(scenario.CHAT_COLOR_WHITE, "", "You best establish a base. They may attack again soon.")
+            scenario.chat("You best establish a base. They may attack again soon.")
             actions.wait(3.0)
             objectives.announce_new_objective(OBJECTIVE_BUILD_HALL)
             objectives.add_objective({
@@ -135,7 +161,7 @@ function on_objectives_complete()
                     description = "Build a Town Hall"
                 },
                 complete_fn = function ()
-                    return scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.HALL) >= 1
+                    return scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.HALL) >= 1
                 end
             })
             actions.wait(5.0)
@@ -152,7 +178,7 @@ function on_objectives_complete()
                     counter_target = 8
                 },
                 complete_fn = function ()
-                    return scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.MINER) >= 8
+                    return scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.MINER) >= 8
                 end
             })
             objectives.add_objective({
@@ -162,7 +188,7 @@ function on_objectives_complete()
                     counter_target = 6
                 },
                 complete_fn = function ()
-                    return scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.COWBOY) >= 6
+                    return scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.COWBOY) >= 6
                 end
             })
             objectives.add_objective({
@@ -170,7 +196,7 @@ function on_objectives_complete()
                     description = "Build a Bunker"
                 },
                 complete_fn = function ()
-                    return scenario.player_get_entity_count(scenario.PLAYER_ID, scenario.entity_type.BUNKER) >= 1
+                    return scenario.get_player_entity_count(scenario.PLAYER_ID, scenario.entity_type.BUNKER) >= 1
                 end
             })
         end)
@@ -211,7 +237,7 @@ function bandit_attack_at_cell(cell)
 
     local previous_camera_cell = scenario.get_camera_centered_cell()
     actions.camera_pan(cell, 0.75)
-    scenario.chat(scenario.CHAT_COLOR_WHITE, "", "Bandits are attacking! Defend yourself!")
+    scenario.chat("Bandits are attacking! Defend yourself!")
     actions.hold_camera(2.0)
     actions.camera_pan(previous_camera_cell, 0.75)
 end
