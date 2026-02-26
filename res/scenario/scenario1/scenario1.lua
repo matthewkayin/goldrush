@@ -2,7 +2,6 @@ local actions = require("actions")
 local objectives = require("objectives")
 local squad_util = require("squad_util")
 local entity_util = require("entity_util")
-local ivec2 = require("ivec2")
 
 local OBJECTIVE_FIND_GOLDMINE = "Find a Gold Mine"
 local OBJECTIVE_BUILD_HALL = "Build a Town Hall"

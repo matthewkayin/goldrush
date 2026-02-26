@@ -998,6 +998,7 @@ static int script_chat(lua_State* lua_state) {
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
     match_shell_add_chat_message(state, FONT_HACK_WHITE, "", chat_message, CHAT_MESSAGE_DURATION);
+    sound_play(SOUND_UI_CLICK);
 
     return 0;
 }
