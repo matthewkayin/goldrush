@@ -142,7 +142,7 @@ function scenario_update()
     if not is_match_over and objectives.current_objective == OBJECTIVE_DEFEAT_BANDITS and scenario.are_objectives_complete() then
         actions.run(function ()
             objectives.announce_objectives_complete()
-            scenario.set_match_over_defeat()
+            scenario.set_match_over_victory()
         end)
         is_match_over = true
     end
