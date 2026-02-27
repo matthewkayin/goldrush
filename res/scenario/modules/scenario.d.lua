@@ -320,10 +320,10 @@ function scenario.find_entity_spawn_cell(entity_type, spawn_cell) end
 --- @return number
 function scenario.create_entity(entity_type, cell, player_id) end
 
---- Returns the ID of the player who controls the specified goldmine
+--- Returns the ID of the hall which surrounds the specified goldmine
 --- @param goldmine_id number
---- @return number
-function scenario.get_player_who_controls_goldmine(goldmine_id) end
+--- @return number | nil
+function scenario.get_hall_surrounding_goldmine(goldmine_id) end
 
 --- Spawns an enemy squad. The entities table should be an array of entity types.
 --- Returns the squad ID of the created squad, or SQUAD_ID_NULL if no squad was created.

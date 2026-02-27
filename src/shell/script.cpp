@@ -70,7 +70,7 @@ static int script_get_entity_id_of(lua_State* lua_state);
 static int script_get_entity_gold_cost(lua_State* lua_state);
 static int script_find_entity_spawn_cell(lua_State* lua_state);
 static int script_create_entity(lua_State* lua_state);
-static int script_get_player_who_controls_goldmine(lua_State* lua_state);
+static int script_get_hall_surrounding_goldmine(lua_State* lua_state);
 
 // Bot
 static int script_bot_add_squad(lua_State* lua_state);
@@ -132,7 +132,7 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "get_entity_gold_cost", script_get_entity_gold_cost },
     { "find_entity_spawn_cell", script_find_entity_spawn_cell },
     { "create_entity", script_create_entity },
-    { "get_player_who_controls_goldmine", script_get_player_who_controls_goldmine },
+    { "get_hall_surrounding_goldmine", script_get_hall_surrounding_goldmine },
 
     // Bot
     { "bot_add_squad", script_bot_add_squad },
@@ -1628,10 +1628,10 @@ static int script_create_entity(lua_State* lua_state) {
     return 1;
 }
 
-// Returns the ID of the player who controls the specified goldmine
+// Returns the ID of the hall which surrounds the specified goldmine
 // @param goldmine_id number
-// @return number
-static int script_get_player_who_controls_goldmine(lua_State* lua_state) {
+// @return number | nil
+static int script_get_hall_surrounding_goldmine(lua_State* lua_state) {
     const int arg_types[] = { LUA_TNUMBER };
     script_validate_arguments(lua_state, arg_types, 1);
 
@@ -1648,10 +1648,11 @@ static int script_get_player_who_controls_goldmine(lua_State* lua_state) {
             bot_does_entity_surround_goldmine(hall, goldmine.cell);
     });
 
-    uint8_t controlling_player_id = hall_surrounding_goldmine_id != ID_NULL
-        ? state->match_state.entities.get_by_id(hall_surrounding_goldmine_id).player_id
-        : PLAYER_NONE;
-    lua_pushnumber(lua_state, controlling_player_id);
+    if (hall_surrounding_goldmine_id == ID_NULL) {
+        lua_pushnil(lua_state);
+    } else {
+        lua_pushnumber(lua_state, hall_surrounding_goldmine_id);
+    }
 
     return 1;
 }

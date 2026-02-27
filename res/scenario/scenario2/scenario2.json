@@ -18730,7 +18730,7 @@
 	"players": [
 		{
 			"name": "Player",
-			"starting_gold": 200,
+			"starting_gold": 400,
 			"allowed_upgrades": [],
 			"allowed_entities": [
 				"Miner",
@@ -19086,12 +19086,39 @@
 			}
 		},
 		{
+			"type": "Cowboy",
+			"player_id": 0,
+			"gold_held": 0,
+			"cell": {
+				"x": 27,
+				"y": 78
+			}
+		},
+		{
+			"type": "Cowboy",
+			"player_id": 0,
+			"gold_held": 0,
+			"cell": {
+				"x": 29,
+				"y": 78
+			}
+		},
+		{
 			"type": "Miner",
 			"player_id": 0,
 			"gold_held": 0,
 			"cell": {
-				"x": 23,
-				"y": 83
+				"x": 25,
+				"y": 81
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 0,
+			"gold_held": 0,
+			"cell": {
+				"x": 26,
+				"y": 80
 			}
 		}
 	],
@@ -19200,6 +19227,35 @@
 				"x": 59,
 				"y": 81
 			}
+		},
+		{
+			"name": "COUNTERATTACK_TRIGGER1",
+			"type": "Cell",
+			"cell": {
+				"x": 10,
+				"y": 35
+			}
+		},
+		{
+			"name": "COUNTERATTACK_TRIGGER2",
+			"type": "Cell",
+			"cell": {
+				"x": 36,
+				"y": 10
+			}
+		},
+		{
+			"name": "COUNTERATTACK_TRIGGER3",
+			"type": "Cell",
+			"cell": {
+				"x": 30,
+				"y": 27
+			}
+		},
+		{
+			"name": "FIRST_HALL_ID",
+			"type": "Entity",
+			"entity_index": 3
 		}
 	]
 }

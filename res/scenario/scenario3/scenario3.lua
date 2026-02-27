@@ -108,9 +108,6 @@ function scenario_init()
         actions.wait(3.0)
         -- Setting this flag triggers bot should produce to be true
         has_finished_opener = true
-
-        actions.wait(5.0)
-        scenario.hint("You can now build bunkers to defend your base.")
     end)
 end
 
