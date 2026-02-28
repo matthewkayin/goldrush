@@ -23,8 +23,14 @@
 const uint32_t TURN_OFFSET = 4;
 const uint32_t TURN_DURATION = 4;
 
+// Chat
 const uint32_t CHAT_MESSAGE_DURATION = 3U * 60U;
 const uint32_t CHAT_MESSAGE_HINT_DURATION = 5U * 60U;
+
+// Alerts
+const uint32_t ALERT_DURATION = 90;
+const uint32_t ALERT_LINGER_DURATION = 60 * 20;
+const uint32_t ALERT_TOTAL_DURATION = ALERT_DURATION + ALERT_LINGER_DURATION;
 
 enum RenderHealthbarType {
     RENDER_HEALTHBAR,

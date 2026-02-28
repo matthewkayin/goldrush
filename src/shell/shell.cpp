@@ -105,9 +105,6 @@ static const uint32_t SOUND_COOLDOWN_DURATION = 5;
 static const uint32_t SOUND_FIRE_NOT_PLAYING = UINT32_MAX;
 
 // Alerts
-static const uint32_t ALERT_DURATION = 90;
-static const uint32_t ALERT_LINGER_DURATION = 60 * 20;
-static const uint32_t ALERT_TOTAL_DURATION = ALERT_DURATION + ALERT_LINGER_DURATION;
 static const int ATTACK_ALERT_DISTANCE = 20;
 
 // Disconnect

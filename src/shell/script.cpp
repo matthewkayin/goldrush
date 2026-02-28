@@ -17,6 +17,12 @@ enum ScriptChatColor {
     SCRIPT_CHAT_COLOR_BLUE
 };
 
+enum ScriptAlertColor {
+    SCRIPT_ALERT_COLOR_WHITE,
+    SCRIPT_ALERT_COLOR_GOLD,
+    SCRIPT_ALERT_COLOR_PLAYER
+};
+
 struct ScriptConstant {
     const char* name;
     int value;
@@ -28,6 +34,7 @@ struct ScriptConstant {
 static int script_log(lua_State* lua_state);
 static int script_play_sound(lua_State* lua_state);
 static int script_get_time(lua_State* lua_state);
+static int script_create_alert(lua_State* lua_state);
 
 // Match over
 static int script_set_match_over_victory(lua_State* lua_state);
@@ -90,6 +97,7 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "log", script_log },
     { "play_sound", script_play_sound },
     { "get_time", script_get_time },
+    { "create_alert", script_create_alert },
 
     // Match over
     { "set_match_over_victory", script_set_match_over_victory },
@@ -152,6 +160,9 @@ static const ScriptConstant GOLD_CONSTANTS[] = {
     { "CHAT_COLOR_WHITE", SCRIPT_CHAT_COLOR_WHITE },
     { "CHAT_COLOR_GOLD", SCRIPT_CHAT_COLOR_GOLD },
     { "CHAT_COLOR_BLUE", SCRIPT_CHAT_COLOR_GOLD },
+    { "ALERT_COLOR_WHITE", SCRIPT_ALERT_COLOR_WHITE },
+    { "ALERT_COLOR_GOLD", SCRIPT_ALERT_COLOR_GOLD },
+    { "ALERT_COLOR_PLAYER", SCRIPT_ALERT_COLOR_PLAYER },
     { "SQUAD_ID_NULL", BOT_SQUAD_ID_NULL },
     { "CAMERA_MODE_FREE", CAMERA_MODE_FREE },
     { "CAMERA_MODE_MINIMAP_DRAG", CAMERA_MODE_MINIMAP_DRAG },
@@ -882,6 +893,47 @@ static int script_get_time(lua_State* lua_state) {
     lua_pushnumber(lua_state, (double)state->match_timer / (double)UPDATES_PER_SECOND);
 
     return 1;
+}
+
+// Creates an alert on the minimap
+// @param alert_color number
+// @param cell ivec2
+// @param cell_size number
+static int script_create_alert(lua_State* lua_state) {
+    static int arg_types[] = { LUA_TNUMBER, LUA_TTABLE, LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 3);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    MinimapPixel pixel = MINIMAP_PIXEL_COUNT;
+    uint32_t alert_color = (uint32_t)lua_tonumber(lua_state, 1);
+    switch (alert_color) {
+        case SCRIPT_ALERT_COLOR_WHITE:
+            pixel = MINIMAP_PIXEL_WHITE;
+            break;
+        case SCRIPT_ALERT_COLOR_GOLD:
+            pixel = MINIMAP_PIXEL_GOLD;
+            break;
+        case SCRIPT_ALERT_COLOR_PLAYER:
+            pixel = (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state->match_state.players[network_get_player_id()].recolor_id);
+            break;
+        default:
+            script_error(lua_state, "Unrecognized alert color %u", alert_color);
+            break;
+    }
+    GOLD_ASSERT(pixel != MINIMAP_PIXEL_COUNT);
+
+    ivec2 cell = script_lua_to_ivec2(lua_state, 2, "cell");
+    int cell_size = (int)lua_tonumber(lua_state, 3);
+
+    state->alerts.push_back((Alert) {
+        .pixel = pixel,
+        .cell = cell,
+        .cell_size = cell_size,
+        .timer = ALERT_TOTAL_DURATION
+    });
+
+    return 0;
 }
 
 // MATCH OVER

@@ -13,12 +13,12 @@ local has_sent_counterattack = false
 
 function scenario_init()
     actions.run(function ()
-        actions.wait(2.0)
+        actions.wait(1)
 
         scenario.chat("Scouts report that there's a bandit camp to the north.")
-        actions.wait(2.0)
+        actions.wait(2)
         scenario.chat("The sheriff wants you to take them out.")
-        actions.wait(2.0)
+        actions.wait(2)
 
         objectives.announce_new_objective(OBJECTIVE_DEFEAT_BANDITS)
         objectives.add_objective({
@@ -30,10 +30,12 @@ function scenario_init()
             end
         })
 
-        actions.wait(15.0)
+        -- TODO: setup timer for harassment!
+
+        actions.wait(15)
         scenario.hint("You can now build bunkers to defend your base.")
 
-        actions.wait(60.0)
+        actions.wait(2 * 60)
 
         local goldmine = {}
         if not scenario.get_entity_by_id(scenario.constants.UNCLAIMED_GOLDMINE, goldmine) then
@@ -43,10 +45,16 @@ function scenario_init()
             cell = goldmine.cell,
             cell_size = 3,
             sight = 4,
-            duration = 5.0
+            duration = 5
         })
         scenario.highlight_entity(scenario.constants.UNCLAIMED_GOLDMINE)
+        scenario.create_alert(scenario.ALERT_COLOR_GOLD, goldmine.cell, 3)
         scenario.chat("Looks like there's an unclaimed gold mine out there.")
+
+        while not is_match_over do
+            actions.wait(2 * 60)
+            spawn_harass_squad()
+        end
     end)
 end
 

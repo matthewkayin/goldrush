@@ -11,16 +11,7 @@ scenario = {}
 scenario.SQUAD_ID_NULL = -1
 scenario.CHAT_COLOR_GOLD = 1
 scenario.CHAT_COLOR_BLUE = 1
-scenario.bot_config_flag = {}
-scenario.bot_config_flag.SHOULD_HARASS = 4
-scenario.bot_config_flag.SHOULD_PRODUCE = 64
-scenario.bot_config_flag.SHOULD_ATTACK_FIRST = 1
-scenario.bot_config_flag.SHOULD_SCOUT = 16
-scenario.bot_config_flag.SHOULD_SURRENDER = 32
-scenario.bot_config_flag.SHOULD_ATTACK = 2
-scenario.bot_config_flag.SHOULD_CANCEL_BUILDINGS = 128
-scenario.bot_config_flag.SHOULD_RETREAT = 8
-
+scenario.ALERT_COLOR_GOLD = 1
 scenario.CAMERA_MODE_PAN = 2
 scenario.entity_mode = {}
 scenario.entity_mode.UNIT_MOVE_FINISHED = 3
@@ -47,6 +38,7 @@ scenario.entity_mode.UNIT_SOLDIER_CHARGE = 9
 scenario.entity_mode.UNIT_ATTACK_WINDUP = 7
 scenario.entity_mode.UNIT_BLOCKED = 1
 
+scenario.ALERT_COLOR_PLAYER = 2
 scenario.entity_type = {}
 scenario.entity_type.BARRACKS = 19
 scenario.entity_type.SHERIFFS = 20
@@ -99,6 +91,16 @@ scenario.bot_squad_type.PATROL = 5
 scenario.bot_squad_type.RETURN = 4
 scenario.bot_squad_type.HOLD_POSITION = 6
 
+scenario.bot_config_flag = {}
+scenario.bot_config_flag.SHOULD_HARASS = 4
+scenario.bot_config_flag.SHOULD_PRODUCE = 64
+scenario.bot_config_flag.SHOULD_ATTACK_FIRST = 1
+scenario.bot_config_flag.SHOULD_SCOUT = 16
+scenario.bot_config_flag.SHOULD_SURRENDER = 32
+scenario.bot_config_flag.SHOULD_ATTACK = 2
+scenario.bot_config_flag.SHOULD_CANCEL_BUILDINGS = 128
+scenario.bot_config_flag.SHOULD_RETREAT = 8
+
 scenario.match_input_type = {}
 scenario.match_input_type.NONE = 0
 scenario.match_input_type.MOVE_ENTITY = 2
@@ -121,7 +123,6 @@ scenario.match_input_type.UNLOAD = 16
 scenario.match_input_type.MOVE_CELL = 1
 scenario.match_input_type.STOP = 8
 
-scenario.PLAYER_NONE = 4
 scenario.sound = {}
 scenario.sound.BUILDING_DESTROY = 11
 scenario.sound.CAMO_OFF = 29
@@ -158,9 +159,11 @@ scenario.sound.MINE_DESTROY = 13
 scenario.sound.FLAG_THUMP = 17
 scenario.sound.HAMMER = 6
 
-scenario.CAMERA_MODE_MINIMAP_DRAG = 1
-scenario.PLAYER_ID = 0
+scenario.PLAYER_NONE = 4
+scenario.ALERT_COLOR_WHITE = 0
 scenario.CAMERA_MODE_HELD = 3
+scenario.PLAYER_ID = 0
+scenario.CAMERA_MODE_MINIMAP_DRAG = 1
 
 --- Send a debug log. If debug logging is disabled, this function does nothing.
 --- @param ... any Values to print
@@ -173,6 +176,12 @@ function scenario.play_sound(sound) end
 --- Returns the time in seconds since the scenario started.
 --- @return number
 function scenario.get_time() end
+
+--- Creates an alert on the minimap
+--- @param alert_color number
+--- @param cell ivec2
+--- @param cell_size number
+function scenario.create_alert(alert_color, cell, cell_size) end
 
 --- End the match in victory.
 function scenario.set_match_over_victory() end
