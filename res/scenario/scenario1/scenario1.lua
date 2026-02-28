@@ -139,7 +139,7 @@ function on_objectives_complete()
         actions.run(function ()
             objectives.announce_objectives_complete()
             local bandit_attack_cell
-            if entity_util.player_has_entity_near_cell(scenario.constants.HARASS_SPAWN_CELL, 4) then
+            if entity_util.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.HARASS_SPAWN_CELL, 4) then
                 bandit_attack_cell = scenario.constants.HARASS_SPAWN_CELL2
             else
                 bandit_attack_cell = scenario.constants.HARASS_SPAWN_CELL

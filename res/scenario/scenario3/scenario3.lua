@@ -1,6 +1,7 @@
 local actions = require("actions")
 local objectives = require("objectives")
 local squad_util = require("squad_util")
+local entity_util = require("entity_util")
 
 local OBJECTIVE_MINE_GOLD = "Mine 5000 Gold before your Opponent"
 
@@ -100,7 +101,7 @@ function scenario_init()
                 description = "Mine 5000 Gold",
             },
             complete_fn = function ()
-                return scenario.player_get_gold_mined_total(scenario.PLAYER_ID) >= TARGET_GOLD_COUNT
+                return scenario.get_player_gold_mined_total(scenario.PLAYER_ID) >= TARGET_GOLD_COUNT
             end
         })
         scenario.set_global_objective_counter(scenario.global_objective_counter_type.GOLD, TARGET_GOLD_COUNT)
@@ -121,7 +122,7 @@ function scenario_update()
         end)
         is_match_over = true
     end
-    if not is_match_over and scenario.player_get_gold_mined_total(ENEMY_PLAYER_ID) >= TARGET_GOLD_COUNT then
+    if not is_match_over and scenario.get_player_gold_mined_total(ENEMY_PLAYER_ID) >= TARGET_GOLD_COUNT then
         actions.run(function ()
             objectives.announce_objectives_failed()
             scenario.set_match_over_defeat()
@@ -131,17 +132,35 @@ function scenario_update()
 
     -- Reactive harass
     if not has_sent_reactive_harass then
-        local player_is_attacking_base1 = scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.HALL_CELL1, HARASS_TRIGGER_DISTANCE)
-        local player_is_attacking_base2 = scenario.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.HALL_CELL2, HARASS_TRIGGER_DISTANCE)
+        local player_is_attacking_base1 = entity_util.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.HALL_CELL1, HARASS_TRIGGER_DISTANCE)
+        local player_is_attacking_base2 = entity_util.player_has_entity_near_cell(scenario.PLAYER_ID, scenario.constants.HALL_CELL2, HARASS_TRIGGER_DISTANCE)
         if player_is_attacking_base1 or player_is_attacking_base2 then
-            local params = {}
-            if player_is_attacking_base1 then
-                params.spawn_cell = scenario.constants.HARASS_SPAWN_CELL1_1
-            else
-                params.spawn_cell = scenario.constants.HARASS_SPAWN_CELL1_2
+            -- Determine time to wait before harassment
+            local min_harass_time = 60
+            local current_time = scenario.get_time()
+            local time_to_wait_before_harassment = 0
+            if current_time < min_harass_time then
+                time_to_wait_before_harassment = min_harass_time - current_time
             end
-            params.goldmine_id = scenario.constants.GOLDMINE1
-            harass_goldmine(params)
+
+            actions.run(function ()
+                -- Wait
+                if time_to_wait_before_harassment ~= 0 then
+                    actions.wait(time_to_wait_before_harassment)
+                end
+
+                -- Build params
+                local params = {}
+                if player_is_attacking_base1 then
+                    params.spawn_cell = scenario.constants.HARASS_SPAWN_CELL1_1
+                else
+                    params.spawn_cell = scenario.constants.HARASS_SPAWN_CELL1_2
+                end
+                params.goldmine_id = scenario.constants.GOLDMINE1
+
+                -- Harass
+                harass_goldmine(params)
+            end)
             has_sent_reactive_harass = true
         end
 
@@ -164,13 +183,23 @@ function scenario_update()
 
     -- Bot should harass
     for harass_index=1,#harassable_goldmines do
-        if not harassable_goldmines[harass_index].has_harassed_player_at_location and
-                scenario.entity_get_player_who_controls_goldmine(harassable_goldmines[harass_index].goldmine_id) == scenario.PLAYER_ID then
-            actions.run(function ()
-                actions.wait(60.0 * 1.0)
-                harass_goldmine(harassable_goldmines[harass_index])
-            end)
-            harassable_goldmines[harass_index].has_harassed_player_at_location = true
+        -- If we haven't harassed the goldmine yet
+        if not harassable_goldmines[harass_index].has_harassed_player_at_location then
+            -- Check to see if the player has taken the goldmine
+            local hall_surrounding_goldmine_id = scenario.get_hall_surrounding_goldmine(harassable_goldmines[harass_index].goldmine_id)
+            local hall_surrounding_goldmine = {}
+            if hall_surrounding_goldmine_id ~= nil and
+                    scenario.get_entity_by_id(hall_surrounding_goldmine_id, hall_surrounding_goldmine) and
+                    hall_surrounding_goldmine.player_id == scenario.PLAYER_ID and
+                    hall_surrounding_goldmine.mode == scenario.entity_mode.BUILDING_FINISHED then
+                -- If they have, then wait 1 minute and harass the goldmine
+                actions.run(function ()
+                    actions.wait(60.0 * 1.0)
+                    harass_goldmine(harassable_goldmines[harass_index])
+                end)
+                -- Make sure to mark that we have harassed them so that we only harass once
+                harassable_goldmines[harass_index].has_harassed_player_at_location = true
+            end
         end
     end
 
@@ -197,8 +226,8 @@ function builder_state_update(builder_state)
         return
     end
 
-    local builder = scenario.entity_get_info(builder_state.builder_id)
-    if not builder or builder.health == 0 then
+    local builder = {}
+    if not scenario.get_entity_by_id(builder_state.builder_id, builder) or builder.health == 0 then
         scenario.log("builder_state, entity", builder_state.builder_id, " - is dead")
         builder_state_release(builder_state)
         return
@@ -212,8 +241,8 @@ function builder_state_update(builder_state)
     end
 
     if builder_state.mode == BUILDER_MODE_BUILDING_HALL and builder.mode ~= scenario.entity_mode.UNIT_BUILD then
-        local hall = scenario.entity_get_info(builder_state.hall_id)
-        if not hall or hall.health == 0 then
+        local hall = {}
+        if not scenario.get_entity_by_id(builder_state.hall_id, hall) or hall.health == 0 then
             scenario.log("builder_state, entity", builder_state.builder_id, " - hall is nil or dead", hall)
             builder_state_release(builder_state)
             return
@@ -222,7 +251,7 @@ function builder_state_update(builder_state)
         scenario.log("builder_state, entity", builder_state.builder_id, " - begin awaiting gold for bunker")
         builder_state.mode = BUILDER_MODE_WAIT_GOLD_BUNKER
         actions.run(function ()
-            while scenario.player_get_gold(ENEMY_PLAYER_ID) < scenario.entity_get_gold_cost(scenario.entity_type.BUNKER) do
+            while scenario.get_player_gold(ENEMY_PLAYER_ID) < scenario.get_entity_gold_cost(scenario.entity_type.BUNKER) do
                 coroutine.yield()
             end
             scenario.log("builder_state, entity", builder_state.builder_id, " - queue bunker input")
@@ -246,8 +275,8 @@ function builder_state_update(builder_state)
     end
 
     if builder_state.mode == BUILDER_MODE_BUILDING_BUNKER and builder.mode ~= scenario.entity_mode.UNIT_BUILD then
-        local bunker = scenario.entity_get_info(builder_state.bunker_id)
-        if not bunker or bunker.health == 0 then
+        local bunker = {}
+        if not scenario.get_entity_by_id(builder_state.bunker_id, bunker) or bunker.health == 0 then
             scenario.log("builder_state, entity", builder_state.builder_id, " - bunker is nil or dead", bunker)
             builder_state_release(builder_state)
             return
@@ -257,11 +286,11 @@ function builder_state_update(builder_state)
         local squad_entity_ids = {}
         table.insert(squad_entity_ids, builder_state.bunker_id)
         for index=1,4 do
-            local entity_cell = scenario.entity_find_spawn_cell(scenario.entity_type.COWBOY, bunker.cell)
+            local entity_cell = scenario.find_entity_spawn_cell(scenario.entity_type.COWBOY, bunker.cell)
             if not entity_cell then
                 break
             end
-            local entity_id = scenario.entity_create(scenario.entity_type.COWBOY, entity_cell, ENEMY_PLAYER_ID)
+            local entity_id = scenario.create_entity(scenario.entity_type.COWBOY, entity_cell, ENEMY_PLAYER_ID)
             table.insert(squad_entity_ids, entity_id)
         end
         scenario.bot_add_squad({
@@ -287,8 +316,8 @@ function should_bot_produce()
 end
 
 function harass_goldmine(params)
-    local goldmine = scenario.entity_get_info(params.goldmine_id)
-    if not goldmine then
+    local goldmine = {}
+    if not scenario.get_entity_by_id(params.goldmine_id, goldmine) then
         error("Goldmine constant does not point to a valid entity")
     end
     squad_util.spawn_harass_squad({

@@ -37,9 +37,10 @@ end
 -- @param cell ivec2
 -- @param distance number
 -- @return boolean
-function entity_util.player_has_entity_near_cell(cell, distance)
+function entity_util.player_has_entity_near_cell(player_id, cell, distance)
     local entity_near_cell_id = entity_util.find_entity(function (entity)
-        return ivec2.manhattan_distance(entity.cell, cell) <= distance
+        return entity.player_id == player_id and
+            ivec2.manhattan_distance(entity.cell, cell) <= distance
     end)
     return entity_near_cell_id ~= nil
 end

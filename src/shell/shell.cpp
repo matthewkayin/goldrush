@@ -2151,7 +2151,16 @@ void match_shell_order_move(MatchShellState* state) {
 
     // Play animation
     if (remembered_entity_id != ID_NULL) {
-        EntityType remembered_entity_type = state->match_state.remembered_entities[player_team][remembered_entity_id].type;
+        // Find remembered entity index
+        uint32_t remembered_entity_index;
+        for (remembered_entity_index = 0; remembered_entity_index < state->match_state.remembered_entities[player_team].size(); remembered_entity_index++) {
+            if (state->match_state.remembered_entities[player_team][remembered_entity_index].entity_id == remembered_entity_id) {
+                break;
+            }
+        }
+        GOLD_ASSERT(remembered_entity_index != state->match_state.remembered_entities[player_team].size());
+
+        EntityType remembered_entity_type = state->match_state.remembered_entities[player_team][remembered_entity_index].type;
         state->move_animation = animation_create(remembered_entity_type == ENTITY_GOLDMINE
                                                         ? ANIMATION_UI_MOVE_ENTITY 
                                                         : ANIMATION_UI_MOVE_ATTACK_ENTITY);
