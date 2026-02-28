@@ -448,19 +448,6 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
         const MatchPlayer& player_a = state_a->players[player_id];
         const MatchPlayer& player_b = state_b->players[player_id];
 
-        GOLD_ASSERT(player_a.active == player_b.active);
-        for (size_t name_index = 0; name_index < sizeof(player_a.name); name_index++) {
-            GOLD_ASSERT(player_a.name[name_index] == player_b.name[name_index]);
-        }
-        GOLD_ASSERT(player_a.padding == player_b.padding);
-        GOLD_ASSERT(player_a.padding2 == player_b.padding2);
-        GOLD_ASSERT(player_a.team == player_b.team);
-        GOLD_ASSERT(player_a.recolor_id == player_b.recolor_id);
-        GOLD_ASSERT(player_a.gold == player_b.gold);
-        GOLD_ASSERT(player_a.gold_mined_total == player_b.gold_mined_total);
-        GOLD_ASSERT(player_a.upgrades == player_b.upgrades);
-        GOLD_ASSERT(player_a.upgrades_in_progress == player_b.upgrades_in_progress);
-
         GOLD_ASSERT(memcmp(&player_a, &player_b, sizeof(player_a)) == 0);
     }
     GOLD_ASSERT(memcmp(&state_a->players, &state_b->players, sizeof(state_a->players)) == 0);

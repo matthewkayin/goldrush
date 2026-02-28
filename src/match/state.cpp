@@ -3909,10 +3909,12 @@ void match_fog_update(MatchState& state, uint32_t player_team, ivec2 cell, int c
 
                             RememberedEntity remembered_entity = (RememberedEntity) {
                                 .entity_id = map_cell.id,
+                                .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLDMINE 
+                                    ? (uint16_t)0U 
+                                    : state.players[entity.player_id].recolor_id,
                                 .type = entity.type,
                                 .frame = frame,
-                                .cell = entity.cell,
-                                .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLDMINE ? 0 : state.players[entity.player_id].recolor_id
+                                .cell = entity.cell
                             };
 
                             uint32_t remembered_entity_index = match_team_find_remembered_entity_index(state, player_team, map_cell.id);

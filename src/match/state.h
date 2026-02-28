@@ -217,11 +217,12 @@ struct Entity {
 
 struct MatchPlayer {
     bool active;
-    char name[MAX_USERNAME_LENGTH + 1];
     uint8_t padding = 0;
-    uint8_t padding2 = 0;
+    uint16_t recolor_id;
+    // We need MAX_USERNAME_LENGTH + 1 to fit the null terminator,
+    // but we add +4 instead to account for padding
+    char name[MAX_USERNAME_LENGTH + 4];
     uint32_t team;
-    int recolor_id;
     uint32_t gold;
     uint32_t gold_mined_total;
     uint32_t upgrades;
