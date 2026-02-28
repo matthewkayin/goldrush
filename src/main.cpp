@@ -558,7 +558,7 @@ void game_set_mode_match(int lcg_seed, Noise* noise) {
 #ifdef GOLD_DEBUG
     if (state.launch_mode == LAUNCH_MODE_TEST_HOST || state.launch_mode == LAUNCH_MODE_TEST_JOIN) {
     #ifdef GOLD_TEST_SEED
-        int test_lcg_seed = GOLD_TEST_SEED
+        int test_lcg_seed = GOLD_TEST_SEED;
     #else
         int test_lcg_seed = rand();
     #endif

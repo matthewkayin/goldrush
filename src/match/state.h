@@ -300,10 +300,10 @@ struct MatchEvent {
 
 struct RememberedEntity {
     EntityId entity_id;
+    uint16_t recolor_id;
     EntityType type;
     ivec2 frame;
     ivec2 cell;
-    int recolor_id;
 };
 
 // Particles

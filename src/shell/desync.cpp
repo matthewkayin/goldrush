@@ -11,7 +11,7 @@
 STATIC_ASSERT(sizeof(int) == 4ULL);
 STATIC_ASSERT(sizeof(MapType) == 4ULL);
 STATIC_ASSERT(sizeof(MapRegionConnection) == 260ULL);
-STATIC_ASSERT(sizeof(RememberedEntity) == 28ULL);
+STATIC_ASSERT(sizeof(RememberedEntity) == 24ULL);
 STATIC_ASSERT(sizeof(Entity) == 256ULL);
 STATIC_ASSERT(sizeof(BuildingQueueItem) == 8ULL);
 STATIC_ASSERT(sizeof(Particle) == 44ULL);
@@ -24,7 +24,7 @@ STATIC_ASSERT(sizeof(EntityCount) == 88ULL);
 STATIC_ASSERT(sizeof(BotSquadType) == 4ULL);
 STATIC_ASSERT(sizeof(BotDesiredSquad) == 92ULL);
 STATIC_ASSERT(sizeof(BotBaseInfo) == 220);
-STATIC_ASSERT(sizeof(MatchState) == 2435284ULL);
+STATIC_ASSERT(sizeof(MatchState) == 2434260ULL);
 STATIC_ASSERT(sizeof(Bot) == 16164ULL);
 
 #ifdef GOLD_DEBUG
@@ -179,6 +179,8 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
         GOLD_ASSERT(tile_a.frame_x == tile_b.frame_x);
         GOLD_ASSERT(tile_a.frame_y == tile_b.frame_y);
         GOLD_ASSERT(tile_a.elevation == tile_b.elevation);
+
+        GOLD_ASSERT(memcmp(&tile_a, &tile_b, sizeof(tile_a)) == 0);
     }
 
     // Map cells
@@ -224,6 +226,8 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
         }
     }
 
+    GOLD_ASSERT(memcmp(&state_a->map, &state_b->map, sizeof(state_a->map)) == 0);
+
     // Fog
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         for (size_t index = 0; index < MAP_SIZE_MAX * MAP_SIZE_MAX; index++) {
@@ -250,7 +254,10 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
             GOLD_ASSERT(entity_a.frame == entity_b.frame);
             GOLD_ASSERT(entity_a.cell == entity_b.cell);
             GOLD_ASSERT(entity_a.recolor_id == entity_b.recolor_id);
+
+            GOLD_ASSERT(memcmp(&entity_a, &entity_b, sizeof(entity_a)) == 0);
         }
+        GOLD_ASSERT(memcmp(&state_a->remembered_entities[player_id], &state_b->remembered_entities[player_id], sizeof(state_a->remembered_entities[player_id])) == 0);
     }
 
     // Entities
@@ -319,11 +326,14 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
         GOLD_ASSERT(entity_a.bleed_timer == entity_b.bleed_timer);
         GOLD_ASSERT(entity_a.bleed_damage_timer == entity_b.bleed_damage_timer);
         desync_assert_animations_equal(entity_a.bleed_animation, entity_b.bleed_animation);
+
+        GOLD_ASSERT(memcmp(&entity_a, &entity_b, sizeof(entity_a)) == 0);
     }
     for (EntityId entity_id = 0; entity_id < ID_MAX; entity_id++) {
         GOLD_ASSERT(state_a->entities.id_to_index[entity_id] == state_b->entities.id_to_index[entity_id]);
     }
     desync_assert_fixed_queues_equal(state_a->entities.available_ids, state_b->entities.available_ids);
+    GOLD_ASSERT(memcmp(&state_a->entities, &state_b->entities, sizeof(state_a->entities)) == 0);
 
     // Path pool
     for (uint32_t index = 0; index < MATCH_MAX_UNITS; index++) {
@@ -333,6 +343,7 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
         GOLD_ASSERT(state_a->entity_paths.free_list[index] == state_b->entity_paths.free_list[index]);
     }
     GOLD_ASSERT(state_a->entity_paths.head == state_b->entity_paths.head);
+    GOLD_ASSERT(memcmp(&state_a->entity_paths, &state_b->entity_paths, sizeof(state_a->entity_paths)) == 0);
 
     // Target queue pool
     for (uint32_t index = 0; index < MATCH_MAX_UNITS; index++) {
@@ -349,6 +360,7 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
         GOLD_ASSERT(state_a->entity_target_queues.free_list[index] == state_b->entity_target_queues.free_list[index]);
     }
     GOLD_ASSERT(state_a->entity_target_queues.head == state_b->entity_target_queues.head);
+    GOLD_ASSERT(memcmp(&state_a->entity_target_queues, &state_b->entity_target_queues, sizeof(state_a->entity_target_queues)) == 0);
 
     // Particles
     {
@@ -363,7 +375,10 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
             desync_assert_animations_equal(particle_a.animation, particle_b.animation);
             GOLD_ASSERT(particle_a.vframe == particle_b.vframe);
             GOLD_ASSERT(particle_a.position == particle_b.position);
+
+            GOLD_ASSERT(memcmp(&particle_a, &particle_b, sizeof(particle_a)) == 0);
         }
+        GOLD_ASSERT(memcmp(&state_a->particles, &state_b->particles, sizeof(state_a->particles)) == 0);
     }
 
     // Projectiles
@@ -377,7 +392,11 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
             GOLD_ASSERT(projectile_a.type == projectile_b.type);
             GOLD_ASSERT(projectile_a.position == projectile_b.position);
             GOLD_ASSERT(projectile_a.target == projectile_b.target);
+
+            GOLD_ASSERT(memcmp(&projectile_a, &projectile_b, sizeof(projectile_a)) == 0);
         }
+
+        GOLD_ASSERT(memcmp(&state_a->projectiles, &state_b->projectiles, sizeof(state_a->projectiles)) == 0);
     }
 
     // Fires
@@ -392,7 +411,11 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
             GOLD_ASSERT(fire_a.source == fire_b.source);
             GOLD_ASSERT(fire_a.time_to_live == fire_b.time_to_live);
             desync_assert_animations_equal(fire_a.animation, fire_b.animation);
+
+            GOLD_ASSERT(memcmp(&fire_a, &fire_b, sizeof(fire_a)) == 0);
         }
+        
+        GOLD_ASSERT(memcmp(&state_a->fires, &state_b->fires, sizeof(state_a->fires)) == 0);
     }
 
     // Fire cells
@@ -413,7 +436,11 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
             GOLD_ASSERT(fog_reveal_a.cell_size == fog_reveal_b.cell_size);
             GOLD_ASSERT(fog_reveal_a.sight == fog_reveal_b.sight);
             GOLD_ASSERT(fog_reveal_a.timer == fog_reveal_b.timer);
+
+            GOLD_ASSERT(memcmp(&fog_reveal_a, &fog_reveal_b, sizeof(fog_reveal_a)) == 0);
         }
+
+        GOLD_ASSERT(memcmp(&state_a->fog_reveals, &state_b->fog_reveals, sizeof(state_a->fog_reveals)) == 0);
     }
 
     // Players
@@ -433,7 +460,10 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
         GOLD_ASSERT(player_a.gold_mined_total == player_b.gold_mined_total);
         GOLD_ASSERT(player_a.upgrades == player_b.upgrades);
         GOLD_ASSERT(player_a.upgrades_in_progress == player_b.upgrades_in_progress);
+
+        GOLD_ASSERT(memcmp(&player_a, &player_b, sizeof(player_a)) == 0);
     }
+    GOLD_ASSERT(memcmp(&state_a->players, &state_b->players, sizeof(state_a->players)) == 0);
 
     // Events
     {
@@ -446,6 +476,9 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
             GOLD_ASSERT(memcmp(&event_a, &event_b, sizeof(MatchEvent)) == 0);
         }
     }
+    GOLD_ASSERT(memcmp(&state_a->events, &state_b->events, sizeof(state_a->events)) == 0);
+
+    GOLD_ASSERT(memcmp(state_a, state_b, sizeof(MatchState)) == 0);
 
     // Bots
     const Bot* bots_a = (Bot*)(state_buffer_a + sizeof(MatchState));
@@ -479,7 +512,7 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
         desync_assert_fixed_vectors_equal(bot_a.entities_assumed_to_be_scouted, bot_b.entities_assumed_to_be_scouted);
 
         // Bot entity reservation
-        GOLD_ASSERT(memcmp(bot_a.entity_reserved_bitset, bot_b.entity_reserved_bitset, sizeof(bot_a.entity_reserved_bitset)));
+        GOLD_ASSERT(memcmp(bot_a.entity_reserved_bitset, bot_b.entity_reserved_bitset, sizeof(bot_a.entity_reserved_bitset)) == 0);
 
         GOLD_ASSERT(bot_a.unit_comp == bot_b.unit_comp);
         GOLD_ASSERT(memcmp(&bot_a.desired_buildings, &bot_b.desired_buildings, sizeof(EntityCount)) == 0);
@@ -526,6 +559,8 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
                 GOLD_ASSERT(memcmp(&base_info_a, &base_info_b, sizeof(BotBaseInfo)) == 0);
             }
         }
+
+        GOLD_ASSERT(memcmp(&bot_a, &bot_b, sizeof(MatchState)) == 0);
     }
 }
 
