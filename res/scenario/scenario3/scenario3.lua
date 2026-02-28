@@ -59,7 +59,6 @@ function scenario_init()
         })
         actions.camera_pan(scenario.constants.HALL_CELL1, 1.5)
         scenario.hold_camera()
-        scenario.play_sound(scenario.sound.UI_CLICK)
         scenario.chat("Those greedy prospectors are taking all the gold!")
         actions.wait(1.0)
         scenario.queue_match_input({
