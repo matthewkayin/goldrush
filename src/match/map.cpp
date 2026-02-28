@@ -988,9 +988,11 @@ void map_bake_ramps(Map& map, const Noise* noise) {
 
         Tile stair_min_tile = map_get_tile(map, stair_min);
         Direction stair_direction = map_get_tile_stair_direction(stair_min_tile);
+
+        // If the stair direction is bad, it means this stair is not placed properly on a wall
         if (stair_direction == DIRECTION_COUNT) {
-            log_error("stair direction is bad. stair min <%i, %i> tile sprite %u", stair_min.x, stair_min.y, stair_min_tile.sprite);
-            GOLD_ASSERT(false);
+            map.tiles[index].sprite = SPRITE_TILE_NULL;
+            continue;
         }
         map_bake_ramp(map, stair_direction, stair_min, stair_max);
 
