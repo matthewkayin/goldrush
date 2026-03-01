@@ -1423,6 +1423,7 @@ void editor_redo_action() {
 
 void editor_clear_actions() {
     state.actions.clear();
+    state.action_head = 0;
 }
 
 bool editor_tool_brush_should_paint() {
