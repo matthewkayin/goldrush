@@ -7,9 +7,11 @@ local ivec2 = require("ivec2")
 local OBJECTIVE_DEFEAT_BANDITS = "Destroy the Bandit's Base"
 
 local ENEMY_PLAYER_ID = 1
+local HARASS_INTERVAL = 2 * 60
 
 local is_match_over = false
-local has_sent_counterattack = false
+local should_harass = false
+local next_harass_time
 
 function scenario_init()
     actions.run(function ()
@@ -30,8 +32,6 @@ function scenario_init()
             end
         })
 
-        -- TODO: setup timer for harassment!
-
         actions.wait(15)
         scenario.hint("You can now build bunkers to defend your base.")
 
@@ -51,10 +51,8 @@ function scenario_init()
         scenario.create_alert(scenario.ALERT_COLOR_GOLD, goldmine.cell, 3)
         scenario.chat("Looks like there's an unclaimed gold mine out there.")
 
-        while not is_match_over do
-            actions.wait(2 * 60)
-            spawn_harass_squad()
-        end
+        should_harass = true
+        next_harass_time = scenario.get_time() + HARASS_INTERVAL
     end)
 end
 
@@ -71,45 +69,12 @@ function scenario_update()
         is_match_over = true
     end
 
-    -- Create counterattack the first time they move out on enemy
-    if not has_sent_counterattack and player_has_entity_near_counterattack_triggers() then
-        spawn_counterattack_squad()
-        has_sent_counterattack = true
+    if should_harass and scenario.get_time() >= next_harass_time then
+        spawn_harass_squad()
+        next_harass_time = next_harass_time + HARASS_INTERVAL
     end
 
     actions.update()
-end
-
-function player_has_entity_near_counterattack_triggers()
-    local entity_near_cell_id = entity_util.find_entity(function (entity)
-        return entity.player_id == scenario.PLAYER_ID and
-            (ivec2.manhattan_distance(entity.cell, scenario.constants.COUNTERATTACK_TRIGGER1) <= 4 or
-            ivec2.manhattan_distance(entity.cell, scenario.constants.COUNTERATTACK_TRIGGER2) <= 4 or
-            ivec2.manhattan_distance(entity.cell, scenario.constants.COUNTERATTACK_TRIGGER3) <= 4)
-    end)
-    return entity_near_cell_id ~= nil
-end
-
-function spawn_counterattack_squad()
-    local harass_spawn_roll = math.random(0, 1)
-    local harass_spawn_cell
-    if harass_spawn_roll == 0 then
-        harass_spawn_cell = scenario.constants.HARASS1_SPAWN1
-    else
-        harass_spawn_cell = scenario.constants.HARASS1_SPAWN2
-    end
-
-    squad_util.spawn_harass_squad({
-        player_id = ENEMY_PLAYER_ID,
-        spawn_cell = harass_spawn_cell,
-        target_cell = scenario.constants.HARASS1_TARGET,
-        entity_types = {
-            scenario.entity_type.BANDIT,
-            scenario.entity_type.BANDIT,
-            scenario.entity_type.COWBOY,
-            scenario.entity_type.COWBOY
-        }
-    })
 end
 
 function spawn_harass_squad()
