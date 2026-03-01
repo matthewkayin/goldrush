@@ -1,8 +1,6 @@
 local objectives = require("objectives")
 local actions = require("actions")
 local squad_util = require("squad_util")
-local entity_util = require("entity_util")
-local ivec2 = require("ivec2")
 
 local OBJECTIVE_DEFEAT_BANDITS = "Destroy the Bandit's Base"
 
