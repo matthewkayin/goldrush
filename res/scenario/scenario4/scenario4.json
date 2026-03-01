@@ -32785,44 +32785,29 @@
 	"players": [
 		{
 			"name": "Player",
+			"team": 0,
+			"recolor_id": 0,
 			"starting_gold": 400,
 			"allowed_upgrades": [
-				"Wagon Armor",
-				"Land Mines",
-				"Bayonets",
-				"Private Eye",
-				"Stakeout",
-				"Serrated Knives",
-				"Tailwind",
-				"Iron Sights"
+				"Land Mines"
 			],
 			"allowed_entities": [
-				"Gold Mine",
 				"Miner",
 				"Cowboy",
 				"Bandit",
-				"Wagon",
-				"Jockey",
-				"Sapper",
 				"Pyro",
-				"Soldier",
-				"Cannoneer",
-				"Detective",
-				"Balloon",
 				"Town Hall",
 				"House",
 				"Saloon",
 				"Bunker",
 				"Workshop",
-				"Blacksmith",
-				"Chicken Coop",
-				"Barracks",
-				"Sheriff's Office",
 				"Land Mine"
 			]
 		},
 		{
-			"name": "Enemy 1",
+			"name": "Rival Prospectors",
+			"team": 1,
+			"recolor_id": 1,
 			"starting_gold": 50,
 			"opener": "Tech First",
 			"preferred_unit_comp": "Cwby/Bndt",
@@ -32837,7 +32822,9 @@
 			]
 		},
 		{
-			"name": "Enemy 2",
+			"name": "Rival Prospectors",
+			"team": 1,
+			"recolor_id": 3,
 			"starting_gold": 50,
 			"opener": "Tech First",
 			"preferred_unit_comp": "Cwby/Bndt",
@@ -32853,6 +32840,8 @@
 		},
 		{
 			"name": "Enemy 3",
+			"team": 3,
+			"recolor_id": 3,
 			"starting_gold": 50,
 			"opener": "Tech First",
 			"preferred_unit_comp": "Cwby/Bndt",

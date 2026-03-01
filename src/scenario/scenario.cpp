@@ -256,6 +256,8 @@ bool scenario_save_file(const Scenario* scenario, const char* json_full_path, co
             // Base player properties
             Json* player_json = json_object();
             json_object_set_string(player_json, "name", scenario->players[index].name);
+            json_object_set_number(player_json, "team", scenario->players[index].team);
+            json_object_set_number(player_json, "recolor_id", scenario->players[index].recolor_id);
             json_object_set_number(player_json, "starting_gold", scenario->players[index].starting_gold);
 
             // Player config
@@ -467,6 +469,24 @@ Scenario* scenario_open_file(const char* json_path, std::string* script_short_pa
             Json* player_json = json_array_get(players_json, index);
             strncpy(scenario->players[index].name, json_object_get_string(player_json, "name"), MAX_USERNAME_LENGTH);
             scenario->players[index].starting_gold = (uint32_t)json_object_get_number(player_json, "starting_gold");
+
+            // Team
+            Json* player_team_json = json_object_get(player_json, "team");
+            if (player_team_json != NULL) {
+                scenario->players[index].team = (uint8_t)player_team_json->number.value;
+            } else {
+                log_warn("Scenario player index %u has no team. Using index as team.", index);
+                scenario->players[index].team = (uint8_t)index;
+            }
+
+            // Recolor ID
+            Json* player_recolor_id_json = json_object_get(player_json, "recolor_id");
+            if (player_recolor_id_json != NULL) {
+                scenario->players[index].recolor_id = (uint8_t)player_recolor_id_json->number.value;
+            } else {
+                log_warn("Scenario player index %u has no recolor_id. Using index as recolor_id.", index);
+                scenario->players[index].recolor_id = (uint8_t)index;
+            }
 
             // Player config
             if (index != 0) {

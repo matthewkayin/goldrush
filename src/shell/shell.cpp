@@ -306,8 +306,8 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
         strcpy(players[player_id].name, player_id == network_get_player_id()
             ? network_get_username()
             : scenario->players[player_id].name);
-        players[player_id].team = player_id;
-        players[player_id].recolor_id = player_id;
+        players[player_id].team = scenario->players[player_id].team;
+        players[player_id].recolor_id = scenario->players[player_id].recolor_id;
         players[player_id].gold = scenario->players[player_id].starting_gold;
         players[player_id].gold_mined_total = 0;
         players[player_id].upgrades = 0;

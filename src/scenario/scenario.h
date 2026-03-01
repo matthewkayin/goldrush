@@ -12,7 +12,10 @@
 #define SCENARIO_CONSTANT_NAME_BUFFER_LENGTH 32
 
 struct ScenarioPlayer {
-    char name[MAX_USERNAME_LENGTH + 1];
+    uint8_t team;
+    uint8_t recolor_id;
+    uint16_t padding = 0;
+    char name[MAX_USERNAME_LENGTH + 4];
     uint32_t starting_gold;
 };
 

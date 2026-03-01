@@ -84,6 +84,23 @@ void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorMenuMode&
 
             std::vector<std::function<void()>> scroll_items;
 
+            // Team
+            scroll_items.push_back([&menu, &ui, scenario]() {
+                uint32_t selected_value = scenario->players[menu.selected_player_id].team;
+                if (editor_menu_dropdown(ui, "Team: ", &selected_value, { "1", "2", "3", "4" }, MENU_RECT)) {
+                    scenario->players[menu.selected_player_id].team = (uint8_t)selected_value;
+                }
+            });
+
+            // Recolor ID
+            scroll_items.push_back([&menu, &ui, scenario]() {
+                const std::vector<std::string> PLAYER_COLOR_STRS = { "Blue", "Red", "Green", "Purple" };
+                uint32_t selected_value = scenario->players[menu.selected_player_id].recolor_id;
+                if (editor_menu_dropdown(ui, "Team: ", &selected_value, PLAYER_COLOR_STRS, MENU_RECT)) {
+                    scenario->players[menu.selected_player_id].recolor_id = (uint8_t)selected_value;
+                }
+            });
+
             // Starting gold
             scroll_items.push_back([&menu, &ui, scenario]() {
                 editor_menu_slider(ui, "Starting Gold:", &scenario->players[menu.selected_player_id].starting_gold, STARTING_GOLD_SLIDER_PARAMS, MENU_RECT);

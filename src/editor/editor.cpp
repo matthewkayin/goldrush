@@ -221,9 +221,9 @@ void editor_save(const char* path);
 // Render
 ivec2 editor_entity_get_animation_frame(EntityType type);
 ivec2 editor_entity_get_render_position(EntityType type, ivec2 cell);
-RenderSpriteParams editor_create_entity_render_params(const ScenarioEntity& entity);
+RenderSpriteParams editor_create_entity_render_params(const Scenario* scenario, const ScenarioEntity& entity);
 MinimapPixel editor_get_minimap_pixel_for_cell(ivec2 cell);
-MinimapPixel editor_get_minimap_pixel_for_entity(const std::vector<uint32_t>& selection, uint32_t entity_index);
+MinimapPixel editor_get_minimap_pixel_for_entity(const Scenario* scenario, const std::vector<uint32_t>& selection, uint32_t entity_index);
 
 void editor_init(SDL_Window* window) {
     state.window = window;
@@ -2064,7 +2064,7 @@ void editor_render() {
                             continue;
                         }
 
-                        RenderSpriteParams params = editor_create_entity_render_params(entity);
+                        RenderSpriteParams params = editor_create_entity_render_params(state.scenario, entity);
                         render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
                     }
                 }
@@ -2085,7 +2085,7 @@ void editor_render() {
                 continue;
             }
 
-            RenderSpriteParams params = editor_create_entity_render_params(entity);
+            RenderSpriteParams params = editor_create_entity_render_params(state.scenario, entity);
             const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_data(entity.type).sprite);
             const Rect render_rect = (Rect) {
                 .x = params.position.x, .y = params.position.y,
@@ -2132,7 +2132,7 @@ void editor_render() {
                 continue;
             }
 
-            RenderSpriteParams params = editor_create_entity_render_params(entity);
+            RenderSpriteParams params = editor_create_entity_render_params(state.scenario, entity);
             const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_data(entity.type).sprite);
             const Rect render_rect = (Rect) {
                 .x = params.position.x, .y = params.position.y,
@@ -2418,7 +2418,7 @@ void editor_render() {
                 .x = entity.cell.x, .y = entity.cell.y,
                 .w = entity_cell_size, .h = entity_cell_size
             };
-            render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, editor_get_minimap_pixel_for_entity(selection, entity_index));
+            render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, editor_get_minimap_pixel_for_entity(state.scenario, selection, entity_index));
         }
         // Clear fog layer
         for (int y = 0; y < state.scenario->map.height; y++) {
@@ -2474,7 +2474,7 @@ ivec2 editor_entity_get_render_position(EntityType type, ivec2 cell) {
         state.camera_offset;
 }
 
-RenderSpriteParams editor_create_entity_render_params(const ScenarioEntity& entity) {
+RenderSpriteParams editor_create_entity_render_params(const Scenario* scenario, const ScenarioEntity& entity) {
     ivec2 params_position = editor_entity_get_render_position(entity.type, entity.cell);
     RenderSpriteParams params = (RenderSpriteParams) {
         .sprite = entity_get_data(entity.type).sprite,
@@ -2482,7 +2482,7 @@ RenderSpriteParams editor_create_entity_render_params(const ScenarioEntity& enti
         .position = params_position,
         .ysort_position = params_position.y,
         .options = 0,
-        .recolor_id = entity.type == ENTITY_GOLDMINE ? 0 : entity.player_id
+        .recolor_id = entity.type == ENTITY_GOLDMINE ? 0 : scenario->players[entity.player_id].recolor_id
     };
     
     const SpriteInfo& sprite_info = render_get_sprite_info(params.sprite);
@@ -2514,7 +2514,7 @@ MinimapPixel editor_get_minimap_pixel_for_cell(ivec2 cell) {
     }
 }
 
-MinimapPixel editor_get_minimap_pixel_for_entity(const std::vector<uint32_t>& selection, uint32_t entity_index) {
+MinimapPixel editor_get_minimap_pixel_for_entity(const Scenario* scenario, const std::vector<uint32_t>& selection, uint32_t entity_index) {
     for (uint32_t index : selection) {
         if (entity_index == index) {
             return MINIMAP_PIXEL_WHITE;
@@ -2525,7 +2525,7 @@ MinimapPixel editor_get_minimap_pixel_for_entity(const std::vector<uint32_t>& se
     if (entity.type == ENTITY_GOLDMINE) {
         return MINIMAP_PIXEL_GOLD;
     }
-    return (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + entity.player_id);
+    return (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + scenario->players[entity.player_id].recolor_id);
 }
 
 #endif
