@@ -106,6 +106,7 @@ struct Objective {
 enum GlobalObjectiveCounterType {
     GLOBAL_OBJECTIVE_COUNTER_OFF,
     GLOBAL_OBJECTIVE_COUNTER_GOLD,
+    GLOBAL_OBJECTIVE_COUNTER_COUNTDOWN,
     GLOBAL_OBJECTIVE_COUNTER_TYPE_COUNT
 };
 
@@ -114,10 +115,15 @@ struct GlobalObjectiveCounterGold {
     uint32_t max_value;
 };
 
+struct GlobalObjectiveCounterCountdown {
+    uint32_t end_frame;
+};
+
 struct GlobalObjectiveCounter {
     GlobalObjectiveCounterType type;
     union {
         GlobalObjectiveCounterGold gold;
+        GlobalObjectiveCounterCountdown countdown;
     };
 };
 

@@ -79,6 +79,7 @@ scenario.target_type.ATTACK_CELL = 3
 
 scenario.CHAT_COLOR_WHITE = 0
 scenario.global_objective_counter_type = {}
+scenario.global_objective_counter_type.COUNTDOWN = 2
 scenario.global_objective_counter_type.OFF = 0
 scenario.global_objective_counter_type.GOLD = 1
 

@@ -552,6 +552,8 @@ const char* match_shell_script_get_global_objective_counter_type_str(GlobalObjec
             return "OFF";
         case GLOBAL_OBJECTIVE_COUNTER_GOLD:
             return "GOLD";
+        case GLOBAL_OBJECTIVE_COUNTER_COUNTDOWN:
+            return "COUNTDOWN";
         case GLOBAL_OBJECTIVE_COUNTER_TYPE_COUNT:
             GOLD_ASSERT(false);
             return "";
@@ -1367,6 +1369,10 @@ static int script_set_global_objective_counter(lua_State* lua_state) {
         case GLOBAL_OBJECTIVE_COUNTER_GOLD: {
             memset(&counter.gold, 0, sizeof(counter.gold));
             counter.gold.max_value = max_value;
+            break;
+        }
+        case GLOBAL_OBJECTIVE_COUNTER_COUNTDOWN: {
+            counter.countdown.end_frame = max_value * UPDATES_PER_SECOND;
             break;
         }
         case GLOBAL_OBJECTIVE_COUNTER_OFF:

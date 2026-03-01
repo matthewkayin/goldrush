@@ -4275,6 +4275,24 @@ void match_shell_render(const MatchShellState* state) {
 
                     objectives_text_pos.y += checkbox_sprite_info.frame_height + 4;
                 }
+            } else if (state->scenario_global_objective_counter.type == GLOBAL_OBJECTIVE_COUNTER_COUNTDOWN) {
+                const uint32_t frames_remaining = state->match_timer < state->scenario_global_objective_counter.countdown.end_frame
+                    ? state->scenario_global_objective_counter.countdown.end_frame - state->match_timer
+                    : 0;
+                const uint32_t minutes_remaining = (frames_remaining / UPDATES_PER_SECOND) / 60;
+                const uint32_t seconds_remaining = (frames_remaining - (minutes_remaining * 60 * UPDATES_PER_SECOND)) / UPDATES_PER_SECOND;
+
+                char timer_text[64];
+                char* timer_text_ptr = timer_text;
+                timer_text_ptr += sprintf(timer_text_ptr, "Time Remaining: %u:", minutes_remaining);
+                if (seconds_remaining < 10) {
+                    timer_text_ptr += sprintf(timer_text_ptr, "0");
+                }
+                timer_text_ptr += sprintf(timer_text_ptr, "%u", seconds_remaining);
+
+                objectives_text_pos.x = 1;
+                render_text(FONT_HACK_SHADOW, timer_text, objectives_text_pos + ivec2(1, 1));
+                render_text(FONT_HACK_GOLD_SATURATED, timer_text, objectives_text_pos);
             }
         }
 
