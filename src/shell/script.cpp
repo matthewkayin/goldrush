@@ -44,6 +44,7 @@ static int script_set_match_over_defeat(lua_State* lua_state);
 static int script_is_player_defeated(lua_State* lua_state);
 static int script_get_player_gold(lua_State* lua_state);
 static int script_get_player_gold_mined_total(lua_State* lua_state);
+static int script_grant_player_upgrade(lua_State* lua_state);
 static int script_get_player_entity_count(lua_State* lua_state);
 
 // Chat
@@ -107,6 +108,7 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "is_player_defeated", script_is_player_defeated },
     { "get_player_gold", script_get_player_gold },
     { "get_player_gold_mined_total", script_get_player_gold_mined_total },
+    { "grant_player_upgrade", script_grant_player_upgrade },
     { "get_player_entity_count", script_get_player_entity_count },
 
     // Chat
@@ -319,6 +321,19 @@ void match_shell_script_register_scenario_constants(lua_State* lua_state) {
         lua_setfield(lua_state, -2, match_shell_script_get_target_type_str((TargetType)target_type));
     }
     lua_setfield(lua_state, -2, "target_type");
+
+    // Upgrades
+    lua_createtable(lua_state, 0, UPGRADE_COUNT);
+    for (uint32_t upgrade_index = 0; upgrade_index < UPGRADE_COUNT; upgrade_index++) {
+        uint32_t upgrade = 1U << upgrade_index;
+
+        char const_name[64];
+        strcpy_to_upper(const_name, upgrade_get_data(upgrade).name);
+
+        lua_pushnumber(lua_state, upgrade);
+        lua_setfield(lua_state, -2, const_name);
+    }
+    lua_setfield(lua_state, -2, "upgrade");
 
     // Sound constants
     lua_createtable(lua_state, 0, SOUND_COUNT);
@@ -1025,6 +1040,37 @@ static int script_get_player_gold_mined_total(lua_State* lua_state) {
     lua_pushnumber(lua_state, state->match_state.players[player_id].gold_mined_total);
 
     return 1;
+}
+
+// Grants the player the specified upgrade
+// @param player_id number
+// @param upgrade number
+static int script_grant_player_upgrade(lua_State* lua_state) {
+    static int arg_types[] = { LUA_TNUMBER, LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 2);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+
+    uint8_t player_id = (uint8_t)lua_tonumber(lua_state, 1);
+    script_validate_player_id(lua_state, state, player_id);
+
+    uint32_t upgrade = (uint32_t)lua_tonumber(lua_state, 2);
+
+    // Validate upgrade type is a real upgrade
+    uint32_t upgrade_index;
+    for (upgrade_index = 0; upgrade_index < UPGRADE_COUNT; upgrade_index++) {
+        uint32_t matching_upgrade = 1U << upgrade_index;
+        if (matching_upgrade == upgrade) {
+            break;
+        }
+    }
+    if (upgrade_index == UPGRADE_COUNT) {
+        script_error(lua_state, "Invalid upgrade type %u", upgrade);
+    }
+
+    match_grant_player_upgrade(state->match_state, player_id, upgrade);
+
+    return 0;
 }
 
 // CHAT

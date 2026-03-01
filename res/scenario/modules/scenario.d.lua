@@ -13,6 +13,16 @@ scenario.CHAT_COLOR_GOLD = 1
 scenario.CHAT_COLOR_BLUE = 1
 scenario.ALERT_COLOR_GOLD = 1
 scenario.CAMERA_MODE_PAN = 2
+scenario.upgrade = {}
+scenario.upgrade.BAYONETS = 4
+scenario.upgrade.TAILWIND = 64
+scenario.upgrade.SERRATED_KNIVES = 32
+scenario.upgrade.PRIVATE_EYE = 8
+scenario.upgrade.STAKEOUT = 16
+scenario.upgrade.IRON_SIGHTS = 128
+scenario.upgrade.LAND_MINES = 2
+scenario.upgrade.WAGON_ARMOR = 1
+
 scenario.entity_mode = {}
 scenario.entity_mode.UNIT_MOVE_FINISHED = 3
 scenario.entity_mode.UNIT_SOLDIER_RANGED_ATTACK_WINDUP = 8
@@ -204,6 +214,11 @@ function scenario.get_player_gold(player_id) end
 --- @param player_id number
 --- @return number
 function scenario.get_player_gold_mined_total(player_id) end
+
+--- Grants the player the specified upgrade
+--- @param player_id number
+--- @param upgrade number
+function scenario.grant_player_upgrade(player_id, upgrade) end
 
 --- Returns the number of entities controlled by the player of a given type.
 --- @param player_id number
