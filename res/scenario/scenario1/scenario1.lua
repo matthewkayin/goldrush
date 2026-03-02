@@ -5,8 +5,8 @@ local entity_util = require("entity_util")
 
 local OBJECTIVE_FIND_GOLDMINE = "Find a Gold Mine"
 local OBJECTIVE_BUILD_HALL = "Build a Town Hall"
-local OBJECTIVE_ESTABLISH_BASE = "Establish a Base"
-local OBJECTIVE_DEFEAT_BANDITS = "Destroy the Bandit's Base"
+local OBJECTIVE_ESTABLISH_BASE = "Establish a base"
+local OBJECTIVE_DEFEAT_BANDITS = "Destroy the bandit's base"
 
 local ENEMY_BANDITS_PLAYER_ID = 1
 

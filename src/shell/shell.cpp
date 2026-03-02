@@ -4290,7 +4290,7 @@ void match_shell_render(const MatchShellState* state) {
                 }
                 timer_text_ptr += sprintf(timer_text_ptr, "%u", seconds_remaining);
 
-                objectives_text_pos.x = 1;
+                // objectives_text_pos.x = 1;
                 render_text(FONT_HACK_SHADOW, timer_text, objectives_text_pos + ivec2(1, 1));
                 render_text(FONT_HACK_GOLD_SATURATED, timer_text, objectives_text_pos);
             }

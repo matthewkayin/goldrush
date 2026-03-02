@@ -5,7 +5,6 @@
 #include "core/filesystem.h"
 #include "core/options.h"
 #include <SDL3/SDL.h>
-#include <vector>
 #include <unordered_map>
 #include <cstdlib>
 #include <cstdio>
@@ -178,7 +177,8 @@ struct SoundVoice {
 struct SoundState {
     SDL_AudioStream* audio_stream;
 
-    std::vector<SoundData> sounds;
+    SoundData* sounds;
+    int sound_count;
     int sound_index[SOUND_COUNT];
 
     SoundVoice voices[SOUND_VOICE_COUNT];
@@ -239,10 +239,21 @@ bool sound_init() {
         return false;
     }
 
+    // Determine number of sounds
+    state.sound_count = 0;
+    for (int sound = 0; sound < SOUND_COUNT; sound++) {
+        const SoundParams& params = SOUND_PARAMS.at((SoundName)sound);
+        state.sound_count += params.variants;
+    }
+
+    // Init sounds buffer
+    state.sounds = (SoundData*)malloc(state.sound_count * sizeof(SoundData));
+    int sounds_size = 0;
+
     // Load sound data
     for (int sound = 0; sound < SOUND_COUNT; sound++) {
         const SoundParams& params = SOUND_PARAMS.at((SoundName)sound);
-        state.sound_index[sound] = (int)state.sounds.size();
+        state.sound_index[sound] = sounds_size;
 
         for (int variant = 0; variant < params.variants; variant++) {
             // Determine sound full path
@@ -269,7 +280,8 @@ bool sound_init() {
             SoundData sound_variant;
             sound_variant.samples = (float*)converted_data;
             sound_variant.frame_count = converted_length / (SOUND_AUDIO_CHANNEL_COUNT * (sizeof(float)));
-            state.sounds.push_back(sound_variant);
+            state.sounds[sounds_size] = sound_variant;
+            sounds_size++;
         } // End for each variant
     } // End for each sound
 
@@ -291,9 +303,10 @@ void sound_quit() {
     SDL_DestroyAudioStream(state.audio_stream);
 
     // Free all sound data
-    for (SoundData sound_data : state.sounds) {
-        SDL_free(sound_data.samples);
+    for (int index = 0; index < state.sound_count; index++) {
+        SDL_free(state.sounds[index].samples);
     }
+    free(state.sounds);
 
     log_info("Quit sound.");
 }

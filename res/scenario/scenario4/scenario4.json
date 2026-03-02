@@ -5092,7 +5092,7 @@
 			2,
 			2,
 			1,
-			2,
+			1,
 			2,
 			2,
 			2,
@@ -32777,7 +32777,449 @@
 			0
 		]
 	},
-	"decorations": [],
+	"decorations": [
+		{
+			"hframe": 0,
+			"cell": {
+				"x": 71,
+				"y": 0
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 59,
+				"y": 5
+			}
+		},
+		{
+			"hframe": 1,
+			"cell": {
+				"x": 35,
+				"y": 6
+			}
+		},
+		{
+			"hframe": 1,
+			"cell": {
+				"x": 101,
+				"y": 6
+			}
+		},
+		{
+			"hframe": 4,
+			"cell": {
+				"x": 116,
+				"y": 11
+			}
+		},
+		{
+			"hframe": 0,
+			"cell": {
+				"x": 12,
+				"y": 12
+			}
+		},
+		{
+			"hframe": 1,
+			"cell": {
+				"x": 45,
+				"y": 13
+			}
+		},
+		{
+			"hframe": 2,
+			"cell": {
+				"x": 69,
+				"y": 15
+			}
+		},
+		{
+			"hframe": 4,
+			"cell": {
+				"x": 26,
+				"y": 19
+			}
+		},
+		{
+			"hframe": 2,
+			"cell": {
+				"x": 57,
+				"y": 21
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 99,
+				"y": 22
+			}
+		},
+		{
+			"hframe": 4,
+			"cell": {
+				"x": 126,
+				"y": 22
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 83,
+				"y": 24
+			}
+		},
+		{
+			"hframe": 4,
+			"cell": {
+				"x": 43,
+				"y": 29
+			}
+		},
+		{
+			"hframe": 0,
+			"cell": {
+				"x": 65,
+				"y": 29
+			}
+		},
+		{
+			"hframe": 1,
+			"cell": {
+				"x": 28,
+				"y": 35
+			}
+		},
+		{
+			"hframe": 1,
+			"cell": {
+				"x": 104,
+				"y": 35
+			}
+		},
+		{
+			"hframe": 4,
+			"cell": {
+				"x": 54,
+				"y": 37
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 89,
+				"y": 39
+			}
+		},
+		{
+			"hframe": 1,
+			"cell": {
+				"x": 14,
+				"y": 40
+			}
+		},
+		{
+			"hframe": 4,
+			"cell": {
+				"x": 124,
+				"y": 41
+			}
+		},
+		{
+			"hframe": 2,
+			"cell": {
+				"x": 39,
+				"y": 43
+			}
+		},
+		{
+			"hframe": 4,
+			"cell": {
+				"x": 0,
+				"y": 47
+			}
+		},
+		{
+			"hframe": 2,
+			"cell": {
+				"x": 112,
+				"y": 47
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 96,
+				"y": 49
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 80,
+				"y": 50
+			}
+		},
+		{
+			"hframe": 0,
+			"cell": {
+				"x": 25,
+				"y": 51
+			}
+		},
+		{
+			"hframe": 1,
+			"cell": {
+				"x": 9,
+				"y": 56
+			}
+		},
+		{
+			"hframe": 1,
+			"cell": {
+				"x": 126,
+				"y": 57
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 105,
+				"y": 61
+			}
+		},
+		{
+			"hframe": 0,
+			"cell": {
+				"x": 72,
+				"y": 64
+			}
+		},
+		{
+			"hframe": 0,
+			"cell": {
+				"x": 21,
+				"y": 66
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 37,
+				"y": 69
+			}
+		},
+		{
+			"hframe": 1,
+			"cell": {
+				"x": 1,
+				"y": 70
+			}
+		},
+		{
+			"hframe": 2,
+			"cell": {
+				"x": 117,
+				"y": 70
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 58,
+				"y": 71
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 93,
+				"y": 71
+			}
+		},
+		{
+			"hframe": 0,
+			"cell": {
+				"x": 79,
+				"y": 78
+			}
+		},
+		{
+			"hframe": 0,
+			"cell": {
+				"x": 104,
+				"y": 79
+			}
+		},
+		{
+			"hframe": 1,
+			"cell": {
+				"x": 28,
+				"y": 80
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 52,
+				"y": 82
+			}
+		},
+		{
+			"hframe": 1,
+			"cell": {
+				"x": 67,
+				"y": 88
+			}
+		},
+		{
+			"hframe": 4,
+			"cell": {
+				"x": 94,
+				"y": 91
+			}
+		},
+		{
+			"hframe": 2,
+			"cell": {
+				"x": 39,
+				"y": 93
+			}
+		},
+		{
+			"hframe": 4,
+			"cell": {
+				"x": 24,
+				"y": 95
+			}
+		},
+		{
+			"hframe": 0,
+			"cell": {
+				"x": 54,
+				"y": 97
+			}
+		},
+		{
+			"hframe": 2,
+			"cell": {
+				"x": 109,
+				"y": 97
+			}
+		},
+		{
+			"hframe": 2,
+			"cell": {
+				"x": 125,
+				"y": 98
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 79,
+				"y": 100
+			}
+		},
+		{
+			"hframe": 1,
+			"cell": {
+				"x": 12,
+				"y": 105
+			}
+		},
+		{
+			"hframe": 0,
+			"cell": {
+				"x": 63,
+				"y": 106
+			}
+		},
+		{
+			"hframe": 0,
+			"cell": {
+				"x": 32,
+				"y": 107
+			}
+		},
+		{
+			"hframe": 4,
+			"cell": {
+				"x": 101,
+				"y": 111
+			}
+		},
+		{
+			"hframe": 4,
+			"cell": {
+				"x": 121,
+				"y": 113
+			}
+		},
+		{
+			"hframe": 0,
+			"cell": {
+				"x": 19,
+				"y": 116
+			}
+		},
+		{
+			"hframe": 2,
+			"cell": {
+				"x": 3,
+				"y": 118
+			}
+		},
+		{
+			"hframe": 4,
+			"cell": {
+				"x": 43,
+				"y": 118
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 73,
+				"y": 118
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 89,
+				"y": 121
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 58,
+				"y": 124
+			}
+		},
+		{
+			"hframe": 0,
+			"cell": {
+				"x": 108,
+				"y": 125
+			}
+		},
+		{
+			"hframe": 2,
+			"cell": {
+				"x": 30,
+				"y": 127
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 124,
+				"y": 127
+			}
+		}
+	],
 	"player_spawn": {
 		"x": 68,
 		"y": 56
@@ -34191,5 +34633,66 @@
 			]
 		}
 	],
-	"constants": []
+	"constants": [
+		{
+			"name": "SPAWN_NE",
+			"type": "Cell",
+			"cell": {
+				"x": 100,
+				"y": 16
+			}
+		},
+		{
+			"name": "SPAWN_NW",
+			"type": "Cell",
+			"cell": {
+				"x": 25,
+				"y": 32
+			}
+		},
+		{
+			"name": "SPAWN_SE",
+			"type": "Cell",
+			"cell": {
+				"x": 99,
+				"y": 111
+			}
+		},
+		{
+			"name": "SPAWN_SW",
+			"type": "Cell",
+			"cell": {
+				"x": 19,
+				"y": 105
+			}
+		},
+		{
+			"name": "TARGET",
+			"type": "Cell",
+			"cell": {
+				"x": 58,
+				"y": 60
+			}
+		},
+		{
+			"name": "HALL_NE",
+			"type": "Entity",
+			"entity_index": 3
+		},
+		{
+			"name": "HALL_SE",
+			"type": "Entity",
+			"entity_index": 27
+		},
+		{
+			"name": "HALL_SW",
+			"type": "Entity",
+			"entity_index": 11
+		},
+		{
+			"name": "HALL_NW",
+			"type": "Entity",
+			"entity_index": 34
+		}
+	]
 }

@@ -2,7 +2,7 @@ local objectives = require("objectives")
 local actions = require("actions")
 local squad_util = require("squad_util")
 
-local OBJECTIVE_DEFEAT_BANDITS = "Destroy the Bandit's Base"
+local OBJECTIVE_DEFEAT_BANDITS = "Destroy the bandit's base"
 
 local ENEMY_PLAYER_ID = 1
 local HARASS_INTERVAL = 2 * 60

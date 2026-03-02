@@ -3,7 +3,7 @@ local objectives = require("objectives")
 local squad_util = require("squad_util")
 local entity_util = require("entity_util")
 
-local OBJECTIVE_MINE_GOLD = "Mine 5000 Gold before your Opponent"
+local OBJECTIVE_MINE_GOLD = "Mine 5000 gold before your opponent"
 
 local ENEMY_PLAYER_ID = 1
 
@@ -97,7 +97,7 @@ function scenario_init()
         objectives.announce_new_objective(OBJECTIVE_MINE_GOLD)
         objectives.add_objective({
             objective = {
-                description = "Mine 5000 Gold",
+                description = "Mine 5000 gold",
             },
             complete_fn = function ()
                 return scenario.get_player_gold_mined_total(scenario.PLAYER_ID) >= TARGET_GOLD_COUNT
