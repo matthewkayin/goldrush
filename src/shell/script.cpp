@@ -397,6 +397,10 @@ void match_shell_script_update(MatchShellState* state) {
 }
 
 void match_shell_script_call(MatchShellState* state, const char* func_name) {
+#ifdef GOLD_DEBUG
+    int stack_size_before = lua_gettop(state->scenario_lua_state);
+#endif
+
     lua_getglobal(state->scenario_lua_state, "debug");
     lua_getfield(state->scenario_lua_state, -1, "traceback");
     lua_remove(state->scenario_lua_state, -2);
@@ -423,6 +427,13 @@ void match_shell_script_call(MatchShellState* state, const char* func_name) {
         log_error("%s", error_str);
         match_shell_leave_match(state, false);
     }
+    // Remove traceback from stack
+    lua_pop(state->scenario_lua_state, 1);
+
+#ifdef GOLD_DEBUG
+    int stack_size_after = lua_gettop(state->scenario_lua_state);
+    GOLD_ASSERT(stack_size_before == stack_size_after);
+#endif
 }
 
 const char* match_shell_script_get_entity_type_str(EntityType type) {

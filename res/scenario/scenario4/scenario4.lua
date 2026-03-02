@@ -33,6 +33,15 @@ local SPAWN_INFO = {
     }
 }
 
+local wave_index = 1
+local next_wave_spawn_time = nil
+local WAVE_LEVELS = {
+    1, 1, 2, 1, 2,
+    2, 3, 1, 2, 3,
+    1, 2, 2, 3, 4,
+    1, 1, 5, 2, 3
+}
+
 function scenario_init()
     actions.run(function ()
         actions.wait(1)
@@ -55,16 +64,25 @@ function scenario_init()
         actions.wait(15)
         scenario.hint("You can now hire Pyros from the Workshop.")
 
-        spawn_wave(1)
+        next_wave_spawn_time = scenario.get_time() + 60
     end)
 end
 
 function scenario_update()
     objectives.update()
 
-    if scenario.are_objectives_complete() then
-        objectives.announce_objectives_complete()
-        scenario.set_match_over_victory()
+    if next_wave_spawn_time ~= nil and scenario.are_objectives_complete() then
+        actions.run(function()
+            objectives.announce_objectives_complete()
+            scenario.set_match_over_victory()
+        end)
+        next_wave_spawn_time = nil
+    end
+
+    if next_wave_spawn_time ~= nil and scenario.get_time() >= next_wave_spawn_time then
+        spawn_wave(WAVE_LEVELS[wave_index])
+        wave_index = wave_index + 1
+        next_wave_spawn_time = next_wave_spawn_time + 60
     end
 
     actions.update()

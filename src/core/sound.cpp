@@ -280,6 +280,7 @@ bool sound_init() {
             SoundData sound_variant;
             sound_variant.samples = (float*)converted_data;
             sound_variant.frame_count = converted_length / (SOUND_AUDIO_CHANNEL_COUNT * (sizeof(float)));
+            log_debug("Sound %i variant %i frame count %i", sound, variant, sound_variant.frame_count);
             state.sounds[sounds_size] = sound_variant;
             sounds_size++;
         } // End for each variant
