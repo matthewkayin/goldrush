@@ -34,12 +34,14 @@ local SPAWN_INFO = {
 }
 
 local wave_index = 1
+local WAVE_INTERVAL = 90
 local next_wave_spawn_time = nil
 local WAVE_LEVELS = {
-    1, 1, 2, 1, 2,
-    2, 3, 1, 2, 3,
-    1, 2, 2, 3, 4,
-    1, 1, 5, 2, 3
+    1, 1, 2, 1,
+    2, 2, 3, 1,
+    2, 3, 3, 4,
+    2, 3, 4, 5,
+    5, 5
 }
 
 function scenario_init()
@@ -64,7 +66,7 @@ function scenario_init()
         actions.wait(15)
         scenario.hint("You can now hire Pyros from the Workshop.")
 
-        next_wave_spawn_time = scenario.get_time() + 60
+        next_wave_spawn_time = scenario.get_time() + WAVE_INTERVAL
     end)
 end
 
@@ -82,7 +84,7 @@ function scenario_update()
     if next_wave_spawn_time ~= nil and scenario.get_time() >= next_wave_spawn_time then
         spawn_wave(WAVE_LEVELS[wave_index])
         wave_index = wave_index + 1
-        next_wave_spawn_time = next_wave_spawn_time + 60
+        next_wave_spawn_time = next_wave_spawn_time + WAVE_INTERVAL
     end
 
     actions.update()
