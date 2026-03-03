@@ -876,6 +876,9 @@ void match_shell_update(MatchShellState* state) {
                 return;
             }
             for (EntityId incoming_id : selection) {
+                if (state->selection.size() == SELECTION_LIMIT) {
+                    break;
+                }
                 if (std::find(state->selection.begin(), state->selection.end(), incoming_id) == state->selection.end()) {
                     state->selection.push_back(incoming_id);
                 }
@@ -1937,6 +1940,9 @@ void match_shell_handle_input(MatchShellState* state) {
                 }
                 
                 for (EntityId entity_id : state->selection) {
+                    if (state->control_groups[control_group_index].size() == SELECTION_LIMIT) {
+                        break;
+                    }
                     if (std::find(state->control_groups[control_group_index].begin(), state->control_groups[control_group_index].end(), entity_id) 
                             == state->control_groups[control_group_index].end()) {
                         state->control_groups[control_group_index].push_back(entity_id);
