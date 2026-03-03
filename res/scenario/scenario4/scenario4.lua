@@ -37,11 +37,10 @@ local wave_index = 1
 local WAVE_INTERVAL = 90
 local next_wave_spawn_time = nil
 local WAVE_LEVELS = {
-    1, 1, 2, 1,
-    2, 2, 3, 1,
-    2, 3, 3, 4,
-    2, 3, 4, 5,
-    5, 5
+    1, 2, 1,
+    2, 3, 2,
+    3, 4, 3,
+    3, 4, 5, 5
 }
 
 function scenario_init()
@@ -82,6 +81,7 @@ function scenario_update()
     end
 
     if next_wave_spawn_time ~= nil and scenario.get_time() >= next_wave_spawn_time then
+        scenario.log("Spawning wave ", wave_index, " at time ", scenario.get_time())
         spawn_wave(WAVE_LEVELS[wave_index])
         wave_index = wave_index + 1
         next_wave_spawn_time = next_wave_spawn_time + WAVE_INTERVAL
@@ -96,14 +96,24 @@ function spawn_wave(level)
     }
     local UNITS_PER_SPAWN = UNITS_PER_SPAWN_AT_LEVEL[level]
 
-    local COWBOY_RATIO = 0.4
-    local BANDIT_RATIO = 0.8
+    scenario.log("spawn_wave at level", level, "units per spawn", UNITS_PER_SPAWN)
+
+    -- 50/50 cowboy bandit
+    -- On levels 3 and up, throw in 20% sapper
+    local COWBOY_RATIO
+    local BANDIT_RATIO
+    if level < 2 then
+        COWBOY_RATIO = 0.5
+        BANDIT_RATIO = 1.0
+    else
+        COWBOY_RATIO = 0.4
+        BANDIT_RATIO = 0.8
+    end
 
     local hall = {}
     for spawn_info_index=1,#SPAWN_INFO do
         -- Check that the hall is still alive
         local spawn_info = SPAWN_INFO[spawn_info_index]
-        scenario.log("SPAWN INFO index ", spawn_info_index, " table ", spawn_info)
         local hall_is_alive =
             scenario.get_entity_by_id(spawn_info.hall_id, hall) and
             hall.health ~= 0

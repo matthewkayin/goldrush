@@ -176,6 +176,7 @@ struct SoundVoice {
 
 struct SoundState {
     SDL_AudioStream* audio_stream;
+    SDL_Mutex* audio_mutex;
 
     SoundData* sounds;
     int sound_count;
@@ -190,6 +191,10 @@ static SoundState state;
 
 static void sound_sdl_audio_callback(void* /*user_data*/, SDL_AudioStream* stream, int additional_amount, int /*total_amount*/) {
     const int BYTES_PER_FRAME = SOUND_AUDIO_CHANNEL_COUNT * sizeof(float);
+
+    if (!SDL_TryLockMutex(state.audio_mutex)) {
+        return;
+    }
 
     int requested_frames = additional_amount / BYTES_PER_FRAME;
     float mix_buffer[SOUND_MIX_BUFFER_SIZE * SOUND_AUDIO_CHANNEL_COUNT];
@@ -224,6 +229,8 @@ static void sound_sdl_audio_callback(void* /*user_data*/, SDL_AudioStream* strea
     }
 
     SDL_PutAudioStreamData(stream, mix_buffer, requested_frames * BYTES_PER_FRAME);
+
+    SDL_UnlockMutex(state.audio_mutex);
 }
 
 bool sound_init() {
@@ -280,7 +287,6 @@ bool sound_init() {
             SoundData sound_variant;
             sound_variant.samples = (float*)converted_data;
             sound_variant.frame_count = converted_length / (SOUND_AUDIO_CHANNEL_COUNT * (sizeof(float)));
-            log_debug("Sound %i variant %i frame count %i", sound, variant, sound_variant.frame_count);
             state.sounds[sounds_size] = sound_variant;
             sounds_size++;
         } // End for each variant
@@ -290,6 +296,8 @@ bool sound_init() {
     SDL_AudioDeviceID audio_device = SDL_GetAudioStreamDevice(state.audio_stream);
     SDL_ResumeAudioDevice(audio_device);
 
+    state.audio_mutex = SDL_CreateMutex();
+
     option_apply(OPTION_SFX_VOLUME);
     option_apply(OPTION_MUSIC_VOLUME);
     log_info("Initialized sound system. Device: %s", SDL_GetAudioDeviceName(audio_device));
@@ -298,6 +306,8 @@ bool sound_init() {
 }
 
 void sound_quit() {
+    SDL_DestroyMutex(state.audio_mutex);
+
     SDL_PauseAudioStreamDevice(state.audio_stream);
 
     // Also closes the associated device
@@ -329,6 +339,8 @@ int sound_voice_frames_remaining(const SoundVoice* voice) {
 }
 
 uint32_t sound_play(SoundName sound, bool looping) { 
+    SDL_LockMutex(state.audio_mutex);
+
     uint32_t available_voice_index = SOUND_VOICE_COUNT;
     for (uint32_t voice_index = 0; voice_index < SOUND_VOICE_COUNT; voice_index++) {
         // Never interrupt a looping voice
@@ -360,6 +372,8 @@ uint32_t sound_play(SoundName sound, bool looping) {
         : rand() % SOUND_PARAMS.at(sound).variants;
     state.voices[available_voice_index].sound_index = state.sound_index[sound] + variant;
     state.voices[available_voice_index].frame = 0;
+
+    SDL_UnlockMutex(state.audio_mutex);
 
     return available_voice_index;
 }
