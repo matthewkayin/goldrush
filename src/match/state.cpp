@@ -3405,9 +3405,7 @@ void entity_explode(MatchState& state, EntityId entity_id) {
 
         Rect defender_rect = entity_get_rect(defender);
         if (explosion_rect.intersects(defender_rect)) {
-            int defender_armor = entity_get_armor(state, defender); 
-            int damage = std::max(1, explosion_damage - defender_armor);
-            defender.health = std::max(defender.health - damage, 0);
+            defender.health = std::max(defender.health - explosion_damage, 0);
             entity_on_attack(state, entity_id, defender);
         }
     }
