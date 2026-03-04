@@ -76,7 +76,7 @@ static int script_get_entity_by_index(lua_State* lua_state);
 static int script_get_entity_count(lua_State* lua_state);
 static int script_get_entity_id_of(lua_State* lua_state);
 static int script_get_entity_gold_cost(lua_State* lua_state);
-static int script_find_entity_spawn_cell(lua_State* lua_state);
+static int script_find_entity_spawn_cells(lua_State* lua_state);
 static int script_create_entity(lua_State* lua_state);
 static int script_get_hall_surrounding_goldmine(lua_State* lua_state);
 
@@ -140,7 +140,7 @@ static const luaL_reg GOLD_FUNCS[] = {
     { "get_entity_count", script_get_entity_count },
     { "get_entity_id_of", script_get_entity_id_of },
     { "get_entity_gold_cost", script_get_entity_gold_cost },
-    { "find_entity_spawn_cell", script_find_entity_spawn_cell },
+    { "find_entity_spawn_cells", script_find_entity_spawn_cells },
     { "create_entity", script_create_entity },
     { "get_hall_surrounding_goldmine", script_get_hall_surrounding_goldmine },
 
@@ -1638,29 +1638,45 @@ static int script_get_entity_gold_cost(lua_State* lua_state) {
     return 1;
 }
 
-// Finds an empty cell for the specified entity to spawn in. The manhattan distance of the cell to the provided spawn_cell will be less than 16
+// Finds an empty cell for the specified entities to spawn in. The manhattan distance of the cell to the provided spawn_cell will be less than 16
 //
-// If no cell is found, returns nil, but this should be rare.
-// @param entity_type number
+// Accepts a table of entity types and returns a parallel table where each entry in the result is either an ivec2 or nil if no spawn location could be found
 // @param spawn_cell ivec2
-// @return ivec2|nil
-static int script_find_entity_spawn_cell(lua_State* lua_state) {
-    const int arg_types[] = { LUA_TNUMBER, LUA_TTABLE };
+// @param entity_types table
+// @return table
+static int script_find_entity_spawn_cells(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TTABLE, LUA_TTABLE };
     script_validate_arguments(lua_state, arg_types, 2);
 
-    // Entity type
-    int entity_type = lua_tonumber(lua_state, 1);
-    script_validate_entity_type(lua_state, entity_type);
-
     // Spawn cell
-    ivec2 spawn_cell = script_lua_to_ivec2(lua_state, 2, "spawn_cell");
+    ivec2 spawn_cell = script_lua_to_ivec2(lua_state, 1, "spawn_cell");
 
-    const EntityData& entity_data = entity_get_data((EntityType)entity_type);
+    // Entity type
+    std::vector<EntityType> entity_types;
+    lua_pushnil(lua_state);
+    while (lua_next(lua_state, -2)) {
+        script_validate_type(lua_state, -1, "entity_type", LUA_TNUMBER);
+        int entity_type = (int)lua_tonumber(lua_state, 1);
+        script_validate_entity_type(lua_state, entity_type);
+        entity_types.push_back((EntityType)entity_type);
+        lua_pop(lua_state, 1);
+    }
+    lua_pop(lua_state, 1);
+
+    if (entity_types.empty()) {
+        script_error(lua_state, "No entity_types were provided.");
+    }
+
     const MatchShellState* state = script_get_match_shell_state(lua_state);
 
     std::vector<ivec2> frontier;
     std::vector<bool> explored = std::vector<bool>(state->match_state.map.width * state->match_state.map.height, false);
-    ivec2 result = ivec2(-1, -1);
+
+    std::vector<ivec2> results = std::vector<ivec2>(entity_types.size(), ivec2(-1, -1));
+    size_t result_index = 0;
+    const EntityData& first_entity_data = entity_get_data(entity_types[result_index]);
+    CellLayer entity_cell_layer = first_entity_data.cell_layer;
+    int entity_cell_size = first_entity_data.cell_size;
 
     frontier.push_back(spawn_cell);
 
@@ -1676,16 +1692,27 @@ static int script_find_entity_spawn_cell(lua_State* lua_state) {
         frontier[nearest_index] = frontier.back();
         frontier.pop_back();
 
-        if (!map_is_cell_rect_occupied(state->match_state.map, entity_data.cell_layer, next, entity_data.cell_size)) {
-            result = next;
-            break;
-        }
-
         explored[next.x + (next.y * state->match_state.map.width)] = true;
+
+        if (!map_is_cell_rect_occupied(state->match_state.map, entity_cell_layer, next, entity_cell_size)) {
+            // Store result
+            results[result_index] = next;
+            result_index++;
+
+            // End the loop if that was the last entity type
+            if (result_index == entity_types.size()) {
+                break;
+            }
+
+            // Otherwise, set the cell layer and size
+            const EntityData& entity_data = entity_get_data(entity_types[result_index]);
+            entity_cell_layer = entity_data.cell_layer;
+            entity_cell_size = entity_data.cell_size;
+        }
 
         for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
             ivec2 child = next + DIRECTION_IVEC2[direction];
-            if (!map_is_cell_rect_in_bounds(state->match_state.map, child, entity_data.cell_size)) {
+            if (!map_is_cell_rect_in_bounds(state->match_state.map, child, entity_cell_size)) {
                 continue;
             }
             if (explored[child.x + (child.y * state->match_state.map.width)]) {
@@ -1708,11 +1735,22 @@ static int script_find_entity_spawn_cell(lua_State* lua_state) {
         }
     }
 
-    if (result.x == -1) {
-        log_warn("No entity spawn cell was found for entity type %u spawn_cell <%i, %i>", entity_type, spawn_cell.x, spawn_cell.y);
-        lua_pushnil(lua_state);
-    } else {
-        script_lua_push_ivec2(lua_state, result);
+    // Create the result table
+    uint32_t number_of_nil_results = 0;
+    lua_createtable(lua_state, (int)results.size(), 0);
+    for (int index = 0; index < (int)results.size(); index++) {
+        if (results[index].x == -1) {
+            lua_pushnil(lua_state);
+            number_of_nil_results++;
+        } else {
+            script_lua_push_ivec2(lua_state, results[index]);
+        }
+
+        lua_rawseti(lua_state, -2, index + 1);
+    }
+
+    if (number_of_nil_results != 0) {
+        log_warn("script_find_entity_spawn_cells - %u results were nil. spawn_cell <%i, %i>", number_of_nil_results, spawn_cell.x, spawn_cell.y);
     }
 
     return 1;
@@ -1809,7 +1847,7 @@ static int script_bot_add_squad(lua_State* lua_state) {
     EntityList entity_list;
     lua_pushnil(lua_state);
     while (lua_next(lua_state, -2)) {
-        script_validate_type(lua_state, -1, "entities.element", LUA_TNUMBER);
+        script_validate_type(lua_state, -1, "entity_list", LUA_TNUMBER);
         EntityId entity_id = (EntityId)lua_tonumber(lua_state, -1);
         if (entity_id == ID_NULL) {
             log_warn("bot_add_squad: provided entity_id is ID_NULL.");

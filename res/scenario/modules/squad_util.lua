@@ -4,12 +4,14 @@ local squad_util = {}
 ---@return number
 function squad_util.spawn_harass_squad(params)
     local entity_ids = {}
-    for i,entity_type in ipairs(params.entity_types) do
-        local entity_cell = scenario.find_entity_spawn_cell(entity_type, params.spawn_cell)
-        if not entity_cell then
+
+    local entity_cells = scenario.find_entity_spawn_cells(params.spawn_cell, params.entity_types)
+    for index=1,#params.entity_types do
+        if entity_cells[index] == nil then
             break
         end
-        local entity_id = scenario.create_entity(entity_type, entity_cell, params.player_id)
+
+        local entity_id = scenario.create_entity(params.entity_types[index], entity_cells[index], params.player_id)
         table.insert(entity_ids, entity_id)
     end
 

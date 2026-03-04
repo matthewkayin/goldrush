@@ -332,11 +332,11 @@ function scenario.get_entity_id_of(entity_index) end
 --- @return number
 function scenario.get_entity_gold_cost(entity_type) end
 
---- If no cell is found, returns nil, but this should be rare.
---- @param entity_type number
+--- Accepts a table of entity types and returns a parallel table where each entry in the result is either an ivec2 or nil if no spawn location could be found
 --- @param spawn_cell ivec2
---- @return ivec2|nil
-function scenario.find_entity_spawn_cell(entity_type, spawn_cell) end
+--- @param entity_types table
+--- @return table
+function scenario.find_entity_spawn_cells(spawn_cell, entity_types) end
 
 --- Creates a new entity. Returns the ID of the newly created entity
 --- @param entity_type number

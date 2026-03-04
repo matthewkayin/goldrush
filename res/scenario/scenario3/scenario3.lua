@@ -282,16 +282,30 @@ function builder_state_update(builder_state)
         end
 
         scenario.log("builder_state, entity", builder_state.builder_id, " - finished bunker")
+
+        -- Determine entity spawn cells
+        local entity_types = {
+            scenario.entity_type.COWBOY,
+            scenario.entity_type.COWBOY,
+            scenario.entity_type.COWBOY,
+            scenario.entity_type.COWBOY
+        }
+        local entity_cells = scenario.find_entity_spawn_cells(bunker.cell, entity_types)
+
+        -- Build squad entity IDs list
         local squad_entity_ids = {}
         table.insert(squad_entity_ids, builder_state.bunker_id)
+
+        -- Spawn entities and add them to the list
         for index=1,4 do
-            local entity_cell = scenario.find_entity_spawn_cell(scenario.entity_type.COWBOY, bunker.cell)
-            if not entity_cell then
+            if entity_cells[index] == nil then
                 break
             end
-            local entity_id = scenario.create_entity(scenario.entity_type.COWBOY, entity_cell, ENEMY_PLAYER_ID)
+            local entity_id = scenario.create_entity(scenario.entity_type.COWBOY, entity_cells[index], ENEMY_PLAYER_ID)
             table.insert(squad_entity_ids, entity_id)
         end
+
+        -- Add squad
         scenario.bot_add_squad({
             player_id = ENEMY_PLAYER_ID,
             type = scenario.bot_squad_type.DEFEND,

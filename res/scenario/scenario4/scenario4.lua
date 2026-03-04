@@ -34,13 +34,12 @@ local SPAWN_INFO = {
 }
 
 local wave_index = 1
-local WAVE_INTERVAL = 90
 local next_wave_spawn_time = nil
+local WAVE_INTERVAL = 75
 local WAVE_LEVELS = {
-    1, 2, 1,
-    2, 3, 2,
-    3, 4, 3,
-    3, 4, 5, 5
+    1, 2, 1, 2, 3,
+    2, 3, 2, 3, 4,
+    3, 4, 3, 5, 5
 }
 
 function scenario_init()
@@ -80,11 +79,11 @@ function scenario_update()
         next_wave_spawn_time = nil
     end
 
-    if next_wave_spawn_time ~= nil and scenario.get_time() >= next_wave_spawn_time then
+    if next_wave_spawn_time ~= nil and wave_index <= #WAVE_LEVELS and scenario.get_time() >= next_wave_spawn_time then
         scenario.log("Spawning wave ", wave_index, " at time ", scenario.get_time())
         spawn_wave(WAVE_LEVELS[wave_index])
-        wave_index = wave_index + 1
         next_wave_spawn_time = next_wave_spawn_time + WAVE_INTERVAL
+        wave_index = wave_index + 1
     end
 
     actions.update()
