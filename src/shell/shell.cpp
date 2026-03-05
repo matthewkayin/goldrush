@@ -4908,7 +4908,12 @@ MinimapPixel match_shell_get_minimap_pixel_for_cell(const MatchShellState* state
         case SPRITE_TILE_SAND3:
             return MINIMAP_PIXEL_SAND;
         case SPRITE_TILE_SAND_WATER:
+        case SPRITE_TILE_GRASS_WATER:
             return MINIMAP_PIXEL_WATER;
+        case SPRITE_TILE_GRASS1:
+        case SPRITE_TILE_GRASS2:
+        case SPRITE_TILE_GRASS3:
+            return MINIMAP_PIXEL_GRASS;
         case SPRITE_TILE_SNOW1:
         case SPRITE_TILE_SNOW2:
         case SPRITE_TILE_SNOW3:

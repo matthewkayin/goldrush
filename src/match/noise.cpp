@@ -178,6 +178,7 @@ NoiseGenParams noise_create_noise_gen_params(MapType map_type, MapSize map_size,
             params.forest_threshold = 0;
             break;
         }
+        case MAP_TYPE_BOULDER:
         case MAP_TYPE_KLONDIKE: {
             params.map_inverted = true;
             params.water_threshold = 40;

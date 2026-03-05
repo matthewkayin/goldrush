@@ -1015,6 +1015,16 @@ SpriteName map_choose_ground_tile_sprite(MapType map_type, int index, int* lcg_s
                 return SPRITE_TILE_SAND1;
             }
         }
+        case MAP_TYPE_BOULDER: {
+            int new_index = lcg_rand(lcg_seed) % 20;
+            if (new_index == 1 && index % 7 == 0) {
+                return SPRITE_TILE_GRASS3;
+            } else if (new_index == 0 && index % 7 == 0) {
+                return SPRITE_TILE_GRASS2;
+            } else {
+                return SPRITE_TILE_GRASS1;
+            }
+        }
         case MAP_TYPE_KLONDIKE: {
             int new_index = lcg_rand(lcg_seed) % 20;
             if (new_index == 1 && index % 7 == 0) {
@@ -1036,6 +1046,8 @@ SpriteName map_choose_water_tile_sprite(MapType map_type) {
     switch (map_type) {
         case MAP_TYPE_TOMBSTONE:
             return SPRITE_TILE_SAND_WATER;
+        case MAP_TYPE_BOULDER:
+            return SPRITE_TILE_GRASS_WATER;
         case MAP_TYPE_KLONDIKE:
             return SPRITE_TILE_SNOW_WATER;
         case MAP_TYPE_COUNT: {
@@ -1049,6 +1061,8 @@ SpriteName map_get_plain_ground_tile_sprite(MapType map_type) {
     switch (map_type) {
         case MAP_TYPE_TOMBSTONE:
             return SPRITE_TILE_SAND1;
+        case MAP_TYPE_BOULDER:
+            return SPRITE_TILE_GRASS1;
         case MAP_TYPE_KLONDIKE:
             return SPRITE_TILE_SNOW1;
         case MAP_TYPE_COUNT: {
@@ -1062,6 +1076,8 @@ SpriteName map_get_decoration_sprite(MapType map_type) {
     switch (map_type) {
         case MAP_TYPE_TOMBSTONE: 
             return SPRITE_DECORATION_ARIZONA;
+        case MAP_TYPE_BOULDER:
+            return SPRITE_DECORATION_BOULDER;
         case MAP_TYPE_KLONDIKE: 
             return SPRITE_DECORATION_KLONDIKE;
         case MAP_TYPE_COUNT: {
@@ -1109,7 +1125,7 @@ void map_generate_decorations(Map& map, Noise* noise, int* lcg_seed, const std::
         for (ivec2 cell : decoration_cells) {
             map_create_decoration_at_cell(map, lcg_seed, cell);
         }
-    } else if (map.type == MAP_TYPE_KLONDIKE) {
+    } else if (map.type == MAP_TYPE_KLONDIKE || map.type == MAP_TYPE_BOULDER) {
         struct TreeNode {
             ivec2 cell;
             ivec2 source_cell;
@@ -1362,7 +1378,7 @@ uint8_t map_neighbors_to_autotile_index(uint32_t p_neighbors) {
 
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point) {
     // Don't allow trees on the very top cell
-    if (map.type == MAP_TYPE_KLONDIKE && point.y < 1) {
+    if ((map.type == MAP_TYPE_KLONDIKE || map.type == MAP_TYPE_BOULDER) && point.y < 1) {
         return false;
     }
     if (point.x < params.margin.x || point.x >= map.width - params.margin.x || point.y < params.margin.y || point.y >= (int)map.height - params.margin.y) {
@@ -1537,7 +1553,10 @@ bool map_is_tile_ground(const Map& map, ivec2 cell) {
         tile_sprite == SPRITE_TILE_SAND3 ||
         tile_sprite == SPRITE_TILE_SNOW1 ||
         tile_sprite == SPRITE_TILE_SNOW2 ||
-        tile_sprite == SPRITE_TILE_SNOW3;
+        tile_sprite == SPRITE_TILE_SNOW3 ||
+        tile_sprite == SPRITE_TILE_GRASS1 ||
+        tile_sprite == SPRITE_TILE_GRASS2 ||
+        tile_sprite == SPRITE_TILE_GRASS3;
 }
 
 bool map_is_tile_ramp(const Map& map, ivec2 cell) {
@@ -1548,7 +1567,8 @@ bool map_is_tile_ramp(const Map& map, ivec2 cell) {
 bool map_is_tile_water(const Map& map, ivec2 cell) {
     uint8_t tile_sprite = map.tiles[cell.x + (cell.y * map.width)].sprite;
     return tile_sprite == SPRITE_TILE_SAND_WATER ||
-        tile_sprite == SPRITE_TILE_SNOW_WATER;
+        tile_sprite == SPRITE_TILE_SNOW_WATER ||
+        tile_sprite == SPRITE_TILE_GRASS_WATER;
 }
 
 bool map_is_cell_rect_same_elevation(const Map& map, ivec2 cell, int size) {

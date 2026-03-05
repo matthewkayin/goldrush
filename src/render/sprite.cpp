@@ -5,6 +5,7 @@
 static const std::unordered_map<Tileset, TilesetParams> TILESET_PARAMS = {
     { TILESET_ARIZONA, (TilesetParams) { .path = "map/arizona_tiles.png" }},
     { TILESET_KLONDIKE, (TilesetParams) { .path = "map/klondike_tiles.png" }},
+    { TILESET_BOULDER, (TilesetParams) { .path = "map/boulder_tiles.png" }},
     { TILESET_FOG, (TilesetParams) { .path = "map/fog_of_war.png" }}
 };
 
@@ -85,6 +86,51 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_KLONDIKE,
+            .type = TILE_TYPE_AUTO,
+            .source_x = 0,
+            .source_y = 16
+        }
+    }},
+    { SPRITE_TILE_WALL_NW_CORNER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 48,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_GRASS1, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = {
+            .tileset = TILESET_BOULDER,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 0,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_GRASS2, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = {
+            .tileset = TILESET_BOULDER,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 16,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_GRASS3, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = {
+            .tileset = TILESET_BOULDER,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 32,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_GRASS_WATER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = {
+            .tileset = TILESET_BOULDER,
             .type = TILE_TYPE_AUTO,
             .source_x = 0,
             .source_y = 16
@@ -372,6 +418,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "map/klondike_decorations.png",
+            .hframes = 4,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_DECORATION_BOULDER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = {
+            .path = "map/boulder_decorations.png",
             .hframes = 4,
             .vframes = 1
         }

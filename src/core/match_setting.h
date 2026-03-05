@@ -27,6 +27,7 @@ enum Teams {
 
 enum MapType {
     MAP_TYPE_TOMBSTONE,
+    MAP_TYPE_BOULDER,
     MAP_TYPE_KLONDIKE,
     MAP_TYPE_COUNT
 };
