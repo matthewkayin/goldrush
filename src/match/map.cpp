@@ -1016,10 +1016,10 @@ SpriteName map_choose_ground_tile_sprite(MapType map_type, int index, int* lcg_s
             }
         }
         case MAP_TYPE_BOULDER: {
-            int new_index = lcg_rand(lcg_seed) % 20;
-            if (new_index == 1 && index % 7 == 0) {
+            int roll = lcg_rand(lcg_seed) % 20;
+            if (roll < 5 && index % 2 == 1) {
                 return SPRITE_TILE_GRASS3;
-            } else if (new_index == 0 && index % 7 == 0) {
+            } else if (roll >= 5 && roll < 10 && index % 2 == 0) {
                 return SPRITE_TILE_GRASS2;
             } else {
                 return SPRITE_TILE_GRASS1;
