@@ -1021,6 +1021,10 @@ SpriteName map_choose_ground_tile_sprite(MapType map_type, int index, int* lcg_s
                 return SPRITE_TILE_GRASS3;
             } else if (roll >= 5 && roll < 10 && index % 2 == 0) {
                 return SPRITE_TILE_GRASS2;
+            } else if (roll >= 18 && index % 13 == 0) {
+                return lcg_rand(lcg_seed) % 5 < 2 ? SPRITE_TILE_GRASS4 : SPRITE_TILE_GRASS5;
+            // } else if (roll == 19 && index % 7 == 0) {
+                // return SPRITE_TILE_GRASS5;
             } else {
                 return SPRITE_TILE_GRASS1;
             }
@@ -1548,15 +1552,9 @@ Tile map_get_tile(const Map& map, ivec2 cell) {
 
 bool map_is_tile_ground(const Map& map, ivec2 cell) {
     uint8_t tile_sprite = map.tiles[cell.x + (cell.y * map.width)].sprite;
-    return tile_sprite == SPRITE_TILE_SAND1 ||
-        tile_sprite == SPRITE_TILE_SAND2 ||
-        tile_sprite == SPRITE_TILE_SAND3 ||
-        tile_sprite == SPRITE_TILE_SNOW1 ||
-        tile_sprite == SPRITE_TILE_SNOW2 ||
-        tile_sprite == SPRITE_TILE_SNOW3 ||
-        tile_sprite == SPRITE_TILE_GRASS1 ||
-        tile_sprite == SPRITE_TILE_GRASS2 ||
-        tile_sprite == SPRITE_TILE_GRASS3;
+    return (tile_sprite >= SPRITE_TILE_SAND1 && tile_sprite <= SPRITE_TILE_SAND3) ||
+        (tile_sprite >= SPRITE_TILE_GRASS1 && tile_sprite <= SPRITE_TILE_GRASS5) ||
+        (tile_sprite >= SPRITE_TILE_SNOW1 && tile_sprite <= SPRITE_TILE_SNOW3);
 }
 
 bool map_is_tile_ramp(const Map& map, ivec2 cell) {

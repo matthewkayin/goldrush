@@ -2502,7 +2502,14 @@ MinimapPixel editor_get_minimap_pixel_for_cell(ivec2 cell) {
         case SPRITE_TILE_SAND3:
             return MINIMAP_PIXEL_SAND;
         case SPRITE_TILE_SAND_WATER:
+        case SPRITE_TILE_GRASS_WATER:
             return MINIMAP_PIXEL_WATER;
+        case SPRITE_TILE_GRASS1:
+        case SPRITE_TILE_GRASS2:
+        case SPRITE_TILE_GRASS3:
+        case SPRITE_TILE_GRASS4:
+        case SPRITE_TILE_GRASS5:
+            return MINIMAP_PIXEL_GRASS;
         case SPRITE_TILE_SNOW1:
         case SPRITE_TILE_SNOW2:
         case SPRITE_TILE_SNOW3:

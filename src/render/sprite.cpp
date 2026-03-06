@@ -127,6 +127,24 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 0
         }
     }},
+    { SPRITE_TILE_GRASS4, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = {
+            .tileset = TILESET_BOULDER,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 32,
+            .source_y = 16
+        }
+    }},
+    { SPRITE_TILE_GRASS5, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = {
+            .tileset = TILESET_BOULDER,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 32,
+            .source_y = 32
+        }
+    }},
     { SPRITE_TILE_GRASS_WATER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
