@@ -251,7 +251,7 @@ bool render_init(SDL_Window* window) {
         }
         state.minimap_pixel_values[MINIMAP_PIXEL_GOLD] = SDL_MapRGBA(format, NULL, 238, 209, 158, 255);
         state.minimap_pixel_values[MINIMAP_PIXEL_SAND] = SDL_MapRGBA(format, NULL, 204, 162, 139, 255);
-        state.minimap_pixel_values[MINIMAP_PIXEL_GRASS] = SDL_MapRGBA(format, NULL, 135, 153, 115, 255);
+        state.minimap_pixel_values[MINIMAP_PIXEL_GRASS] = SDL_MapRGBA(format, NULL, 116, 153, 119, 255);
         state.minimap_pixel_values[MINIMAP_PIXEL_WATER] = SDL_MapRGBA(format, NULL, 70, 100, 115, 255);
         state.minimap_pixel_values[MINIMAP_PIXEL_WALL] = SDL_MapRGBA(format, NULL, 94, 88, 89, 255);
         state.minimap_pixel_values[MINIMAP_PIXEL_SNOW] = SDL_MapRGBA(format, NULL, 181, 179, 167, 255);
