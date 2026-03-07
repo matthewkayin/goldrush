@@ -2420,6 +2420,13 @@ void editor_render() {
             };
             render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, editor_get_minimap_pixel_for_entity(state.scenario, selection, entity_index));
         }
+        // Minimap cell-constant
+        if (state.tool == EDITOR_TOOL_CONSTANTS && !state.scenario->constants.empty() &&
+                state.scenario->constants[state.tool_value].type == SCENARIO_CONSTANT_TYPE_CELL &&
+                state.scenario->constants[state.tool_value].cell.x != -1) {
+                ivec2 constant_cell = state.scenario->constants[state.tool_value].cell;
+            render_minimap_fill_rect(MINIMAP_LAYER_TILE, (Rect) { .x = constant_cell.x, .y = constant_cell.y, .w = 1, .h = 1 }, MINIMAP_PIXEL_WHITE);
+        }
         // Clear fog layer
         for (int y = 0; y < state.scenario->map.height; y++) {
             for (int x = 0; x < state.scenario->map.width; x++) {
