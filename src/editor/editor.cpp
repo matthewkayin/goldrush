@@ -2189,7 +2189,7 @@ void editor_render() {
             if (entity_type == ENTITY_GOLDMINE) {
                 recolor_id = 0;
             } else if (state.tool == EDITOR_TOOL_ADD_ENTITY) {
-                recolor_id = state.tool_add_entity_player_id;
+                recolor_id = state.scenario->players[state.tool_add_entity_player_id].recolor_id;
             } else {
                 recolor_id = state.scenario->entities[state.tool_value].player_id;
             }

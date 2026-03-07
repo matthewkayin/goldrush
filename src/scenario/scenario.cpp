@@ -20,6 +20,8 @@ Scenario* scenario_base_init() {
             sprintf(scenario->players[player_id].name, "Enemy %u", player_id);
         }
         scenario->players[player_id].starting_gold = 50;
+        scenario->players[player_id].team = player_id;
+        scenario->players[player_id].recolor_id = player_id;
     }
 
     for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
