@@ -64,7 +64,10 @@ function scenario_init()
         objectives.add_objective({
             objective = {
                 description = "The villagers must survive"
-            }
+            },
+            complete_fn = function ()
+                return false
+            end
         })
     end)
 end

@@ -58,10 +58,7 @@ FILE* replay_file_open(int32_t lcg_seed, MapType map_type, const Noise* noise, M
 
     // Players
     for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        fwrite(&players[player_id].active, 1, sizeof(bool), file);
-        fwrite(players[player_id].name, 1, sizeof(players[player_id].name), file);
-        fwrite(&players[player_id].team, 1, sizeof(uint32_t), file);
-        fwrite(&players[player_id].recolor_id, 1, sizeof(int32_t), file);
+        fwrite(&players[player_id], 1, sizeof(MatchPlayer), file);
     }
 
     return file;
@@ -153,10 +150,7 @@ bool replay_file_read(const char* path, MatchState& state, std::vector<std::vect
     // Players
     MatchPlayer players[MAX_PLAYERS];
     for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        fread(&players[player_id].active, 1, sizeof(bool), file);
-        fread(players[player_id].name, 1, sizeof(players[player_id].name), file);
-        fread(&players[player_id].team, 1, sizeof(uint32_t), file);
-        fread(&players[player_id].recolor_id, 1, sizeof(int32_t), file);
+        fread(&players[player_id], 1, sizeof(MatchPlayer), file);
     }
 
     // Init state

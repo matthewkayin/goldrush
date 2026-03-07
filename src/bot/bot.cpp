@@ -4230,14 +4230,14 @@ int bot_score_entity_list(const MatchState& state, const Bot& bot, const EntityL
 
 bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id, bool allow_assumed_scouts) {
     int entity_cell_size = entity_get_data(entity.type).cell_size;
-    uint32_t bot_team = state.players[bot.player_id].team;
+    uint8_t bot_vision_group = state.players[bot.player_id].vision_group;
     // If fog is revealed, then they can see it
-    if (match_is_cell_rect_revealed(state, bot_team, entity.cell, entity_cell_size)) {
+    if (match_is_cell_rect_revealed(state, bot_vision_group, entity.cell, entity_cell_size)) {
         return true;
     }
     // If for is only explored but they have seen the entity before, then they can see it
-    if (match_is_cell_rect_explored(state, bot_team, entity.cell, entity_cell_size) &&
-            match_team_remembers_entity(state, state.players[bot.player_id].team, entity_id)) {
+    if (match_is_cell_rect_explored(state, bot_vision_group, entity.cell, entity_cell_size) &&
+            match_vision_group_remembers_entity(state, bot_vision_group, entity_id)) {
         return true;
     }
     if (allow_assumed_scouts && bot.entities_assumed_to_be_scouted.contains(entity_id)) {

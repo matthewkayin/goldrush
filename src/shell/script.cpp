@@ -1184,10 +1184,10 @@ static int script_fog_reveal(lua_State* lua_state) {
     lua_pop(lua_state, 1);
 
     MatchShellState* state = script_get_match_shell_state(lua_state);
-    uint8_t team = state->match_state.players[network_get_player_id()].team;
-    match_fog_update(state->match_state, team, cell, cell_size, sight, false, CELL_LAYER_GROUND, true);
+    uint8_t vision_group = state->match_state.players[network_get_player_id()].vision_group;
+    match_fog_update(state->match_state, vision_group, cell, cell_size, sight, false, CELL_LAYER_GROUND, true);
     state->match_state.fog_reveals.push_back((FogReveal) {
-        .team = team,
+        .vision_group = vision_group,
         .cell = cell,
         .cell_size = cell_size,
         .sight = sight,
@@ -1479,14 +1479,14 @@ static int script_highlight_entity(lua_State* lua_state) {
     // Do a fog reveal on the highlighted entity
     const Entity& entity = state->match_state.entities.get_by_id(entity_id);
     FogReveal fog_reveal = (FogReveal) {
-        .team = state->match_state.players[network_get_player_id()].team,
+        .vision_group = state->match_state.players[network_get_player_id()].vision_group,
         .cell = entity.cell,
         .cell_size = entity_get_data(entity.type).cell_size,
         .sight = 3,
         .timer = 160U // this is the duration of animation_ui_highlight_entity
     };
 
-    match_fog_update(state->match_state, fog_reveal.team, fog_reveal.cell, fog_reveal.cell_size, fog_reveal.sight, false, CELL_LAYER_GROUND, true);
+    match_fog_update(state->match_state, fog_reveal.vision_group, fog_reveal.cell, fog_reveal.cell_size, fog_reveal.sight, false, CELL_LAYER_GROUND, true);
     state->match_state.fog_reveals.push_back(fog_reveal);
 
     return 0;

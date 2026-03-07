@@ -18,13 +18,13 @@ STATIC_ASSERT(sizeof(Particle) == 44ULL);
 STATIC_ASSERT(sizeof(Projectile) == 20ULL);
 STATIC_ASSERT(sizeof(Target) == 36ULL);
 STATIC_ASSERT(sizeof(FogReveal) == 24ULL);
-STATIC_ASSERT(sizeof(MatchPlayer) == 60ULL);
+STATIC_ASSERT(sizeof(MatchPlayer) == 56ULL);
 STATIC_ASSERT(sizeof(BotUnitComp) == 4ULL);
 STATIC_ASSERT(sizeof(EntityCount) == 88ULL);
 STATIC_ASSERT(sizeof(BotSquadType) == 4ULL);
 STATIC_ASSERT(sizeof(BotDesiredSquad) == 92ULL);
 STATIC_ASSERT(sizeof(BotBaseInfo) == 220);
-STATIC_ASSERT(sizeof(MatchState) == 2434260ULL);
+STATIC_ASSERT(sizeof(MatchState) == 2434244ULL);
 STATIC_ASSERT(sizeof(Bot) == 16164ULL);
 
 #ifdef GOLD_DEBUG
@@ -229,25 +229,25 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
     GOLD_ASSERT(memcmp(&state_a->map, &state_b->map, sizeof(state_a->map)) == 0);
 
     // Fog
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+    for (uint8_t vision_group = 0; vision_group < MAX_PLAYERS; vision_group++) {
         for (size_t index = 0; index < MAP_SIZE_MAX * MAP_SIZE_MAX; index++) {
-            GOLD_ASSERT(state_a->fog[player_id][index] == state_b->fog[player_id][index]);
+            GOLD_ASSERT(state_a->fog[vision_group][index] == state_b->fog[vision_group][index]);
         }
     }
 
     // Detection
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+    for (uint8_t vision_group = 0; vision_group < MAX_PLAYERS; vision_group++) {
         for (size_t index = 0; index < MAP_SIZE_MAX * MAP_SIZE_MAX; index++) {
-            GOLD_ASSERT(state_a->detection[player_id][index] == state_b->detection[player_id][index]);
+            GOLD_ASSERT(state_a->detection[vision_group][index] == state_b->detection[vision_group][index]);
         }
     }
 
     // Remembered entities
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        GOLD_ASSERT(state_a->remembered_entities[player_id].size() == state_b->remembered_entities[player_id].size());
+    for (uint8_t vision_group = 0; vision_group < MAX_PLAYERS; vision_group++) {
+        GOLD_ASSERT(state_a->remembered_entities[vision_group].size() == state_b->remembered_entities[vision_group].size());
         for (size_t index = 0; index < MATCH_MAX_REMEMBERED_ENTITIES; index++) {
-            const RememberedEntity& entity_a = state_a->remembered_entities[player_id].data[index];
-            const RememberedEntity& entity_b = state_b->remembered_entities[player_id].data[index];
+            const RememberedEntity& entity_a = state_a->remembered_entities[vision_group].data[index];
+            const RememberedEntity& entity_b = state_b->remembered_entities[vision_group].data[index];
 
             GOLD_ASSERT(entity_a.entity_id == entity_b.entity_id);
             GOLD_ASSERT(entity_a.type == entity_b.type);
@@ -257,7 +257,7 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
 
             GOLD_ASSERT(memcmp(&entity_a, &entity_b, sizeof(entity_a)) == 0);
         }
-        GOLD_ASSERT(memcmp(&state_a->remembered_entities[player_id], &state_b->remembered_entities[player_id], sizeof(state_a->remembered_entities[player_id])) == 0);
+        GOLD_ASSERT(memcmp(&state_a->remembered_entities[vision_group], &state_b->remembered_entities[vision_group], sizeof(state_a->remembered_entities[vision_group])) == 0);
     }
 
     // Entities
@@ -430,12 +430,6 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
         for (size_t index = 0; index < MATCH_MAX_FOG_REVEALS; index++) {
             const FogReveal& fog_reveal_a = state_a->fog_reveals.data[index];
             const FogReveal& fog_reveal_b = state_b->fog_reveals.data[index];
-
-            GOLD_ASSERT(fog_reveal_a.team == fog_reveal_b.team);
-            GOLD_ASSERT(fog_reveal_a.cell == fog_reveal_b.cell);
-            GOLD_ASSERT(fog_reveal_a.cell_size == fog_reveal_b.cell_size);
-            GOLD_ASSERT(fog_reveal_a.sight == fog_reveal_b.sight);
-            GOLD_ASSERT(fog_reveal_a.timer == fog_reveal_b.timer);
 
             GOLD_ASSERT(memcmp(&fog_reveal_a, &fog_reveal_b, sizeof(fog_reveal_a)) == 0);
         }

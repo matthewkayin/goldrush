@@ -224,6 +224,7 @@ MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
         players[player_id].team = network_get_match_setting(MATCH_SETTING_TEAMS) == TEAMS_ENABLED 
                                         ? network_player.team
                                         : player_id;
+        players[player_id].vision_group = players[player_id].team;
         players[player_id].recolor_id = network_player.recolor_id;
     }
 
@@ -307,6 +308,7 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
             ? network_get_username()
             : scenario->players[player_id].name);
         players[player_id].team = scenario->players[player_id].team;
+        players[player_id].vision_group = scenario->players[player_id].vision_group;
         players[player_id].recolor_id = scenario->players[player_id].recolor_id;
         players[player_id].gold = scenario->players[player_id].starting_gold;
         players[player_id].gold_mined_total = 0;
@@ -1868,7 +1870,7 @@ void match_shell_handle_input(MatchShellState* state) {
             // If they rallied onto their gold, adjust their rally point and play an animation to clearly indicate that units will rally out to the mine
             // But only do this if the goldmine has been explored, otherwise we would reveal to players that there is a goldmine where they clicked
             const Entity& goldmine = state->match_state.entities.get_by_id(cell.id);
-            if (match_is_cell_rect_explored(state->match_state, state->match_state.players[network_get_player_id()].team, goldmine.cell, entity_get_data(goldmine.type).cell_size)) {
+            if (match_is_cell_rect_explored(state->match_state, state->match_state.players[network_get_player_id()].vision_group, goldmine.cell, entity_get_data(goldmine.type).cell_size)) {
                 input.rally.rally_point = (goldmine.cell * TILE_SIZE) + ivec2(23, 16);
                 state->move_animation = animation_create(ANIMATION_UI_MOVE_ENTITY);
                 state->move_animation_entity_id = cell.id;
@@ -2075,8 +2077,8 @@ void match_shell_order_move(MatchShellState* state) {
     bool input_move_target_is_balloon = false;
 
     // Checks if clicked on entity
-    uint8_t player_team = state->match_state.players[network_get_player_id()].team;
-    int fog_value = match_get_fog(state->match_state, state->match_state.players[network_get_player_id()].team, input.move.target_cell);
+    const uint8_t player_vision_group = state->match_state.players[network_get_player_id()].vision_group;
+    int fog_value = match_get_fog(state->match_state, player_vision_group, input.move.target_cell);
     // If clicked on hidden fog or the minimap, then don't check for entity click
     if (fog_value != FOG_HIDDEN && !match_shell_is_mouse_in_ui()) {
         for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
@@ -2086,7 +2088,7 @@ void match_shell_order_move(MatchShellState* state) {
                 continue;
             }
             // Non-units *can* be selected under explored fog, but only if we have explored that the building exists
-            if (fog_value == FOG_EXPLORED && !match_team_remembers_entity(state->match_state, player_team, state->match_state.entities.get_id_of(entity_index))) {
+            if (fog_value == FOG_EXPLORED && !match_vision_group_remembers_entity(state->match_state, player_vision_group, state->match_state.entities.get_id_of(entity_index))) {
                 continue;
             }
             // Don't target unselectable units
@@ -2094,7 +2096,7 @@ void match_shell_order_move(MatchShellState* state) {
                 continue;
             }
             // Don't target invisible units (unless we have detection)
-            if (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state->match_state.detection[player_team][input.move.target_cell.x + (input.move.target_cell.y * state->match_state.map.width)] == 0) {
+            if (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state->match_state.detection[player_vision_group][input.move.target_cell.x + (input.move.target_cell.y * state->match_state.map.width)] == 0) {
                 continue;
             }
 
@@ -2159,14 +2161,14 @@ void match_shell_order_move(MatchShellState* state) {
     if (remembered_entity_id != ID_NULL) {
         // Find remembered entity index
         uint32_t remembered_entity_index;
-        for (remembered_entity_index = 0; remembered_entity_index < state->match_state.remembered_entities[player_team].size(); remembered_entity_index++) {
-            if (state->match_state.remembered_entities[player_team][remembered_entity_index].entity_id == remembered_entity_id) {
+        for (remembered_entity_index = 0; remembered_entity_index < state->match_state.remembered_entities[player_vision_group].size(); remembered_entity_index++) {
+            if (state->match_state.remembered_entities[player_vision_group][remembered_entity_index].entity_id == remembered_entity_id) {
                 break;
             }
         }
-        GOLD_ASSERT(remembered_entity_index != state->match_state.remembered_entities[player_team].size());
+        GOLD_ASSERT(remembered_entity_index != state->match_state.remembered_entities[player_vision_group].size());
 
-        EntityType remembered_entity_type = state->match_state.remembered_entities[player_team][remembered_entity_index].type;
+        EntityType remembered_entity_type = state->match_state.remembered_entities[player_vision_group][remembered_entity_index].type;
         state->move_animation = animation_create(remembered_entity_type == ENTITY_GOLDMINE
                                                         ? ANIMATION_UI_MOVE_ENTITY 
                                                         : ANIMATION_UI_MOVE_ATTACK_ENTITY);
@@ -2545,7 +2547,7 @@ bool match_shell_is_cell_rect_revealed(const MatchShellState* state, ivec2 cell,
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if ((state->replay_fog_player_ids[state->replay_fog_index] == PLAYER_NONE ||
                     state->replay_fog_player_ids[state->replay_fog_index] == player_id) &&
-                    match_is_cell_rect_revealed(state->match_state, state->match_state.players[player_id].team, cell, cell_size)) {
+                    match_is_cell_rect_revealed(state->match_state, state->match_state.players[player_id].vision_group, cell, cell_size)) {
                 return true;
             }
         }
@@ -2556,7 +2558,7 @@ bool match_shell_is_cell_rect_revealed(const MatchShellState* state, ivec2 cell,
             if (state->debug_fog == DEBUG_FOG_BOT_VISION) {
                 for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                     if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT &&
-                            match_is_cell_rect_revealed(state->match_state, state->match_state.players[player_id].team, cell, cell_size)) {
+                            match_is_cell_rect_revealed(state->match_state, state->match_state.players[player_id].vision_group, cell, cell_size)) {
                         return true;
                     }
                 }
@@ -2564,7 +2566,7 @@ bool match_shell_is_cell_rect_revealed(const MatchShellState* state, ivec2 cell,
                 return true;
             }
         #endif
-        return match_is_cell_rect_revealed(state->match_state, state->match_state.players[network_get_player_id()].team, cell, cell_size);
+        return match_is_cell_rect_revealed(state->match_state, state->match_state.players[network_get_player_id()].vision_group, cell, cell_size);
     }
 }
 
@@ -2577,7 +2579,7 @@ int match_shell_get_fog(const MatchShellState* state, ivec2 cell) {
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if (state->replay_fog_player_ids[state->replay_fog_index] == PLAYER_NONE ||
                     state->replay_fog_player_ids[state->replay_fog_index] == player_id) {
-                int player_fog_value = match_get_fog(state->match_state, state->match_state.players[player_id].team, cell);
+                int player_fog_value = match_get_fog(state->match_state, state->match_state.players[player_id].vision_group, cell);
                 // If at least one player has revealed fog, then return a revealed fog value
                 if (player_fog_value > 0) {
                     return 1;
@@ -2597,7 +2599,7 @@ int match_shell_get_fog(const MatchShellState* state, ivec2 cell) {
                 int fog_value = FOG_HIDDEN;
                 for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                     if ((network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT || network_get_player_id() == player_id)) {
-                        int player_fog_value = match_get_fog(state->match_state, state->match_state.players[player_id].team, cell);
+                        int player_fog_value = match_get_fog(state->match_state, state->match_state.players[player_id].vision_group, cell);
 
                         // If at least one player has revealed fog, then return a revealed fog value
                         if (player_fog_value > 0) {
@@ -2614,7 +2616,7 @@ int match_shell_get_fog(const MatchShellState* state, ivec2 cell) {
                 return 1;
             }
         #endif
-        return match_get_fog(state->match_state, state->match_state.players[network_get_player_id()].team, cell);
+        return match_get_fog(state->match_state, state->match_state.players[network_get_player_id()].vision_group, cell);
     }
 }
 
@@ -2725,10 +2727,10 @@ bool match_shell_is_building_place_cell_valid(const MatchShellState* state, ivec
     Cell map_ground_cell = map_get_cell(state->match_state.map, CELL_LAYER_GROUND, cell);
     if (map_ground_cell.type == CELL_UNIT || map_ground_cell.type == CELL_MINER || map_ground_cell.type == CELL_BUILDING) {
         // If the entity is not visible to the player, then we will ignore the fact that it's blocking the building
-        uint8_t player_team = state->match_state.players[network_get_player_id()].team;
+        uint8_t player_vision_group = state->match_state.players[network_get_player_id()].vision_group;
         if (cell != miner_cell &&
                 (entity_is_visible_to_player(state->match_state, state->match_state.entities.get_by_id(map_ground_cell.id), network_get_player_id()) ||
-                (map_ground_cell.type == CELL_BUILDING && match_team_remembers_entity(state->match_state, player_team, map_ground_cell.id)))) {
+                (map_ground_cell.type == CELL_BUILDING && match_vision_group_remembers_entity(state->match_state, player_vision_group, map_ground_cell.id)))) {
             return false;
         }
     } else if (map_ground_cell.type != CELL_EMPTY) {
@@ -2748,7 +2750,7 @@ bool match_shell_is_building_place_cell_valid(const MatchShellState* state, ivec
     }
 
     // Check that we're not building on hidden fog
-    if (match_get_fog(state->match_state, state->match_state.players[network_get_player_id()].team, cell) == FOG_HIDDEN) {
+    if (match_get_fog(state->match_state, state->match_state.players[network_get_player_id()].vision_group, cell) == FOG_HIDDEN) {
         return false;
     }
 
@@ -3161,7 +3163,7 @@ void match_shell_render(const MatchShellState* state) {
                             .recolor_id = 0
                         };
                         ivec2 ui_move_cell = state->move_animation_position / TILE_SIZE;
-                        if (match_get_fog(state->match_state, state->match_state.players[network_get_player_id()].team, ui_move_cell) > 0) {
+                        if (match_get_fog(state->match_state, state->match_state.players[network_get_player_id()].vision_group, ui_move_cell) > 0) {
                             render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
                         } else {
                             above_fog_sprite_params.push_back(params);
@@ -3174,10 +3176,10 @@ void match_shell_render(const MatchShellState* state) {
                                 match_shell_render_entity_move_animation(state, entity, state->move_animation);
                             }
                         } else if (cell_layer == CELL_LAYER_GROUND) {
-                            uint8_t player_team = state->match_state.players[network_get_player_id()].team;
-                            uint32_t remembered_entity_index = match_team_find_remembered_entity_index(state->match_state, player_team, state->move_animation_entity_id);
+                            uint8_t player_vision_group = state->match_state.players[network_get_player_id()].vision_group;
+                            uint32_t remembered_entity_index = match_vision_group_find_remembered_entity_index(state->match_state, player_vision_group, state->move_animation_entity_id);
                             if (remembered_entity_index != MATCH_ENTITY_NOT_REMEMBERED) {
-                                const RememberedEntity& remembered_entity = state->match_state.remembered_entities[player_team][remembered_entity_index];
+                                const RememberedEntity& remembered_entity = state->match_state.remembered_entities[player_vision_group][remembered_entity_index];
                                 const int cell_size = entity_get_data(remembered_entity.type).cell_size;
                                 ivec2 entity_center_position = (remembered_entity.cell * TILE_SIZE) + ((ivec2(cell_size, cell_size) * TILE_SIZE) / 2);
 
@@ -3283,13 +3285,13 @@ void match_shell_render(const MatchShellState* state) {
         }
 
         // Remembered entities
-        for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
-            if (!match_shell_should_render_remembered_entities_for_team(state, team)) {
+        for (uint8_t vision_group = 0; vision_group < MAX_PLAYERS; vision_group++) {
+            if (!match_shell_should_render_remembered_entities_for_vision_group(state, vision_group)) {
                 continue;
             }
 
-            for (uint32_t remembered_entity_index = 0; remembered_entity_index < state->match_state.remembered_entities[team].size(); remembered_entity_index++) {
-                const RememberedEntity& remembered_entity = state->match_state.remembered_entities[team][remembered_entity_index];
+            for (uint32_t remembered_entity_index = 0; remembered_entity_index < state->match_state.remembered_entities[vision_group].size(); remembered_entity_index++) {
+                const RememberedEntity& remembered_entity = state->match_state.remembered_entities[vision_group][remembered_entity_index];
                 const EntityData& entity_data = entity_get_data(remembered_entity.type);
                 // Don't draw the remembered entity if we can see it, otherwise we will double draw them
                 if (match_shell_is_cell_rect_revealed(state, remembered_entity.cell, entity_data.cell_size)) {
@@ -4359,13 +4361,13 @@ void match_shell_render(const MatchShellState* state) {
             render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, match_shell_get_minimap_pixel_for_entity(state, entity));
         }
         // Minimap remembered entities
-        for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
-            if (!match_shell_should_render_remembered_entities_for_team(state, team)) {
+        for (uint8_t vision_group = 0; vision_group < MAX_PLAYERS; vision_group++) {
+            if (!match_shell_should_render_remembered_entities_for_vision_group(state, vision_group)) {
                 continue;
             }
 
-            for (uint32_t remembered_entity_index = 0; remembered_entity_index < state->match_state.remembered_entities[team].size(); remembered_entity_index++) {
-                const RememberedEntity& remembered_entity = state->match_state.remembered_entities[team][remembered_entity_index];
+            for (uint32_t remembered_entity_index = 0; remembered_entity_index < state->match_state.remembered_entities[vision_group].size(); remembered_entity_index++) {
+                const RememberedEntity& remembered_entity = state->match_state.remembered_entities[vision_group][remembered_entity_index];
                 const EntityData& entity_data = entity_get_data(remembered_entity.type);
                 Rect entity_rect = (Rect) {
                     .x = remembered_entity.cell.x, .y = remembered_entity.cell.y,
@@ -4432,17 +4434,17 @@ void match_shell_render(const MatchShellState* state) {
     }
 }
 
-bool match_shell_should_render_remembered_entities_for_team(const MatchShellState* state, uint8_t team) {
+bool match_shell_should_render_remembered_entities_for_vision_group(const MatchShellState* state, uint8_t vision_group) {
     // If using replay fog none or everyone, then there is no need to render remembered buildings because we can just see all entities normally
     if (state->replay_mode && (state->replay_fog_index == REPLAY_FOG_NONE || state->replay_fog_index == REPLAY_FOG_EVERYONE)) {
         return false;
     }
     // If we are in replay mode and looking at the fog for a specific player, then skip this team if it is not that player's team
-    if (state->replay_mode && state->match_state.players[state->replay_fog_player_ids[state->replay_fog_index]].team != team) {
+    if (state->replay_mode && state->match_state.players[state->replay_fog_player_ids[state->replay_fog_index]].vision_group != vision_group) {
         return false;
     }
     // If we are not in replay mode, then skip this team if it is not the network player's team
-    if (!state->replay_mode && state->match_state.players[network_get_player_id()].team != team) {
+    if (!state->replay_mode && state->match_state.players[network_get_player_id()].vision_group != vision_group) {
         return false;
     }
 

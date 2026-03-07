@@ -21,6 +21,7 @@ Scenario* scenario_base_init() {
         }
         scenario->players[player_id].starting_gold = 50;
         scenario->players[player_id].team = player_id;
+        scenario->players[player_id].vision_group = player_id;
         scenario->players[player_id].recolor_id = player_id;
     }
 
@@ -259,6 +260,7 @@ bool scenario_save_file(const Scenario* scenario, const char* json_full_path, co
             Json* player_json = json_object();
             json_object_set_string(player_json, "name", scenario->players[index].name);
             json_object_set_number(player_json, "team", scenario->players[index].team);
+            json_object_set_number(player_json, "vision_group", scenario->players[index].vision_group);
             json_object_set_number(player_json, "recolor_id", scenario->players[index].recolor_id);
             json_object_set_number(player_json, "starting_gold", scenario->players[index].starting_gold);
 
@@ -479,6 +481,15 @@ Scenario* scenario_open_file(const char* json_path, std::string* script_short_pa
             } else {
                 log_warn("Scenario player index %u has no team. Using index as team.", index);
                 scenario->players[index].team = (uint8_t)index;
+            }
+
+            // Vision group
+            Json* player_vision_group_json = json_object_get(player_json, "vision_group");
+            if (player_vision_group_json != NULL) {
+                scenario->players[index].vision_group = (uint8_t)player_vision_group_json->number.value;
+            } else {
+                log_warn("Scenario player index %u has no vision group. Using team as default", index);
+                scenario->players[index].vision_group = scenario->players[index].team;
             }
 
             // Recolor ID
