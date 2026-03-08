@@ -1196,7 +1196,8 @@ void match_shell_update(MatchShellState* state) {
                     .w = event.alert.cell_size * TILE_SIZE, 
                     .h = event.alert.cell_size * TILE_SIZE 
                 };
-                if (camera_rect.intersects(alert_rect)) {
+                // If the player is already looking at the alert location, then don't show the alert
+                if (camera_rect.intersects(alert_rect) && match_shell_is_cell_rect_revealed(state, event.alert.cell, event.alert.cell_size)) {
                     break;
                 }
 
@@ -1221,6 +1222,19 @@ void match_shell_update(MatchShellState* state) {
                                                     ? MATCH_UI_STATUS_UNDER_ATTACK 
                                                     : MATCH_UI_STATUS_ALLY_UNDER_ATTACK);
                     sound_play(SOUND_ALERT_BELL);
+
+                    const uint8_t player_vision_group = state->match_state.players[network_get_player_id()].vision_group;
+                    if (state->match_state.players[event.alert.player_id].vision_group != player_vision_group) {
+                        FogReveal fog_reveal = (FogReveal) {
+                            .vision_group = player_vision_group,
+                            .cell = event.alert.cell,
+                            .cell_size = event.alert.cell_size,
+                            .sight = 9,
+                            .timer = 3U * 60U
+                        };
+                        match_fog_update(state->match_state, fog_reveal.vision_group, fog_reveal.cell, fog_reveal.cell_size, fog_reveal.sight, false, CELL_LAYER_GROUND, true);
+                        state->match_state.fog_reveals.push_back(fog_reveal);
+                    }
                 } 
                 break;
             }

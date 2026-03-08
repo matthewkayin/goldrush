@@ -2616,7 +2616,7 @@ bool entity_is_visible_to_player(const MatchState& state, const Entity& entity, 
         return false;
     }
 
-    if (entity.type != ENTITY_GOLDMINE && state.players[entity.player_id].team == state.players[player_id].team) {
+    if (entity.type != ENTITY_GOLDMINE && state.players[entity.player_id].vision_group == state.players[player_id].vision_group) {
         return true;
     }
 
@@ -3076,6 +3076,13 @@ Target entity_target_nearest_enemy(const MatchState& state, const Entity& entity
         }
         // Don't attack entities that the player can't see
         if (!entity_is_visible_to_player(state, other, entity.player_id)) {
+            continue;
+        }
+        // Don't attack entities that we can't target
+        if (other_data.cell_layer == CELL_LAYER_SKY && 
+                (entity.type == ENTITY_BANDIT || 
+                entity.type == ENTITY_CANNON || 
+                entity.type == ENTITY_SAPPER)) {
             continue;
         }
         // Don't attack entities that are within min range

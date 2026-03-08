@@ -32,10 +32,45 @@ local VILLAGER_MINERS = {
     }
 }
 
+-- BANDIT_SPAWN_LAKE
+-- BANDIT_SPAWN_BEAN
+-- BANDIT_SPAWN_CLIFF
+-- BANDIT_SPAWN_STAIRS
+-- BANDIT_SPAWN_WOODS
+local ATTACK_SPAWN_CELLS = {
+    -- Southern villager
+    {
+        scenario.constants.BANDIT_SPAWN_LAKE,
+        scenario.constants.BANDIT_SPAWN_CLIFF,
+        scenario.constants.BANDIT_SPAWN_WOODS
+    },
+    -- Northwest villager
+    {
+        scenario.constants.BANDIT_SPAWN_STAIRS,
+        scenario.constants.BANDIT_SPAWN_BEAN,
+        scenario.constants.BANDIT_SPAWN_WOODS
+    },
+    -- Northeast villager
+    {
+        scenario.constants.BANDIT_SPAWN_BEAN,
+        scenario.constants.BANDIT_SPAWN_WOODS
+    },
+    -- Player
+    {
+        scenario.constants.BANDIT_SPAWN_CLIFF,
+        scenario.constants.BANDIT_SPAWN_WOODS
+    }
+}
+
 local VILLAGERS_PLAYER_ID = 1
 local BANDITS_PLAYER_ID = 2
 
+local ATTACK_INTERVAL = 60
+local ATTACK_TARGET_PLAYER = #VILLAGER_HALLS + 1
+
 local is_match_over = false
+local attack_index = 1
+local next_attack_time
 
 function scenario_init()
     actions.run(function ()
@@ -76,23 +111,30 @@ function scenario_init()
                 cell = villager_hall_cells[index],
                 cell_size = 4,
                 sight = 13,
-                duration = 7.0
+                duration = 6.0
             })
             actions.camera_pan(villager_hall_cells[index], camera_pan_durations[index])
             scenario.hold_camera()
+
+            -- Slight pause before sending message
+            actions.wait(0.2)
 
             if index == 1 then
                 scenario.chat("Bandits have been hitting these settlements hard.")
             elseif index == 2 then
                 scenario.chat("If their towns are destroyed, the villagers will have nowhere else to go.")
+            elseif index == 3 then
+                -- Announce new objective
+                scenario.play_sound(scenario.sound.UI_CLICK)
+                scenario.chat_prefixed(scenario.CHAT_COLOR_GOLD, "New Objective:", OBJECTIVE_PROTECT_VILLAGERS)
+                objectives.current_objective = OBJECTIVE_PROTECT_VILLAGERS
             end
-            actions.wait(2.0)
+            actions.wait(1.8)
         end
 
         actions.camera_pan(previous_camera_cell, 1.5)
         actions.wait(1.0)
 
-        objectives.announce_new_objective(OBJECTIVE_PROTECT_VILLAGERS)
         objectives.add_objective({
             objective = {
                 description = "Destroy the bandit's base",
@@ -112,10 +154,10 @@ function scenario_init()
 
         scenario.bot_set_config_flag(VILLAGERS_PLAYER_ID, scenario.bot_config_flag.SHOULD_PRODUCE, true)
 
-        actions.wait(10.0)
+        actions.wait(5.0)
         scenario.hint("You can how hire Wagons, which are fast transport units.")
 
-        spawn_harass_squad()
+        next_attack_time = scenario.get_time()
     end)
 end
 
@@ -142,6 +184,13 @@ function scenario_update()
         is_match_over = true
     end
 
+    -- Spawn harass squads
+    if not is_match_over and next_attack_time ~= nil and scenario.get_time() >= next_attack_time then
+        spawn_harass_squad()
+        next_attack_time = next_attack_time + ATTACK_INTERVAL
+        attack_index = attack_index + 1
+    end
+
     actions.update()
 end
 
@@ -159,18 +208,89 @@ function a_villager_hall_has_been_defeated()
     return false
 end
 
+function spawn_harass_squad_get_target_index()
+    if attack_index <= 4 then
+        return attack_index
+    end
+
+    local target_roll = math.random()
+    local CHANCE_TO_HIT_PLAYER = 0.2
+    if target_roll < CHANCE_TO_HIT_PLAYER then
+        return ATTACK_TARGET_PLAYER
+    end
+
+    local CHANCE_TO_HIT_EACH_VILLAGER = (1.0 - CHANCE_TO_HIT_PLAYER) / #VILLAGER_HALLS
+    target_roll = target_roll - CHANCE_TO_HIT_PLAYER
+    for villager_index=1,#VILLAGER_HALLS do
+        if target_roll < (CHANCE_TO_HIT_EACH_VILLAGER * villager_index) then
+            return villager_index
+        end
+    end
+
+    -- If we didn't return already, just choose the last villager
+    -- Most likely we will hit this scenario if the roll is 1.0 exactly,
+    -- which might end up being slightly above CHANCE_TO_HIT_EACH_VILLAGER * #VILLAGER_HALLS
+    return #VILLAGER_HALLS
+end
+
 function spawn_harass_squad()
-    local hall_id = VILLAGER_HALLS[1]
+    local target_index = spawn_harass_squad_get_target_index()
+
+    -- Determine spawn location
+    local spawn_roll = math.random(1, #ATTACK_SPAWN_CELLS[target_index])
+    local spawn_cell = ATTACK_SPAWN_CELLS[target_index][spawn_roll]
+
+    -- Determine hall ID
+    local hall_id
+    if target_index == ATTACK_TARGET_PLAYER then
+        hall_id = scenario.constants.PLAYER_HALL
+    else
+        hall_id = VILLAGER_HALLS[target_index]
+    end
+
+    -- Determine attack target based on hall
     local hall = {}
     if not scenario.get_entity_by_id(hall_id, hall) then
         scenario.log("Getting hall ", hall_id, " by ID failed in spawn_harass_squad().")
         return
     end
+    local target_cell = hall.cell
 
+    -- Determine size of harassment
+    local entity_count
+    if attack_index <= 4 then
+        entity_count = 3
+    else
+        entity_count = math.random(4, 12)
+    end
+
+    -- Determine entity types
+    local entity_types = {}
+    for entity_index=1,entity_count do
+        local entity_type
+        if attack_index <= 4 then
+            entity_type = scenario.entity_type.BANDIT
+        else
+            local entity_type_roll = math.random()
+            if entity_type_roll < 0.1 then
+                entity_type = scenario.entity_type.PYRO
+            elseif entity_type_roll < 0.3 then
+                entity_type = scenario.entity_type.SAPPER
+            elseif entity_type_roll < 0.6 then
+                entity_type = scenario.entity_type.COWBOY
+            else
+                entity_type = scenario.entity_type.BANDIT
+            end
+        end
+
+        table.insert(entity_types, entity_type)
+    end
+
+    -- Spawn harass squad
     squad_util.spawn_harass_squad({
         player_id = BANDITS_PLAYER_ID,
-        target_cell = hall.cell,
-        spawn_cell = scenario.constants.BANDIT_SPAWN_WOODS,
+        target_cell = target_cell,
+        spawn_cell = spawn_cell,
         entity_types = {
             scenario.entity_type.BANDIT,
             scenario.entity_type.BANDIT,
