@@ -404,12 +404,16 @@ void editor_update() {
                     break;
                 }
                 case EDITOR_TOOL_SQUADS: {
+                    bool already_clicked = false;
+
                     ui_begin_row(state.ui, ivec2(0, 0), 2);
                         std::vector<std::string> squad_dropdown_items;
                         for (uint32_t squad_index = 0; squad_index < state.scenario->squads.size(); squad_index++) {
                             squad_dropdown_items.push_back(std::string(state.scenario->squads[squad_index].name));
                         }
-                        ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.tool_value, squad_dropdown_items, false, 9);
+                        if (ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.tool_value, squad_dropdown_items, false, 9)) {
+                            already_clicked = true;
+                        }
                         if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_PLUS, false, false)) {
                             editor_do_action((EditorAction) {
                                 .type = EDITOR_ACTION_ADD_SQUAD
@@ -458,7 +462,7 @@ void editor_update() {
                                     }
                                     uint32_t entity_index = squad.entities[squad_entity_index];
                                     EntityType entity_type = state.scenario->entities[entity_index].type;
-                                    if (ui_icon_button(state.ui, entity_get_data(entity_type).icon, true)) {
+                                    if (ui_icon_button(state.ui, entity_get_data(entity_type).icon, true) && !already_clicked) {
                                         editor_remove_entity_from_squad(state.tool_value, entity_index);
                                     }
                                 }
@@ -2191,7 +2195,7 @@ void editor_render() {
             } else if (state.tool == EDITOR_TOOL_ADD_ENTITY) {
                 recolor_id = state.scenario->players[state.tool_add_entity_player_id].recolor_id;
             } else {
-                recolor_id = state.scenario->entities[state.tool_value].player_id;
+                recolor_id = state.scenario->players[state.scenario->entities[state.tool_value].player_id].recolor_id;
             }
 
             render_sprite_frame(entity_data.sprite, editor_entity_get_animation_frame(entity_type), entity_position, RENDER_SPRITE_NO_CULL, recolor_id);
