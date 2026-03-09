@@ -218,8 +218,8 @@ struct Entity {
 struct MatchPlayer {
     bool active;
     uint8_t team;
-    uint8_t vision_group;
     uint8_t recolor_id;
+    uint8_t padding = 0;
     // We need MAX_USERNAME_LENGTH + 1 to fit the null terminator,
     // but we add +4 instead to account for padding
     char name[MAX_USERNAME_LENGTH + 4];
@@ -344,7 +344,7 @@ struct Projectile {
 // Fog
 
 struct FogReveal {
-    uint32_t vision_group;
+    uint32_t team;
     ivec2 cell;
     int cell_size;
     int sight;
@@ -420,8 +420,8 @@ bool match_is_target_invalid(const MatchState& state, const Target& target, uint
 bool match_player_has_buildings(const MatchState& state, uint8_t player_id);
 bool match_player_has_entities(const MatchState& state, uint8_t player_id);
 
-uint32_t match_vision_group_find_remembered_entity_index(const MatchState& state, uint8_t vision_group, EntityId entity_id);
-bool match_vision_group_remembers_entity(const MatchState& state, uint8_t vision_group, EntityId entity_id);
+uint32_t match_team_find_remembered_entity_index(const MatchState& state, uint8_t team, EntityId entity_id);
+bool match_team_remembers_entity(const MatchState& state, uint8_t team, EntityId entity_id);
 
 // Entity
 
@@ -521,10 +521,10 @@ void match_event_player_defeated(MatchState& state, uint8_t player_id);
 
 // Fog
 
-int match_get_fog(const MatchState& state, uint8_t vision_group, ivec2 cell);
-bool match_is_cell_rect_revealed(const MatchState& state, uint8_t vision_group, ivec2 cell, int cell_size);
-bool match_is_cell_rect_explored(const MatchState& state, uint8_t vision_group, ivec2 cell, int cell_size);
-void match_fog_update(MatchState& state, uint8_t vision_group, ivec2 cell, int cell_size, int sight, bool has_detection, CellLayer cell_layer, bool increment);
+int match_get_fog(const MatchState& state, uint8_t team, ivec2 cell);
+bool match_is_cell_rect_revealed(const MatchState& state, uint8_t team, ivec2 cell, int cell_size);
+bool match_is_cell_rect_explored(const MatchState& state, uint8_t team, ivec2 cell, int cell_size);
+void match_fog_update(MatchState& state, uint8_t team, ivec2 cell, int cell_size, int sight, bool has_detection, CellLayer cell_layer, bool increment);
 
 // Fire
 

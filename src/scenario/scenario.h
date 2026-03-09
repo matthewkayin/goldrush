@@ -13,9 +13,8 @@
 
 struct ScenarioPlayer {
     uint8_t team;
-    uint8_t vision_group;
     uint8_t recolor_id;
-    uint8_t padding = 0;
+    uint16_t padding = 0;
     char name[MAX_USERNAME_LENGTH + 4];
     uint32_t starting_gold;
 };

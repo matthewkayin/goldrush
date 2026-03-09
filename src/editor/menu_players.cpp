@@ -92,14 +92,6 @@ void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorMenuMode&
                 }
             });
 
-            // Vision group
-            scroll_items.push_back([&menu, &ui, scenario]() {
-                uint32_t selected_value = scenario->players[menu.selected_player_id].vision_group;
-                if (editor_menu_dropdown(ui, "Vision Group: ", &selected_value, { "1", "2", "3", "4" }, MENU_RECT)) {
-                    scenario->players[menu.selected_player_id].vision_group = (uint8_t)selected_value;
-                }
-            });
-
             // Recolor ID
             scroll_items.push_back([&menu, &ui, scenario]() {
                 const std::vector<std::string> PLAYER_COLOR_STRS = { "Blue", "Red", "Green", "Purple" };

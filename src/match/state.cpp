@@ -241,9 +241,9 @@ void match_grant_player_upgrade(MatchState& state, uint8_t player_id, uint32_t u
             }
 
             // De-increment the detective's vision without detection
-            match_fog_update(state, state.players[entity.player_id].vision_group, entity.cell, entity_data.cell_size, entity_data.sight, false, entity_data.cell_layer, false);
+            match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, false, entity_data.cell_layer, false);
             // Then re-increment it with detection
-            match_fog_update(state, state.players[entity.player_id].vision_group, entity.cell, entity_data.cell_size, entity_data.sight, true, entity_data.cell_layer, true);
+            match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, true, entity_data.cell_layer, true);
         }
     }
 }
@@ -508,7 +508,7 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
                         .type = CELL_UNIT,
                         .id = state.entities.get_id_of(entity_index)
                     });
-                    match_fog_update(state, state.players[builder.player_id].vision_group, builder.cell, builder_data.cell_size, builder_data.sight, entity_has_detection(state, builder), builder_data.cell_layer, true);
+                    match_fog_update(state, state.players[builder.player_id].team, builder.cell, builder_data.cell_size, builder_data.sight, entity_has_detection(state, builder), builder_data.cell_layer, true);
                     break;
                 }
             }
@@ -773,7 +773,7 @@ void match_update(MatchState& state) {
         while (index < state.fog_reveals.size()) {
             state.fog_reveals[index].timer--;
             if (state.fog_reveals[index].timer == 0) {
-                match_fog_update(state, state.fog_reveals[index].vision_group, state.fog_reveals[index].cell, state.fog_reveals[index].cell_size, state.fog_reveals[index].sight, false, CELL_LAYER_GROUND, false);
+                match_fog_update(state, state.fog_reveals[index].team, state.fog_reveals[index].cell, state.fog_reveals[index].cell_size, state.fog_reveals[index].sight, false, CELL_LAYER_GROUND, false);
                 state.fog_reveals.remove_at_unordered(index);
             } else {
                 index++;
@@ -792,7 +792,7 @@ void match_update(MatchState& state) {
                 if (state.entities[entity_index].player_id != PLAYER_NONE && state.entities[entity_index].garrison_id == ID_NULL) {
                     const EntityData& entity_data = entity_get_data(state.entities[entity_index].type);
                     // Decrementing non-detection fog only because entities should clear their detection when they begin death
-                    match_fog_update(state, state.players[state.entities[entity_index].player_id].vision_group, state.entities[entity_index].cell, entity_data.cell_size, entity_data.sight, false, entity_data.cell_layer, false);
+                    match_fog_update(state, state.players[state.entities[entity_index].player_id].team, state.entities[entity_index].cell, entity_data.cell_size, entity_data.sight, false, entity_data.cell_layer, false);
                 }
                 // Remove this entity from garrisoned list if they are garrisoned
                 if (state.entities[entity_index].garrison_id != ID_NULL) {
@@ -818,16 +818,16 @@ void match_update(MatchState& state) {
     }
 
     // Update remembered entities
-    for (uint8_t vision_group = 0; vision_group < MAX_PLAYERS; vision_group++) {
+    for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
         // Remove any remembered entities (but only if the players can see that they should be removed)
         uint8_t remembered_entity_index = 0;
-        while (remembered_entity_index < state.remembered_entities[vision_group].size()) {
-            const RememberedEntity& remembered_entity = state.remembered_entities[vision_group][remembered_entity_index];
+        while (remembered_entity_index < state.remembered_entities[team].size()) {
+            const RememberedEntity& remembered_entity = state.remembered_entities[team][remembered_entity_index];
             uint32_t entity_index = state.entities.get_index_of(remembered_entity.entity_id);
             if ((entity_index == INDEX_INVALID || state.entities[entity_index].health == 0) && 
-                    match_is_cell_rect_revealed(state, vision_group, remembered_entity.cell, entity_get_data(remembered_entity.type).cell_size)) {
+                    match_is_cell_rect_revealed(state, team, remembered_entity.cell, entity_get_data(remembered_entity.type).cell_size)) {
                 // Remove remembered entity
-                state.remembered_entities[vision_group].remove_at_unordered(remembered_entity_index);
+                state.remembered_entities[team].remove_at_unordered(remembered_entity_index);
             } else {
                 remembered_entity_index++;
             }
@@ -966,9 +966,9 @@ bool match_player_has_entities(const MatchState& state, uint8_t player_id) {
     return false;
 }
 
-uint32_t match_vision_group_find_remembered_entity_index(const MatchState& state, uint8_t vision_group, EntityId entity_id) {
-    for (uint32_t index = 0; index < state.remembered_entities[vision_group].size(); index++) {
-        if (state.remembered_entities[vision_group][index].entity_id == entity_id) {
+uint32_t match_team_find_remembered_entity_index(const MatchState& state, uint8_t team, EntityId entity_id) {
+    for (uint32_t index = 0; index < state.remembered_entities[team].size(); index++) {
+        if (state.remembered_entities[team][index].entity_id == entity_id) {
             return index;
         }
     }
@@ -976,9 +976,9 @@ uint32_t match_vision_group_find_remembered_entity_index(const MatchState& state
     return MATCH_ENTITY_NOT_REMEMBERED;
 }
 
-bool match_vision_group_remembers_entity(const MatchState& state, uint8_t vision_group, EntityId entity_id) {
-    for (uint32_t index = 0; index < state.remembered_entities[vision_group].size(); index++) {
-        if (state.remembered_entities[vision_group][index].entity_id == entity_id) {
+bool match_team_remembers_entity(const MatchState& state, uint8_t team, EntityId entity_id) {
+    for (uint32_t index = 0; index < state.remembered_entities[team].size(); index++) {
+        if (state.remembered_entities[team][index].entity_id == entity_id) {
             return true;
         }
     }
@@ -1051,7 +1051,7 @@ EntityId entity_create(MatchState& state, EntityType type, ivec2 cell, uint8_t p
         .type = entity_is_unit(type) ? CELL_UNIT : CELL_BUILDING,
         .id = id
     });
-    match_fog_update(state, state.players[entity.player_id].vision_group, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, true);
+    match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, true);
 
     if (entity_is_building(type)) {
         map_calculate_unreachable_cells(state.map);
@@ -1144,9 +1144,9 @@ void entity_update(MatchState& state, uint32_t entity_index) {
 
             if (entity_has_detection(state, entity) && entity.garrison_id == ID_NULL) {
                 // Remove this units detection
-                match_fog_update(state, state.players[entity.player_id].vision_group, entity.cell, entity_data.cell_size, entity_data.sight, true, entity_data.cell_layer, false);
+                match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, true, entity_data.cell_layer, false);
                 // Then re-increment fog with non-detection so that we can still see death fade
-                match_fog_update(state, state.players[entity.player_id].vision_group, entity.cell, entity_data.cell_size, entity_data.sight, false, entity_data.cell_layer, true);
+                match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, false, entity_data.cell_layer, true);
             }
         } else {
             entity.mode = MODE_BUILDING_DESTROYED;
@@ -1436,13 +1436,13 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                                 .id = ID_NULL
                             });
                         }
-                        match_fog_update(state, state.players[entity.player_id].vision_group, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, false);
+                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, false);
                         entity.cell = entity_path->back();
                         map_set_cell_rect(state.map, entity_data.cell_layer, entity.cell, entity_data.cell_size, (Cell) {
                             .type = entity_is_mining(state, entity) ? CELL_MINER : CELL_UNIT,
                             .id = entity_id
                         });
-                        match_fog_update(state, state.players[entity.player_id].vision_group, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, true);
+                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, true);
                         entity_path->pop_back();
                         if (entity_path->empty()) {
                             state.entity_paths.release(entity.path_index);
@@ -1594,7 +1594,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                             map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
                                 .type = CELL_EMPTY, .id = ID_NULL
                             });
-                            match_fog_update(state, state.players[entity.player_id].vision_group, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, false);
+                            match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, false);
                             EntityId building_id = entity_create(state, entity.target.build.building_type, entity.target.build.building_cell, entity.player_id);
                             if (building_id != ID_NULL) {
                                 entity.target.id = building_id;
@@ -1777,7 +1777,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                             map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
                                 .type = CELL_EMPTY, .id = ID_NULL
                             });
-                            match_fog_update(state, state.players[entity.player_id].vision_group, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, false);
+                            match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, false);
                             match_event_play_sound(state, SOUND_GARRISON_IN, target.position.to_ivec2());
                             update_finished = true;
                             break;
@@ -1930,7 +1930,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                         if (entity.target.type == TARGET_NONE) {
                             entity.goldmine_id = ID_NULL;
                         }
-                        match_fog_update(state, state.players[entity.player_id].vision_group, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, false);
+                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, false);
                         entity.cell = exit_cell;
                         ivec2 exit_from_cell = get_nearest_cell_in_rect(exit_cell, mine.cell, mine_data.cell_size);
                         entity.direction = enum_from_ivec2_direction(exit_cell - exit_from_cell);
@@ -1942,7 +1942,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                                         : CELL_UNIT,
                             .id = entity_id
                         });
-                        match_fog_update(state, state.players[entity.player_id].vision_group, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, true);
+                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, true);
 
                         if (mine.garrisoned_units.empty() && mine.gold_held == 0) {
                             mine.mode = MODE_GOLDMINE_COLLAPSED;
@@ -2616,18 +2616,18 @@ bool entity_is_visible_to_player(const MatchState& state, const Entity& entity, 
         return false;
     }
 
-    if (entity.type != ENTITY_GOLDMINE && state.players[entity.player_id].vision_group == state.players[player_id].vision_group) {
+    if (entity.type != ENTITY_GOLDMINE && state.players[entity.player_id].team == state.players[player_id].team) {
         return true;
     }
 
     const bool entity_is_invisible = entity_check_flag(entity, ENTITY_FLAG_INVISIBLE);
     const int entity_cell_size = entity_get_data(entity.type).cell_size;
-    const uint8_t player_vision_group = state.players[player_id].vision_group;
+    const uint8_t player_team = state.players[player_id].team;
 
     for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size; y++) {
         for (int x = entity.cell.x; x < entity.cell.x + entity_cell_size; x++) {
-            if (state.fog[player_vision_group][x + (y * state.map.width)] > 0 && 
-                    (!entity_is_invisible || state.detection[player_vision_group][x + (y * state.map.width)] > 0)) {
+            if (state.fog[player_team][x + (y * state.map.width)] > 0 && 
+                    (!entity_is_invisible || state.detection[player_team][x + (y * state.map.width)] > 0)) {
                 return true;
             }
         }
@@ -2637,8 +2637,8 @@ bool entity_is_visible_to_player(const MatchState& state, const Entity& entity, 
         ivec2 prev_cell = entity.cell - DIRECTION_IVEC2[entity.direction];
         for (int y = prev_cell.y; y < prev_cell.y + entity_cell_size; y++) {
             for (int x = prev_cell.x; x < prev_cell.x + entity_cell_size; x++) {
-                if (state.fog[player_vision_group][x + (y * state.map.width)] > 0 && 
-                        (!entity_is_invisible || state.detection[player_vision_group][x + (y * state.map.width)] > 0)) {
+                if (state.fog[player_team][x + (y * state.map.width)] > 0 && 
+                        (!entity_is_invisible || state.detection[player_team][x + (y * state.map.width)] > 0)) {
                     return true;
                 }
             }
@@ -3176,13 +3176,13 @@ void entity_attack_target(MatchState& state, EntityId attacker_id) {
     if (entity_get_elevation(attacker, state.map) > entity_get_elevation(defender, state.map) &&
             !entity_check_flag(attacker, ENTITY_FLAG_INVISIBLE)) {
         FogReveal reveal = (FogReveal) {
-            .vision_group = state.players[defender.player_id].vision_group,
+            .team = state.players[defender.player_id].team,
             .cell = attacker.cell,
             .cell_size = attacker_data.cell_size,
             .sight = 3,
             .timer = FOG_REVEAL_DURATION
         };
-        match_fog_update(state, reveal.vision_group, reveal.cell, reveal.cell_size, reveal.sight, false, CELL_LAYER_GROUND, true);
+        match_fog_update(state, reveal.team, reveal.cell, reveal.cell_size, reveal.sight, false, CELL_LAYER_GROUND, true);
         state.fog_reveals.push_back(reveal);
     }
 
@@ -3335,7 +3335,7 @@ void entity_unload_unit(MatchState& state, Entity& carrier, EntityId garrisoned_
             map_set_cell_rect(state.map, CELL_LAYER_GROUND, garrisoned_unit.cell, garrisoned_unit_data.cell_size, (Cell) {
                 .type = CELL_UNIT, .id = carrier.garrisoned_units[index]
             });
-            match_fog_update(state, state.players[garrisoned_unit.player_id].vision_group, garrisoned_unit.cell, garrisoned_unit_data.cell_size, garrisoned_unit_data.sight, entity_has_detection(state, garrisoned_unit), garrisoned_unit_data.cell_layer, true);
+            match_fog_update(state, state.players[garrisoned_unit.player_id].team, garrisoned_unit.cell, garrisoned_unit_data.cell_size, garrisoned_unit_data.sight, entity_has_detection(state, garrisoned_unit), garrisoned_unit_data.cell_layer, true);
             garrisoned_unit.mode = MODE_UNIT_IDLE;
             garrisoned_unit.target = target_none();
             garrisoned_unit.garrison_id = ID_NULL;
@@ -3371,7 +3371,7 @@ void entity_release_garrisoned_units_on_death(MatchState& state, Entity& entity)
                     map_set_cell_rect(state.map, CELL_LAYER_GROUND, garrisoned_unit.cell, garrisoned_unit_data.cell_size, (Cell) {
                         .type = CELL_UNIT, .id = garrisoned_unit_id
                     });
-                    match_fog_update(state, state.players[garrisoned_unit.player_id].vision_group, garrisoned_unit.cell, garrisoned_unit_data.cell_size, garrisoned_unit_data.sight, entity_has_detection(state, garrisoned_unit), garrisoned_unit_data.cell_layer, true);
+                    match_fog_update(state, state.players[garrisoned_unit.player_id].team, garrisoned_unit.cell, garrisoned_unit_data.cell_size, garrisoned_unit_data.sight, entity_has_detection(state, garrisoned_unit), garrisoned_unit_data.cell_layer, true);
                     unit_is_placed = true;
                     break;
                 }
@@ -3512,7 +3512,7 @@ void entity_stop_building(MatchState& state, EntityId entity_id) {
     map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
         .type = CELL_UNIT, .id = entity_id
     });
-    match_fog_update(state, state.players[entity.player_id].vision_group, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, true); 
+    match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_has_detection(state, entity), entity_data.cell_layer, true); 
 }
 
 void entity_building_finish(MatchState& state, EntityId building_id) {
@@ -3787,14 +3787,14 @@ void match_event_player_defeated(MatchState& state, uint8_t player_id) {
 
 // FOG
 
-int match_get_fog(const MatchState& state, uint8_t vision_group, ivec2 cell) {
-    return state.fog[vision_group][cell.x + (cell.y * state.map.width)];
+int match_get_fog(const MatchState& state, uint8_t team, ivec2 cell) {
+    return state.fog[team][cell.x + (cell.y * state.map.width)];
 }
 
-bool match_is_cell_rect_revealed(const MatchState& state, uint8_t vision_group, ivec2 cell, int cell_size) {
+bool match_is_cell_rect_revealed(const MatchState& state, uint8_t team, ivec2 cell, int cell_size) {
     for (int y = cell.y; y < cell.y + cell_size; y++) {
         for (int x = cell.x; x < cell.x + cell_size; x++) {
-            if (state.fog[vision_group][x + (y * state.map.width)] > 0) {
+            if (state.fog[team][x + (y * state.map.width)] > 0) {
                 return true;
             }
         }
@@ -3803,10 +3803,10 @@ bool match_is_cell_rect_revealed(const MatchState& state, uint8_t vision_group, 
     return false;
 }
 
-bool match_is_cell_rect_explored(const MatchState& state, uint8_t vision_group, ivec2 cell, int cell_size) {
+bool match_is_cell_rect_explored(const MatchState& state, uint8_t team, ivec2 cell, int cell_size) {
     for (int y = cell.y; y < cell.y + cell_size; y++) {
         for (int x = cell.x; x < cell.x + cell_size; x++) {
-            if (state.fog[vision_group][x + (y * state.map.width)] != FOG_HIDDEN) {
+            if (state.fog[team][x + (y * state.map.width)] != FOG_HIDDEN) {
                 return true;
             }
         }
@@ -3815,7 +3815,7 @@ bool match_is_cell_rect_explored(const MatchState& state, uint8_t vision_group, 
     return false;
 }
 
-void match_fog_update(MatchState& state, uint8_t vision_group, ivec2 cell, int cell_size, int sight, bool has_detection, CellLayer cell_layer, bool increment) {
+void match_fog_update(MatchState& state, uint8_t team, ivec2 cell, int cell_size, int sight, bool has_detection, CellLayer cell_layer, bool increment) {
     /*
     * This function does a raytrace from the cell center outwards to determine what this unit can see
     * Raytracing is done using Bresenham's Line Generation Algorithm (https://www.geeksforgeeks.org/bresenhams-line-generation-algorithm/)
@@ -3887,18 +3887,18 @@ void match_fog_update(MatchState& state, uint8_t vision_group, ivec2 cell, int c
                 }
 
                 if (increment) {
-                    if (state.fog[vision_group][line_cell.x + (line_cell.y * state.map.width)] == FOG_HIDDEN) {
-                        state.fog[vision_group][line_cell.x + (line_cell.y * state.map.width)] = 1;
+                    if (state.fog[team][line_cell.x + (line_cell.y * state.map.width)] == FOG_HIDDEN) {
+                        state.fog[team][line_cell.x + (line_cell.y * state.map.width)] = 1;
                     } else {
-                        state.fog[vision_group][line_cell.x + (line_cell.y * state.map.width)]++;
+                        state.fog[team][line_cell.x + (line_cell.y * state.map.width)]++;
                     }
                     if (has_detection) {
-                        state.detection[vision_group][line_cell.x + (line_cell.y * state.map.width)]++;
+                        state.detection[team][line_cell.x + (line_cell.y * state.map.width)]++;
                     }
                 } else {
-                    state.fog[vision_group][line_cell.x + (line_cell.y * state.map.width)]--;
+                    state.fog[team][line_cell.x + (line_cell.y * state.map.width)]--;
                     if (has_detection) {
-                        state.detection[vision_group][line_cell.x + (line_cell.y * state.map.width)]--;
+                        state.detection[team][line_cell.x + (line_cell.y * state.map.width)]--;
                     }
 
                     // Remember revealed entities
@@ -3922,11 +3922,11 @@ void match_fog_update(MatchState& state, uint8_t vision_group, ivec2 cell, int c
                                 .cell = entity.cell
                             };
 
-                            uint32_t remembered_entity_index = match_vision_group_find_remembered_entity_index(state, vision_group, map_cell.id);
+                            uint32_t remembered_entity_index = match_team_find_remembered_entity_index(state, team, map_cell.id);
                             if (remembered_entity_index == MATCH_ENTITY_NOT_REMEMBERED) {
-                                state.remembered_entities[vision_group].push_back(remembered_entity);
+                                state.remembered_entities[team].push_back(remembered_entity);
                             } else {
-                                state.remembered_entities[vision_group][remembered_entity_index] = remembered_entity;
+                                state.remembered_entities[team][remembered_entity_index] = remembered_entity;
                             }
                         }
                     } // End if cell value < cell empty

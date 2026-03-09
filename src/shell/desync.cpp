@@ -229,25 +229,25 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
     GOLD_ASSERT(memcmp(&state_a->map, &state_b->map, sizeof(state_a->map)) == 0);
 
     // Fog
-    for (uint8_t vision_group = 0; vision_group < MAX_PLAYERS; vision_group++) {
+    for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
         for (size_t index = 0; index < MAP_SIZE_MAX * MAP_SIZE_MAX; index++) {
-            GOLD_ASSERT(state_a->fog[vision_group][index] == state_b->fog[vision_group][index]);
+            GOLD_ASSERT(state_a->fog[team][index] == state_b->fog[team][index]);
         }
     }
 
     // Detection
-    for (uint8_t vision_group = 0; vision_group < MAX_PLAYERS; vision_group++) {
+    for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
         for (size_t index = 0; index < MAP_SIZE_MAX * MAP_SIZE_MAX; index++) {
-            GOLD_ASSERT(state_a->detection[vision_group][index] == state_b->detection[vision_group][index]);
+            GOLD_ASSERT(state_a->detection[team][index] == state_b->detection[team][index]);
         }
     }
 
     // Remembered entities
-    for (uint8_t vision_group = 0; vision_group < MAX_PLAYERS; vision_group++) {
-        GOLD_ASSERT(state_a->remembered_entities[vision_group].size() == state_b->remembered_entities[vision_group].size());
+    for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
+        GOLD_ASSERT(state_a->remembered_entities[team].size() == state_b->remembered_entities[team].size());
         for (size_t index = 0; index < MATCH_MAX_REMEMBERED_ENTITIES; index++) {
-            const RememberedEntity& entity_a = state_a->remembered_entities[vision_group].data[index];
-            const RememberedEntity& entity_b = state_b->remembered_entities[vision_group].data[index];
+            const RememberedEntity& entity_a = state_a->remembered_entities[team].data[index];
+            const RememberedEntity& entity_b = state_b->remembered_entities[team].data[index];
 
             GOLD_ASSERT(entity_a.entity_id == entity_b.entity_id);
             GOLD_ASSERT(entity_a.type == entity_b.type);
@@ -257,7 +257,7 @@ void desync_compare_frames(uint8_t* state_buffer_a, uint8_t* state_buffer_b) {
 
             GOLD_ASSERT(memcmp(&entity_a, &entity_b, sizeof(entity_a)) == 0);
         }
-        GOLD_ASSERT(memcmp(&state_a->remembered_entities[vision_group], &state_b->remembered_entities[vision_group], sizeof(state_a->remembered_entities[vision_group])) == 0);
+        GOLD_ASSERT(memcmp(&state_a->remembered_entities[team], &state_b->remembered_entities[team], sizeof(state_a->remembered_entities[team])) == 0);
     }
 
     // Entities

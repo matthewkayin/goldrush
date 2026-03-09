@@ -33634,7 +33634,6 @@
 		{
 			"name": "Player",
 			"team": 0,
-			"vision_group": 0,
 			"recolor_id": 0,
 			"starting_gold": 50,
 			"allowed_upgrades": [
@@ -33662,7 +33661,6 @@
 		{
 			"name": "Villagers",
 			"team": 0,
-			"vision_group": 1,
 			"recolor_id": 2,
 			"starting_gold": 50,
 			"opener": "Tech First",
@@ -33680,7 +33678,6 @@
 		{
 			"name": "Bandits",
 			"team": 1,
-			"vision_group": 2,
 			"recolor_id": 1,
 			"starting_gold": 50,
 			"opener": "Tech First",
@@ -33694,7 +33691,6 @@
 		{
 			"name": "Enemy 3",
 			"team": 3,
-			"vision_group": 3,
 			"recolor_id": 3,
 			"starting_gold": 50,
 			"opener": "Tech First",
@@ -34560,6 +34556,24 @@
 			"cell": {
 				"x": 10,
 				"y": 99
+			}
+		},
+		{
+			"type": "Cowboy",
+			"player_id": 0,
+			"gold_held": 0,
+			"cell": {
+				"x": 104,
+				"y": 72
+			}
+		},
+		{
+			"type": "Cowboy",
+			"player_id": 0,
+			"gold_held": 0,
+			"cell": {
+				"x": 105,
+				"y": 73
 			}
 		}
 	],
