@@ -2424,6 +2424,8 @@ AnimationName entity_get_expected_animation(const Entity& entity) {
                 return ANIMATION_BALLOON_DEATH_START;
             case MODE_UNIT_BALLOON_DEATH:
                 return ANIMATION_BALLOON_DEATH;
+            case MODE_UNIT_DEATH_FADE:
+                return ANIMATION_BALLOON_DEATH_FADE;
             default: 
                 return ANIMATION_UNIT_IDLE;
         }

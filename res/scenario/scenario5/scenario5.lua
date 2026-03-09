@@ -52,10 +52,10 @@ local ATTACK_SPAWN_CELLS = {
         scenario.constants.BANDIT_SPAWN_BEAN,
         scenario.constants.BANDIT_SPAWN_WOODS
     },
-    -- Player
+    -- Player expansion
     {
-        scenario.constants.BANDIT_SPAWN_CLIFF,
-        scenario.constants.BANDIT_SPAWN_WOODS
+        scenario.constants.BANDIT_SPAWN_BEAN,
+        scenario.constants.BANDIT_SPAWN_STAIRS
     }
 }
 
@@ -67,6 +67,7 @@ local ATTACK_TARGET_PLAYER = #VILLAGER_HALLS + 1
 
 local is_match_over = false
 local next_attack_time
+local player_expansion_hall_id = nil
 
 function scenario_init()
     actions.run(function ()
@@ -155,60 +156,24 @@ function scenario_init()
 
         actions.wait(15)
 
-        -- Harass each villager
+        -- Send first harass
         local spawn_cells = {
             scenario.constants.BANDIT_SPAWN_WOODS,
             scenario.constants.BANDIT_SPAWN_STAIRS,
             scenario.constants.BANDIT_SPAWN_BEAN
         }
-        local target_index1 = math.random(1, 3)
-        local target_index2 = math.random(1, 3)
-        if target_index2 == target_index1 then
-            if target_index2 == 3 then
-                target_index2 = 1
-            else
-                target_index2 = target_index2 + 1
-            end
-        end
-        squad_util.spawn_harass_squad({
-            player_id = BANDITS_PLAYER_ID,
-            target_cell = villager_hall_cells[target_index1],
-            spawn_cell = spawn_cells[target_index1],
-            entity_types = {
-                scenario.entity_type.BANDIT,
-                scenario.entity_type.BANDIT,
-                scenario.entity_type.BANDIT
-            }
-        })
-        squad_util.spawn_harass_squad({
-            player_id = BANDITS_PLAYER_ID,
-            target_cell = villager_hall_cells[target_index2],
-            spawn_cell = spawn_cells[target_index2],
-            entity_types = {
-                scenario.entity_type.BANDIT,
-                scenario.entity_type.BANDIT,
-                scenario.entity_type.BANDIT
-            }
-        })
-
-        actions.wait(ATTACK_INTERVAL)
-
-        -- Harass player
-        if scenario.get_entity_by_id(scenario.constants.PLAYER_HALL, hall) then
+        local target_indices = choose_random_harass_targets()
+        for index = 1,#target_indices do
             squad_util.spawn_harass_squad({
                 player_id = BANDITS_PLAYER_ID,
-                target_cell = hall.cell,
-                spawn_cell = scenario.constants.BANDIT_SPAWN_CLIFF,
+                target_cell = villager_hall_cells[target_indices[index]],
+                spawn_cell = spawn_cells[target_indices[index]],
                 entity_types = {
                     scenario.entity_type.BANDIT,
                     scenario.entity_type.BANDIT,
                     scenario.entity_type.BANDIT
                 }
             })
-        else
-            -- This is only a warning since the player could have destroyed their own hall and the game shouldn't crash in that instance
-            -- But we still want this to warn us in case the hall ID isn't set properly
-            scenario.log("WARN - Player hall ID not found")
         end
 
         next_attack_time = scenario.get_time() + ATTACK_INTERVAL
@@ -238,21 +203,30 @@ function scenario_update()
         is_match_over = true
     end
 
+    -- Check for player expansion death
+    if player_expansion_hall_id ~= nil then
+        local hall = {}
+        local hall_is_alive =
+            scenario.get_entity_by_id(player_expansion_hall_id, hall)
+            and hall.health ~= 0
+        
+        if not hall_is_alive then
+            player_expansion_hall_id = nil
+        end
+    end
+
+    -- Check for player expansion
+    if player_expansion_hall_id == nil then
+        player_expansion_hall_id = scenario.get_hall_surrounding_goldmine(scenario.constants.UNOCCUPIED_GOLDMINE)
+    end
+
     -- Spawn harass squads
     if not is_match_over and next_attack_time ~= nil and scenario.get_time() >= next_attack_time then
-        -- Determine attack target indexes
-        local target_index1 = math.random(1, 4)
-        local target_index2 = math.random(1, 4)
-        if target_index2 == target_index1 then
-            if target_index2 == 4 then
-                target_index2 = 1
-            else
-                target_index2 = target_index2 + 1
-            end
+        local target_indices = choose_random_harass_targets()
+        for index = 1,#target_indices do
+            harass_villager(target_indices[index])
         end
 
-        spawn_harass_squad(target_index1)
-        spawn_harass_squad(target_index2)
         next_attack_time = next_attack_time + ATTACK_INTERVAL
     end
 
@@ -273,7 +247,26 @@ function a_villager_hall_has_been_defeated()
     return false
 end
 
-function spawn_harass_squad(target_index)
+function choose_random_harass_targets()
+    local upper_bound = 3
+    if player_expansion_hall_id ~= nil then
+        upper_bound = 4
+    end
+
+    local target_index1 = math.random(1, upper_bound)
+    local target_index2 = math.random(1, upper_bound)
+    if target_index2 == target_index1 then
+        if target_index2 == upper_bound then
+            target_index2 = 1
+        else
+            target_index2 = target_index2 + 1
+        end
+    end
+
+    return { target_index1, target_index2 }
+end
+
+function harass_villager(target_index)
     -- Determine spawn location
     local spawn_roll = math.random(1, #ATTACK_SPAWN_CELLS[target_index])
     local spawn_cell = ATTACK_SPAWN_CELLS[target_index][spawn_roll]

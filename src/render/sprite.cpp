@@ -1307,7 +1307,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "entity/unit_balloon.png",
-            .hframes = 5,
+            .hframes = 6,
             .vframes = 3
         }
     }},

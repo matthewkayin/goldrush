@@ -34835,9 +34835,9 @@
 			}
 		},
 		{
-			"name": "PLAYER_HALL",
+			"name": "UNOCCUPIED_GOLDMINE",
 			"type": "Entity",
-			"entity_index": 64
+			"entity_index": 97
 		},
 		{
 			"name": "VILLAGER_MINE1",

@@ -1,6 +1,5 @@
 #include "animation.h"
 
-#include "asserts.h"
 #include <unordered_map>
 #include <vector>
 
@@ -15,7 +14,7 @@ struct AnimationData {
     int loops;
 };
 
-static std::unordered_map<AnimationName, AnimationData> ANIMATION_DATA;
+static AnimationData ANIMATION_DATA[ANIMATION_NAME_COUNT];
 static bool initialized = false;
 
 std::vector<AnimationFrame> animation_frame_range(int start_hframe, int end_hframe, uint32_t duration) {
@@ -157,6 +156,13 @@ void animation_init() {
         .frames = animation_frame_range(3, 4, 8),
         .loops = ANIMATION_LOOPS_INDEFINITELY
     };
+    ANIMATION_DATA[ANIMATION_BALLOON_DEATH_FADE] = (AnimationData) {
+        .vframe = -1,
+        .frames = {
+            (AnimationFrame) { .hframe = 5, .duration = 180 * 3 }
+        },
+        .loops = 1
+    };
     ANIMATION_DATA[ANIMATION_RALLY_FLAG] = (AnimationData) {
         .vframe = 0,
         .frames = animation_frame_range(0, 5, 6),
@@ -231,15 +237,15 @@ Animation animation_create(AnimationName name) {
         animation_init();
     }
 
-    auto it = ANIMATION_DATA.find(name);
-    GOLD_ASSERT(it != ANIMATION_DATA.end());
+    GOLD_ASSERT(name < ANIMATION_NAME_COUNT);
+    const AnimationData& animation_data = ANIMATION_DATA[name];
 
     Animation animation;
     animation.name = name;
     animation.timer = 0;
     animation.frame_index = 0;
-    animation.frame = ivec2(it->second.frames[0].hframe, it->second.vframe != -1 ? it->second.vframe : 0);
-    animation.loops_remaining = it->second.loops;
+    animation.frame = ivec2(animation_data.frames[0].hframe, animation_data.vframe != -1 ? animation_data.vframe : 0);
+    animation.loops_remaining = animation_data.loops;
 
     return animation;
 }
@@ -249,17 +255,17 @@ bool animation_is_playing(const Animation& animation) {
 }
 
 void animation_update(Animation& animation) {
-    auto it = ANIMATION_DATA.find(animation.name);
-    GOLD_ASSERT(it != ANIMATION_DATA.end());
+    GOLD_ASSERT(animation.name < ANIMATION_NAME_COUNT);
+    const AnimationData& animation_data = ANIMATION_DATA[animation.name];
 
     animation.timer++;
-    if (animation.timer == it->second.frames[animation.frame_index].duration) {
+    if (animation.timer == animation_data.frames[animation.frame_index].duration) {
         animation.timer = 0;
-        if (animation.frame_index < it->second.frames.size() - 1) {
+        if (animation.frame_index < animation_data.frames.size() - 1) {
             animation.frame_index++;
             animation.frame.x++;
         } else {
-            if (it->second.loops != ANIMATION_LOOPS_INDEFINITELY) {
+            if (animation_data.loops != ANIMATION_LOOPS_INDEFINITELY) {
                 animation.loops_remaining--;
             }
             if (animation.loops_remaining != 0) {
@@ -267,7 +273,7 @@ void animation_update(Animation& animation) {
                 animation.frame_index = 0;
             }
         }
-        animation.frame.x = it->second.frames[animation.frame_index].hframe;
+        animation.frame.x = animation_data.frames[animation.frame_index].hframe;
     }
 }
 
