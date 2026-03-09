@@ -69,7 +69,6 @@ local ATTACK_INTERVAL = 60
 local ATTACK_TARGET_PLAYER = #VILLAGER_HALLS + 1
 
 local is_match_over = false
-local attack_index = 1
 local next_attack_time
 
 function scenario_init()
@@ -157,7 +156,48 @@ function scenario_init()
         actions.wait(5.0)
         scenario.hint("You can how hire Wagons, which are fast transport units.")
 
-        next_attack_time = scenario.get_time()
+        actions.wait(60)
+
+        -- Harass each villager
+        local spawn_cells = {
+            scenario.constants.BANDIT_SPAWN_WOODS,
+            scenario.constants.BANDIT_SPAWN_STAIRS,
+            scenario.constants.BANDIT_SPAWN_BEAN
+        }
+        for villager_index=1,#VILLAGER_HALLS do
+            squad_util.spawn_harass_squad({
+                player_id = BANDITS_PLAYER_ID,
+                target_cell = villager_hall_cells[villager_index],
+                spawn_cell = spawn_cells[villager_index],
+                entity_types = {
+                    scenario.entity_type.BANDIT,
+                    scenario.entity_type.BANDIT,
+                    scenario.entity_type.BANDIT
+                }
+            })
+        end
+
+        actions.wait(ATTACK_INTERVAL)
+
+        -- Harass player
+        if scenario.get_entity_by_id(scenario.constants.PLAYER_HALL, hall) then
+            squad_util.spawn_harass_squad({
+                player_id = BANDITS_PLAYER_ID,
+                target_cell = hall.cell,
+                spawn_cell = scenario.constants.BANDIT_SPAWN_CLIFF,
+                entity_types = {
+                    scenario.entity_type.BANDIT,
+                    scenario.entity_type.BANDIT,
+                    scenario.entity_type.BANDIT
+                }
+            })
+        else
+            -- This is only a warning since the player could have destroyed their own hall and the game shouldn't crash in that instance
+            -- But we still want this to warn us in case the hall ID isn't set properly
+            scenario.log("WARN - Player hall ID not found")
+        end
+
+        next_attack_time = scenario.get_time() + ATTACK_INTERVAL
     end)
 end
 
@@ -186,9 +226,20 @@ function scenario_update()
 
     -- Spawn harass squads
     if not is_match_over and next_attack_time ~= nil and scenario.get_time() >= next_attack_time then
-        spawn_harass_squad()
+        -- Determine attack target indexes
+        local target_index1 = math.random(1, 4)
+        local target_index2 = math.random(1, 4)
+        if target_index2 == target_index1 then
+            if target_index2 == 4 then
+                target_index2 = 1
+            else
+                target_index2 = target_index2 + 1
+            end
+        end
+
+        spawn_harass_squad(target_index1)
+        spawn_harass_squad(target_index2)
         next_attack_time = next_attack_time + ATTACK_INTERVAL
-        attack_index = attack_index + 1
     end
 
     actions.update()
@@ -208,34 +259,7 @@ function a_villager_hall_has_been_defeated()
     return false
 end
 
-function spawn_harass_squad_get_target_index()
-    if attack_index <= 4 then
-        return attack_index
-    end
-
-    local target_roll = math.random()
-    local CHANCE_TO_HIT_PLAYER = 0.2
-    if target_roll < CHANCE_TO_HIT_PLAYER then
-        return ATTACK_TARGET_PLAYER
-    end
-
-    local CHANCE_TO_HIT_EACH_VILLAGER = (1.0 - CHANCE_TO_HIT_PLAYER) / #VILLAGER_HALLS
-    target_roll = target_roll - CHANCE_TO_HIT_PLAYER
-    for villager_index=1,#VILLAGER_HALLS do
-        if target_roll < (CHANCE_TO_HIT_EACH_VILLAGER * villager_index) then
-            return villager_index
-        end
-    end
-
-    -- If we didn't return already, just choose the last villager
-    -- Most likely we will hit this scenario if the roll is 1.0 exactly,
-    -- which might end up being slightly above CHANCE_TO_HIT_EACH_VILLAGER * #VILLAGER_HALLS
-    return #VILLAGER_HALLS
-end
-
-function spawn_harass_squad()
-    local target_index = spawn_harass_squad_get_target_index()
-
+function spawn_harass_squad(target_index)
     -- Determine spawn location
     local spawn_roll = math.random(1, #ATTACK_SPAWN_CELLS[target_index])
     local spawn_cell = ATTACK_SPAWN_CELLS[target_index][spawn_roll]
@@ -256,34 +280,36 @@ function spawn_harass_squad()
     end
     local target_cell = hall.cell
 
-    -- Determine size of harassment
-    local entity_count
-    if attack_index <= 4 then
-        entity_count = 3
+    local ATTACK_TYPE_BANDITS = 1
+    local ATTACK_TYPE_SAPPER = 2
+    local ATTACK_TYPE_PYRO = 3
+
+    local attack_type_roll = math.random()
+    local entity_types
+    if attack_type_roll < 0.6 then
+        attack_type = ATTACK_TYPE_BANDITS
+        entity_types = {
+            scenario.entity_type.BANDIT,
+            scenario.entity_type.BANDIT,
+            scenario.entity_type.BANDIT,
+            scenario.entity_type.COWBOY,
+            scenario.entity_type.COWBOY
+        }
+    elseif attack_type_roll < 0.9 then
+        attack_type = ATTACK_TYPE_SAPPER
+        entity_types = {
+            scenario.entity_type.SAPPER,
+            scenario.entity_type.SAPPER,
+            scenario.entity_type.COWBOY,
+            scenario.entity_type.COWBOY
+        }
     else
-        entity_count = math.random(4, 12)
-    end
-
-    -- Determine entity types
-    local entity_types = {}
-    for entity_index=1,entity_count do
-        local entity_type
-        if attack_index <= 4 then
-            entity_type = scenario.entity_type.BANDIT
-        else
-            local entity_type_roll = math.random()
-            if entity_type_roll < 0.1 then
-                entity_type = scenario.entity_type.PYRO
-            elseif entity_type_roll < 0.3 then
-                entity_type = scenario.entity_type.SAPPER
-            elseif entity_type_roll < 0.6 then
-                entity_type = scenario.entity_type.COWBOY
-            else
-                entity_type = scenario.entity_type.BANDIT
-            end
-        end
-
-        table.insert(entity_types, entity_type)
+        attack_type = ATTACK_TYPE_PYRO
+        entity_types = {
+            scenario.entity_type.PYRO,
+            scenario.entity_type.COWBOY,
+            scenario.entity_type.COWBOY
+        }
     end
 
     -- Spawn harass squad
@@ -291,10 +317,6 @@ function spawn_harass_squad()
         player_id = BANDITS_PLAYER_ID,
         target_cell = target_cell,
         spawn_cell = spawn_cell,
-        entity_types = {
-            scenario.entity_type.BANDIT,
-            scenario.entity_type.BANDIT,
-            scenario.entity_type.BANDIT
-        }
+        entity_types = entity_types
     })
 end
