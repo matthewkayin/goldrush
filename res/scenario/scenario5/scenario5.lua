@@ -65,7 +65,7 @@ local ATTACK_SPAWN_CELLS = {
 local VILLAGERS_PLAYER_ID = 1
 local BANDITS_PLAYER_ID = 2
 
-local ATTACK_INTERVAL = 60
+local ATTACK_INTERVAL = 180
 local ATTACK_TARGET_PLAYER = #VILLAGER_HALLS + 1
 
 local is_match_over = false
