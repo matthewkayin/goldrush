@@ -32,7 +32,6 @@ local VILLAGER_MINERS = {
     }
 }
 
--- BANDIT_SPAWN_LAKE
 -- BANDIT_SPAWN_BEAN
 -- BANDIT_SPAWN_CLIFF
 -- BANDIT_SPAWN_STAIRS
@@ -40,15 +39,13 @@ local VILLAGER_MINERS = {
 local ATTACK_SPAWN_CELLS = {
     -- Southern villager
     {
-        scenario.constants.BANDIT_SPAWN_LAKE,
         scenario.constants.BANDIT_SPAWN_CLIFF,
         scenario.constants.BANDIT_SPAWN_WOODS
     },
     -- Northwest villager
     {
         scenario.constants.BANDIT_SPAWN_STAIRS,
-        scenario.constants.BANDIT_SPAWN_BEAN,
-        scenario.constants.BANDIT_SPAWN_WOODS
+        scenario.constants.BANDIT_SPAWN_BEAN
     },
     -- Northeast villager
     {
@@ -65,7 +62,7 @@ local ATTACK_SPAWN_CELLS = {
 local VILLAGERS_PLAYER_ID = 1
 local BANDITS_PLAYER_ID = 2
 
-local ATTACK_INTERVAL = 180
+local ATTACK_INTERVAL = 90
 local ATTACK_TARGET_PLAYER = #VILLAGER_HALLS + 1
 
 local is_match_over = false
@@ -156,7 +153,7 @@ function scenario_init()
         actions.wait(5.0)
         scenario.hint("You can how hire Wagons, which are fast transport units.")
 
-        actions.wait(60)
+        actions.wait(15)
 
         -- Harass each villager
         local spawn_cells = {
@@ -164,18 +161,35 @@ function scenario_init()
             scenario.constants.BANDIT_SPAWN_STAIRS,
             scenario.constants.BANDIT_SPAWN_BEAN
         }
-        for villager_index=1,#VILLAGER_HALLS do
-            squad_util.spawn_harass_squad({
-                player_id = BANDITS_PLAYER_ID,
-                target_cell = villager_hall_cells[villager_index],
-                spawn_cell = spawn_cells[villager_index],
-                entity_types = {
-                    scenario.entity_type.BANDIT,
-                    scenario.entity_type.BANDIT,
-                    scenario.entity_type.BANDIT
-                }
-            })
+        local target_index1 = math.random(1, 3)
+        local target_index2 = math.random(1, 3)
+        if target_index2 == target_index1 then
+            if target_index2 == 3 then
+                target_index2 = 1
+            else
+                target_index2 = target_index2 + 1
+            end
         end
+        squad_util.spawn_harass_squad({
+            player_id = BANDITS_PLAYER_ID,
+            target_cell = villager_hall_cells[target_index1],
+            spawn_cell = spawn_cells[target_index1],
+            entity_types = {
+                scenario.entity_type.BANDIT,
+                scenario.entity_type.BANDIT,
+                scenario.entity_type.BANDIT
+            }
+        })
+        squad_util.spawn_harass_squad({
+            player_id = BANDITS_PLAYER_ID,
+            target_cell = villager_hall_cells[target_index2],
+            spawn_cell = spawn_cells[target_index2],
+            entity_types = {
+                scenario.entity_type.BANDIT,
+                scenario.entity_type.BANDIT,
+                scenario.entity_type.BANDIT
+            }
+        })
 
         actions.wait(ATTACK_INTERVAL)
 

@@ -34374,8 +34374,8 @@
 			"player_id": 0,
 			"gold_held": 0,
 			"cell": {
-				"x": 112,
-				"y": 53
+				"x": 110,
+				"y": 54
 			}
 		},
 		{
@@ -34397,7 +34397,7 @@
 			}
 		},
 		{
-			"type": "Miner",
+			"type": "Cowboy",
 			"player_id": 0,
 			"gold_held": 0,
 			"cell": {
@@ -34577,12 +34577,12 @@
 			}
 		},
 		{
-			"type": "Miner",
-			"player_id": 0,
-			"gold_held": 0,
+			"type": "Gold Mine",
+			"player_id": 4,
+			"gold_held": 20000,
 			"cell": {
-				"x": 104,
-				"y": 64
+				"x": 38,
+				"y": 92
 			}
 		},
 		{
@@ -34599,8 +34599,8 @@
 			"player_id": 0,
 			"gold_held": 0,
 			"cell": {
-				"x": 108,
-				"y": 53
+				"x": 105,
+				"y": 66
 			}
 		},
 		{
@@ -34608,35 +34608,8 @@
 			"player_id": 0,
 			"gold_held": 0,
 			"cell": {
-				"x": 109,
-				"y": 63
-			}
-		},
-		{
-			"type": "Cowboy",
-			"player_id": 0,
-			"gold_held": 0,
-			"cell": {
-				"x": 110,
-				"y": 64
-			}
-		},
-		{
-			"type": "Cowboy",
-			"player_id": 0,
-			"gold_held": 0,
-			"cell": {
-				"x": 111,
-				"y": 63
-			}
-		},
-		{
-			"type": "Gold Mine",
-			"player_id": 4,
-			"gold_held": 20000,
-			"cell": {
-				"x": 38,
-				"y": 92
+				"x": 104,
+				"y": 65
 			}
 		}
 	],
@@ -34830,35 +34803,35 @@
 			"entity_index": 6
 		},
 		{
-			"name": "BANDIT_SPAWN_LAKE",
+			"name": "BANDIT_SPAWN_WOODS",
 			"type": "Cell",
 			"cell": {
-				"x": 23,
-				"y": 89
+				"x": 80,
+				"y": 72
 			}
 		},
 		{
 			"name": "BANDIT_SPAWN_BEAN",
 			"type": "Cell",
 			"cell": {
-				"x": 44,
-				"y": 66
+				"x": 43,
+				"y": 58
 			}
 		},
 		{
 			"name": "BANDIT_SPAWN_STAIRS",
 			"type": "Cell",
 			"cell": {
-				"x": 20,
-				"y": 62
+				"x": 18,
+				"y": 55
 			}
 		},
 		{
 			"name": "BANDIT_SPAWN_CLIFF",
 			"type": "Cell",
 			"cell": {
-				"x": 115,
-				"y": 124
+				"x": 118,
+				"y": 105
 			}
 		},
 		{
@@ -34925,14 +34898,6 @@
 			"name": "VILLAGER3_MINER3",
 			"type": "Entity",
 			"entity_index": 32
-		},
-		{
-			"name": "BANDIT_SPAWN_WOODS",
-			"type": "Cell",
-			"cell": {
-				"x": 80,
-				"y": 72
-			}
 		}
 	]
 }
