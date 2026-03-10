@@ -62,7 +62,7 @@ void match_init(MatchState& state, int32_t lcg_seed, MatchPlayer players[MAX_PLA
 
         // Init goldmines
         for (ivec2 cell : goldmine_cells) {
-            entity_goldmine_create(state, cell, MATCH_GOLDMINE_STARTING_GOLD);
+            entity_misc_create(state, ENTITY_GOLDMINE, cell, MATCH_GOLDMINE_STARTING_GOLD);
         }
 
         // Init player spawns
@@ -918,7 +918,7 @@ bool match_is_target_invalid(const MatchState& state, const Target& target, uint
         return true;
     }
 
-    if (state.entities[target_index].type == ENTITY_GOLDMINE) {
+    if (entity_is_misc(state.entities[target_index].type)) {
         return false;
     }
     
@@ -1062,17 +1062,19 @@ EntityId entity_create(MatchState& state, EntityType type, ivec2 cell, uint8_t p
     return id;
 }
 
-EntityId entity_goldmine_create(MatchState& state, ivec2 cell, uint32_t gold_left) {
+EntityId entity_misc_create(MatchState& state, EntityType type, ivec2 cell, uint32_t gold_left) {
+    GOLD_ASSERT(entity_is_misc(type));
+
     if (state.entities.is_full()) {
         log_warn("entity_create cannot create entity: entities is full");
         return ID_NULL;
     }
 
     Entity entity;
-    entity.type = ENTITY_GOLDMINE;
-    entity.mode = gold_left != 0 
-        ? MODE_GOLDMINE
-        : MODE_GOLDMINE_COLLAPSED;
+    entity.type = type;
+    entity.mode = gold_left == 0 && type == ENTITY_GOLDMINE
+        ? MODE_GOLDMINE_COLLAPSED
+        : MODE_GOLDMINE;
     entity.player_id = PLAYER_NONE;
     memset(entity.padding, 0, sizeof(entity.padding));
     entity.flags = 0;
@@ -1107,7 +1109,9 @@ EntityId entity_goldmine_create(MatchState& state, ivec2 cell, uint32_t gold_lef
 
     EntityId id = state.entities.push_back(entity);
     map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_get_data(entity.type).cell_size, (Cell) {
-        .type = CELL_GOLDMINE,
+        .type = type == ENTITY_GOLDMINE 
+            ? CELL_GOLDMINE
+            : CELL_BUILDING,
         .id = id
     });
 
@@ -2338,7 +2342,7 @@ int entity_get_range_squared(const MatchState& state, const Entity& entity) {
 }
 
 bool entity_is_selectable(const Entity& entity) {
-    if (entity.type == ENTITY_GOLDMINE) {
+    if (entity_is_misc(entity.type)) {
         return true;
     }
 
@@ -2535,8 +2539,7 @@ ivec2 entity_get_animation_frame(const Entity& entity) {
         }
         // Building finished frame
         return ivec2(3, 0);
-    } else {
-        // Gold
+    } else if (entity.type == ENTITY_GOLDMINE) {
         if (entity.mode == MODE_GOLDMINE_COLLAPSED) {
             return ivec2(2, 0);
         }
@@ -2544,7 +2547,12 @@ ivec2 entity_get_animation_frame(const Entity& entity) {
             return ivec2(1, 0);
         }
         return ivec2(0, 0);
+    } else if (entity.type == ENTITY_CRATE) {
+        return ivec2(entity.gold_held, 0);
     }
+
+    GOLD_ASSERT(false);
+    return ivec2(0, 0);
 }
 
 Rect entity_goldmine_get_block_building_rect(ivec2 cell) {
@@ -3065,7 +3073,7 @@ Target entity_target_nearest_enemy(const MatchState& state, const Entity& entity
         const EntityData& other_data = entity_get_data(other.type);
 
         // Goldmines are not enemies
-        if (other.type == ENTITY_GOLDMINE) {
+        if (entity_is_misc(other.type)) {
             continue;
         }
         // Allies are not enemies
@@ -3269,7 +3277,7 @@ void entity_attack_target(MatchState& state, EntityId attacker_id) {
 
         for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
             Entity& entity = state.entities[entity_index];
-            if (entity.type == ENTITY_GOLDMINE || !entity_is_selectable(entity)) {
+            if (entity_is_misc(entity.type) || !entity_is_selectable(entity)) {
                 continue;
             }
 
@@ -3406,7 +3414,7 @@ void entity_explode(MatchState& state, EntityId entity_id) {
             continue;
         }
         Entity& defender = state.entities[defender_index];
-        if (defender.type == ENTITY_GOLDMINE || 
+        if (entity_is_misc(defender.type) ||
                 !entity_is_selectable(defender) ||
                 entity_get_data(defender.type).cell_layer == CELL_LAYER_SKY) {
             continue;
@@ -3910,13 +3918,15 @@ void match_fog_update(MatchState& state, uint8_t team, ivec2 cell, int cell_size
                         Entity& entity = state.entities.get_by_id(map_cell.id);
                         if (entity_is_selectable(entity) && entity.type != ENTITY_LANDMINE) {
                             ivec2 frame = entity_get_animation_frame(entity);
+
+                            // When remembering goldmines, remember them as empty, not full
                             if (entity.type == ENTITY_GOLDMINE && frame.x == 1) {
                                 frame.x = 0;
                             }
 
                             RememberedEntity remembered_entity = (RememberedEntity) {
                                 .entity_id = map_cell.id,
-                                .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLDMINE 
+                                .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity_is_misc(entity.type)
                                     ? (uint16_t)0U 
                                     : (uint16_t)state.players[entity.player_id].recolor_id,
                                 .type = entity.type,

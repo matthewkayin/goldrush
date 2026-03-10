@@ -355,18 +355,20 @@ void editor_update() {
 
                     ui_icon_button(state.ui, entity_get_data(entity.type).icon, true);
 
-                    if (entity.type == ENTITY_GOLDMINE) {
+                    if (entity.type == ENTITY_GOLDMINE || entity.type == ENTITY_CRATE) {
                         char gold_text[16];
                         sprintf(gold_text, "Gold: %u", state.tool_edit_entity_gold_held);
 
                         ui_text(state.ui, FONT_HACK_GOLD, gold_text);
 
+                        uint32_t max = entity.type == ENTITY_GOLDMINE ? 20000 : 3;
+                        uint32_t step = entity.type == ENTITY_GOLDMINE ? 50 : 0;
                         ui_slider(state.ui, &state.tool_edit_entity_gold_held, NULL, (UiSliderParams) {
                             .display = UI_SLIDER_DISPLAY_NO_VALUE,
                             .size = UI_SLIDER_SIZE_MINI,
                             .min = 0,
-                            .max = 20000,
-                            .step = 50
+                            .max = max,
+                            .step = step
                         }); 
                         if (input_is_action_just_released(INPUT_ACTION_LEFT_CLICK) && state.tool_edit_entity_gold_held != entity.gold_held) {
                             ScenarioEntity edited_entity = entity;
@@ -1081,7 +1083,7 @@ void editor_update() {
             .type = EDITOR_ACTION_ADD_ENTITY,
             .data = (EditorActionAddEntity) {
                 .type = (EntityType)state.tool_value,
-                .player_id = state.tool_value == ENTITY_GOLDMINE 
+                .player_id = entity_is_misc((EntityType)state.tool_value)
                     ? (uint8_t)PLAYER_NONE 
                     : (uint8_t)state.tool_add_entity_player_id,
                 .cell = editor_get_hovered_cell()
@@ -2190,7 +2192,7 @@ void editor_render() {
 
             // Determine preview recolor ID
             uint8_t recolor_id;
-            if (entity_type == ENTITY_GOLDMINE) {
+            if (entity_is_misc(entity_type)) {
                 recolor_id = 0;
             } else if (state.tool == EDITOR_TOOL_ADD_ENTITY) {
                 recolor_id = state.scenario->players[state.tool_add_entity_player_id].recolor_id;
@@ -2493,7 +2495,7 @@ RenderSpriteParams editor_create_entity_render_params(const Scenario* scenario, 
         .position = params_position,
         .ysort_position = params_position.y,
         .options = 0,
-        .recolor_id = entity.type == ENTITY_GOLDMINE ? 0 : scenario->players[entity.player_id].recolor_id
+        .recolor_id = entity_is_misc(entity.type) ? 0 : scenario->players[entity.player_id].recolor_id
     };
     
     const SpriteInfo& sprite_info = render_get_sprite_info(params.sprite);
@@ -2540,7 +2542,7 @@ MinimapPixel editor_get_minimap_pixel_for_entity(const Scenario* scenario, const
     }
 
     const ScenarioEntity& entity = state.scenario->entities[entity_index];
-    if (entity.type == ENTITY_GOLDMINE) {
+    if (entity_is_misc(entity.type)) {
         return MINIMAP_PIXEL_GOLD;
     }
     return (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + scenario->players[entity.player_id].recolor_id);

@@ -440,6 +440,8 @@ const char* match_shell_script_get_entity_type_str(EntityType type) {
     switch (type) {
         case ENTITY_GOLDMINE:
             return "GOLDMINE";
+        case ENTITY_CRATE:
+            return "CRATE";
         case ENTITY_MINER:
             return "MINER";
         case ENTITY_COWBOY:

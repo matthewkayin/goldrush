@@ -58,7 +58,9 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
                 entity.gold_held = 0;
                 if (entity.type == ENTITY_GOLDMINE) {
                     entity.gold_held = 7500;
-                } 
+                } else if (entity.type == ENTITY_CRATE) {
+                    entity.gold_held = 3;
+                }
                 scenario->entities[scenario->entity_count] = entity;
                 scenario->entity_count++;
             } else {

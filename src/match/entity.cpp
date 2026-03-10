@@ -25,6 +25,27 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
         .goldmine_data = {}
     }},
+    { ENTITY_CRATE, (EntityData) {
+        .name = "Crate",
+        .sprite = SPRITE_CRATE,
+        .icon = SPRITE_BUTTON_ICON_CRATE,
+        .death_sound = SOUND_BUNKER_DESTROY,
+        .cell_layer = CELL_LAYER_GROUND,
+        .cell_size = 1,
+
+        .gold_cost = 0,
+        .train_duration = 0,
+        .max_health = 0,
+        .sight = 0,
+        .armor = 0,
+        .attack_priority = 0,
+        
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false,
+
+        .goldmine_data = {}
+    }},
     { ENTITY_MINER, (EntityData) {
         .name = "Miner",
         .sprite = SPRITE_UNIT_MINER,
@@ -665,10 +686,14 @@ EntityType entity_type_from_str(const char* str) {
     return (EntityType)entity_type;
 }
 
+bool entity_is_misc(EntityType type) {
+    return type < ENTITY_MINER;
+}
+
 bool entity_is_unit(EntityType type) {
-    return type > ENTITY_GOLDMINE && type < ENTITY_HALL;
+    return type >= ENTITY_MINER && type < ENTITY_HALL;
 }
 
 bool entity_is_building(EntityType type) {
-    return type >= ENTITY_HALL && type != ENTITY_TYPE_COUNT;
+    return type >= ENTITY_HALL && type < ENTITY_TYPE_COUNT;
 }

@@ -20,12 +20,12 @@ STATIC_ASSERT(sizeof(Target) == 36ULL);
 STATIC_ASSERT(sizeof(FogReveal) == 24ULL);
 STATIC_ASSERT(sizeof(MatchPlayer) == 56ULL);
 STATIC_ASSERT(sizeof(BotUnitComp) == 4ULL);
-STATIC_ASSERT(sizeof(EntityCount) == 88ULL);
+STATIC_ASSERT(sizeof(EntityCount) == 92ULL);
 STATIC_ASSERT(sizeof(BotSquadType) == 4ULL);
-STATIC_ASSERT(sizeof(BotDesiredSquad) == 92ULL);
+STATIC_ASSERT(sizeof(BotDesiredSquad) == 96ULL);
 STATIC_ASSERT(sizeof(BotBaseInfo) == 220);
 STATIC_ASSERT(sizeof(MatchState) == 2434244ULL);
-STATIC_ASSERT(sizeof(Bot) == 16164ULL);
+STATIC_ASSERT(sizeof(Bot) == 16208ULL);
 
 #ifdef GOLD_DEBUG
 

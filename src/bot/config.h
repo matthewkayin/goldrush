@@ -46,7 +46,7 @@ struct BotConfig {
     BotOpener opener;
     BotUnitComp preferred_unit_comp;
 };
-STATIC_ASSERT(sizeof(BotConfig) == 48ULL);
+STATIC_ASSERT(sizeof(BotConfig) == 52ULL);
 
 BotConfig bot_config_init();
 BotConfig bot_config_init_from_difficulty(Difficulty difficulty);

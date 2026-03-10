@@ -340,8 +340,8 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
     for (uint32_t entity_index = 0; entity_index < scenario->entity_count; entity_index++) {
         const ScenarioEntity& entity = scenario->entities[entity_index];
 
-        if (entity.type == ENTITY_GOLDMINE) {
-            entity_goldmine_create(state->match_state, entity.cell, entity.gold_held);
+        if (entity_is_misc(entity.type)) {
+            entity_misc_create(state->match_state, entity.type, entity.cell, entity.gold_held);
             continue;
         }
 
@@ -2168,7 +2168,7 @@ void match_shell_order_move(MatchShellState* state) {
         GOLD_ASSERT(remembered_entity_index != state->match_state.remembered_entities[player_team].size());
 
         EntityType remembered_entity_type = state->match_state.remembered_entities[player_team][remembered_entity_index].type;
-        state->move_animation = animation_create(remembered_entity_type == ENTITY_GOLDMINE
+        state->move_animation = animation_create(entity_is_misc(remembered_entity_type)
                                                         ? ANIMATION_UI_MOVE_ENTITY 
                                                         : ANIMATION_UI_MOVE_ATTACK_ENTITY);
         state->move_animation_position = cell_center(input.move.target_cell).to_ivec2();
@@ -3976,7 +3976,7 @@ void match_shell_render(const MatchShellState* state) {
             render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
             render_sprite_frame(entity_get_icon(state->match_state, entity.type, entity.player_id), ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
 
-            if (entity.type == ENTITY_GOLDMINE) {
+            if (entity_is_misc(entity.type)) {
                 if (entity.mode == MODE_GOLDMINE_COLLAPSED) {
                     render_text(FONT_HACK_WHITE, "Collapsed!", SELECTION_LIST_TOP_LEFT + ivec2(36, 20));
                 } else {
@@ -4372,7 +4372,7 @@ void match_shell_render(const MatchShellState* state) {
                     .x = remembered_entity.cell.x, .y = remembered_entity.cell.y,
                     .w = entity_data.cell_size, .h = entity_data.cell_size
                 };
-                MinimapPixel pixel = remembered_entity.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + remembered_entity.recolor_id);
+                MinimapPixel pixel = entity_is_misc(remembered_entity.type) ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + remembered_entity.recolor_id);
                 render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
             }
         }
@@ -4457,6 +4457,9 @@ bool match_shell_use_yellow_rings(const MatchShellState* state) {
 SpriteName match_shell_get_entity_select_ring(EntityType type, bool attacking) {
     if (type == ENTITY_GOLDMINE) {
         return SPRITE_SELECT_RING_GOLDMINE;
+    }
+    if (type == ENTITY_CRATE) {
+        return SPRITE_SELECT_RING_UNIT;
     }
     if (type == ENTITY_LANDMINE) {
         if (attacking) {
@@ -4546,7 +4549,7 @@ RenderSpriteParams match_shell_create_entity_render_params(const MatchShellState
         .position = params_position,
         .ysort_position = params_position.y,
         .options = 0,
-        .recolor_id = entity.type == ENTITY_GOLDMINE || entity.mode == MODE_BUILDING_DESTROYED ? 0 : state->match_state.players[entity.player_id].recolor_id
+        .recolor_id = entity_is_misc(entity.type) || entity.mode == MODE_BUILDING_DESTROYED ? 0 : state->match_state.players[entity.player_id].recolor_id
     };
     const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(state->match_state, entity));
     if (entity_is_unit(entity.type)) {
@@ -4585,7 +4588,7 @@ void match_shell_render_entity_select_rings_and_healthbars(const MatchShellState
     Rect entity_rect = entity_get_rect(entity);
 
     // Render select ring
-    bool use_red_select_ring = state->replay_mode || entity.type == ENTITY_GOLDMINE 
+    bool use_red_select_ring = state->replay_mode || entity_is_misc(entity.type) 
                                     ? false 
                                     : state->match_state.players[entity.player_id].team != state->match_state.players[network_get_player_id()].team;
     SpriteName select_ring_sprite = match_shell_get_entity_select_ring(entity.type, use_red_select_ring);
@@ -4929,7 +4932,7 @@ MinimapPixel match_shell_get_minimap_pixel_for_cell(const MatchShellState* state
 }
 
 MinimapPixel match_shell_get_minimap_pixel_for_entity(const MatchShellState* state, const Entity& entity) {
-    if (entity.type == ENTITY_GOLDMINE) {
+    if (entity_is_misc(entity.type)) {
         return MINIMAP_PIXEL_GOLD;
     }
     if (entity_check_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER)) {

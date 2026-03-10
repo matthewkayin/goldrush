@@ -2273,7 +2273,7 @@ EntityList bot_squad_get_nearby_enemy_list(const MatchState& state, const Bot& b
         EntityId enemy_id = state.entities.get_id_of(enemy_index);
 
         // Filter down to enemy units
-        if (enemy.type == ENTITY_GOLDMINE || 
+        if (entity_is_misc(enemy.type) ||
                 (entity_is_building(enemy.type) && enemy.type != ENTITY_BUNKER) ||
                 state.players[enemy.player_id].team == state.players[bot.player_id].team ||
                 !entity_is_selectable(enemy)) {

@@ -426,7 +426,7 @@ bool match_team_remembers_entity(const MatchState& state, uint8_t team, EntityId
 // Entity
 
 EntityId entity_create(MatchState& state, EntityType type, ivec2 cell, uint8_t player_id);
-EntityId entity_goldmine_create(MatchState& state, ivec2 cell, uint32_t gold_left);
+EntityId entity_misc_create(MatchState& state, EntityType type, ivec2 cell, uint32_t gold_left);
 void entity_update(MatchState& state, uint32_t entity_index);
 
 SpriteName entity_get_sprite(const MatchState& state, const Entity& entity);
