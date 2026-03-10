@@ -1977,7 +1977,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
                 ? ID_NULL
                 : match_find_best_entity(state, (MatchFindBestEntityParams) {
                     .filter = [&state, &unit](const Entity& enemy, EntityId /*enemy_id*/) {
-                        return enemy.type != ENTITY_GOLDMINE &&
+                        return !entity_is_misc(enemy.type) &&
                                 state.players[enemy.player_id].team != state.players[unit.player_id].team &&
                                 entity_is_selectable(enemy) &&
                                 ivec2::manhattan_distance(enemy.cell, unit.cell) < BOT_NEAR_DISTANCE &&
@@ -2217,7 +2217,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
     bool is_enemy_near_target = false;
     if (squad.type == BOT_SQUAD_TYPE_RESERVES || squad.type == BOT_SQUAD_TYPE_ATTACK) {
         EntityId enemy_near_target_id = match_find_entity(state, [&state, &bot, &squad](const Entity& entity, EntityId /*entity_id*/) {
-            return entity.type != ENTITY_GOLDMINE &&
+            return !entity_is_misc(entity.type) &&
                 state.players[entity.player_id].team != state.players[bot.player_id].team &&
                 entity.health != 0 &&
                 ivec2::manhattan_distance(entity.cell, squad.target_cell) < BOT_MEDIUM_DISTANCE;
@@ -2579,7 +2579,7 @@ bool bot_squad_should_carrier_unload_garrisoned_units(const MatchState& state, c
         return true;
     }
     EntityId nearby_enemy_id = match_find_entity(state, [&state, &carrier](const Entity& enemy, EntityId /*enemy_id*/) {
-        return enemy.type != ENTITY_GOLDMINE &&
+        return !entity_is_misc(enemy.type) &&
                 state.players[enemy.player_id].team != state.players[carrier.player_id].team &&
                 entity_is_selectable(enemy) &&
                 ivec2::manhattan_distance(enemy.cell, carrier.cell) < BOT_NEAR_DISTANCE &&
@@ -4462,7 +4462,7 @@ bool bot_is_bandit_rushing(const Bot& bot) {
 
 bool bot_is_area_safe(const MatchState& state, const Bot& bot, ivec2 cell) {
     EntityId nearby_enemy_id = match_find_entity(state, [&state, &bot, &cell](const Entity& entity, EntityId /*entity_id*/) {
-            return entity.type != ENTITY_GOLDMINE &&
+            return !entity_is_misc(entity.type) &&
                     entity_is_selectable(entity) &&
                     state.players[entity.player_id].team != state.players[bot.player_id].team &&
                     ivec2::manhattan_distance(entity.cell, cell) < BOT_NEAR_DISTANCE;

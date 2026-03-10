@@ -2119,7 +2119,7 @@ void match_shell_order_move(MatchShellState* state) {
         input.type = MATCH_INPUT_MOVE_REPAIR;
     } else if (state->mode == MATCH_SHELL_MODE_TARGET_MOLOTOV) {
         input.type = MATCH_INPUT_MOVE_MOLOTOV;
-    } else if (input.move.target_id != ID_NULL && state->match_state.entities.get_by_id(input.move.target_id).type != ENTITY_GOLDMINE &&
+    } else if (input.move.target_id != ID_NULL && !entity_is_misc(state->match_state.entities.get_by_id(input.move.target_id).type) &&
                (state->mode == MATCH_SHELL_MODE_TARGET_ATTACK || 
                 state->match_state.players[state->match_state.entities.get_by_id(input.move.target_id).player_id].team != state->match_state.players[network_get_player_id()].team)) {
         input.type = MATCH_INPUT_MOVE_ATTACK_ENTITY;
@@ -2408,10 +2408,10 @@ std::vector<EntityId> match_shell_create_selection(const MatchShellState* state,
         }
     }
 
-    // Select gold mines
+    // Select misc
     for (uint32_t index = 0; index < state->match_state.entities.size(); index++) {
         const Entity& entity = state->match_state.entities[index];
-        if (entity.type != ENTITY_GOLDMINE ||
+        if (!entity_is_misc(entity.type) ||
                 !match_shell_is_entity_visible(state, entity)) {
             continue;
         }

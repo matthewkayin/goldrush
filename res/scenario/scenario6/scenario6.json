@@ -18546,6 +18546,24 @@
 				"x": 13,
 				"y": 4
 			}
+		},
+		{
+			"type": "Gold Mine",
+			"player_id": 4,
+			"gold_held": 7500,
+			"cell": {
+				"x": 14,
+				"y": 10
+			}
+		},
+		{
+			"type": "Cowboy",
+			"player_id": 0,
+			"gold_held": 0,
+			"cell": {
+				"x": 7,
+				"y": 12
+			}
 		}
 	],
 	"squads": [],

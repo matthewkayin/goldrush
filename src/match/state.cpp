@@ -2146,7 +2146,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
 
     // Check for fire
     // If entity is moving, check for fire based on its previous cell
-    if (entity.type != ENTITY_GOLDMINE && 
+    if (!entity_is_misc(entity.type) && 
             entity_data.cell_layer != CELL_LAYER_SKY && 
             entity.type != ENTITY_BUNKER &&
             entity.health != 0 && entity.garrison_id == ID_NULL) {
@@ -2626,7 +2626,7 @@ bool entity_is_visible_to_player(const MatchState& state, const Entity& entity, 
         return false;
     }
 
-    if (entity.type != ENTITY_GOLDMINE && state.players[entity.player_id].team == state.players[player_id].team) {
+    if (!entity_is_misc(entity.type) && state.players[entity.player_id].team == state.players[player_id].team) {
         return true;
     }
 

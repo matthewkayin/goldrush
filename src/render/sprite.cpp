@@ -1227,7 +1227,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "entity/crate.png",
-            .hframes = 3,
+            .hframes = 5,
             .vframes = 1
         }
     }},
