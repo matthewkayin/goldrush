@@ -2526,9 +2526,17 @@ ivec2 entity_get_animation_frame(const Entity& entity) {
             frame.y = 2;
         }
 
+        // Miner holding gold frame adjustment
         if (entity.gold_held && (entity.animation.name == ANIMATION_UNIT_MOVE || entity.animation.name == ANIMATION_UNIT_IDLE)) {
-            frame.y += 3;
+            if (entity.gold_held >= 100 && frame.y == 0) {
+                frame.y = 6;
+            } else if (entity.gold_held >= 100 && frame.y == 2) {
+                frame.y = 7;
+            } else {
+                frame.y += 3;
+            }
         }
+
         if (entity.type == ENTITY_SAPPER && entity.target.type == TARGET_ATTACK_ENTITY) {
             frame.y += 3;
         }

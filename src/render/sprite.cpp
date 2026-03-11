@@ -1260,7 +1260,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .sheet = {
             .path = "entity/unit_miner.png",
             .hframes = 15,
-            .vframes = 6
+            .vframes = 8
         }
     }},
     { SPRITE_UNIT_COWBOY, (SpriteParams) {
