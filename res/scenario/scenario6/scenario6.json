@@ -18541,7 +18541,7 @@
 		{
 			"type": "Crate",
 			"player_id": 4,
-			"gold_held": 3,
+			"gold_held": 4,
 			"cell": {
 				"x": 13,
 				"y": 4
@@ -18563,6 +18563,51 @@
 			"cell": {
 				"x": 7,
 				"y": 12
+			}
+		},
+		{
+			"type": "Town Hall",
+			"player_id": 0,
+			"gold_held": 0,
+			"cell": {
+				"x": 3,
+				"y": 7
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 0,
+			"gold_held": 0,
+			"cell": {
+				"x": 5,
+				"y": 5
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 0,
+			"gold_held": 0,
+			"cell": {
+				"x": 6,
+				"y": 2
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 0,
+			"gold_held": 0,
+			"cell": {
+				"x": 10,
+				"y": 3
+			}
+		},
+		{
+			"type": "Miner",
+			"player_id": 0,
+			"gold_held": 0,
+			"cell": {
+				"x": 8,
+				"y": 5
 			}
 		}
 	],

@@ -361,8 +361,8 @@ void editor_update() {
 
                         ui_text(state.ui, FONT_HACK_GOLD, gold_text);
 
-                        uint32_t max = entity.type == ENTITY_GOLDMINE ? 20000 : 3;
-                        uint32_t step = entity.type == ENTITY_GOLDMINE ? 50 : 0;
+                        uint32_t max = entity.type == ENTITY_GOLDMINE ? 20000 : 4;
+                        uint32_t step = entity.type == ENTITY_GOLDMINE ? 50 : 1;
                         ui_slider(state.ui, &state.tool_edit_entity_gold_held, NULL, (UiSliderParams) {
                             .display = UI_SLIDER_DISPLAY_NO_VALUE,
                             .size = UI_SLIDER_SIZE_MINI,

@@ -4459,7 +4459,7 @@ SpriteName match_shell_get_entity_select_ring(EntityType type, bool attacking) {
         return SPRITE_SELECT_RING_GOLDMINE;
     }
     if (type == ENTITY_CRATE) {
-        return SPRITE_SELECT_RING_UNIT;
+        return SPRITE_SELECT_RING_CRATE;
     }
     if (type == ENTITY_LANDMINE) {
         if (attacking) {

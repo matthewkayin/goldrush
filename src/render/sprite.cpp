@@ -1215,6 +1215,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_SELECT_RING_CRATE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = {
+            .path = "select_ring/crate.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
     { SPRITE_GOLDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
