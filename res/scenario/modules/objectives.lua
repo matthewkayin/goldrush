@@ -38,6 +38,7 @@ function objectives.add_objective(params)
         index = index,
         complete_fn = params.complete_fn
     })
+    return index
 end
 
 function objectives.update()

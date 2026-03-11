@@ -3981,7 +3981,10 @@ void match_shell_render(const MatchShellState* state) {
                     render_text(FONT_HACK_WHITE, "Collapsed!", SELECTION_LIST_TOP_LEFT + ivec2(36, 20));
                 } else {
                     char gold_left_str[8];
-                    sprintf(gold_left_str, "%u", entity.gold_held);
+                    const uint32_t gold_held = entity.type == ENTITY_CRATE
+                        ? entity.gold_held * CRATE_GOLD_PER_BAR
+                        : entity.gold_held;
+                    sprintf(gold_left_str, "%u", gold_held);
                     render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(36, 20), RENDER_SPRITE_NO_CULL, 0);
                     render_text(FONT_HACK_WHITE, gold_left_str, SELECTION_LIST_TOP_LEFT + ivec2(36 + render_get_sprite_info(SPRITE_UI_GOLD_ICON).frame_width + 2, 21));
                 }

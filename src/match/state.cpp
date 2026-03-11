@@ -28,7 +28,6 @@ static const uint32_t MINE_PRIME_DURATION = 6 * 6;
 static const uint32_t FOG_REVEAL_DURATION = 60;
 static const fixed BLEED_SPEED_PERCENTAGE = fixed::from_int_and_raw_decimal(0, 192);
 static const uint32_t MATCH_LOW_GOLD_THRESHOLD = 1000;
-const uint32_t CRATE_GOLD_PER_BAR = 100U;
 
 void match_init(MatchState& state, int32_t lcg_seed, MatchPlayer players[MAX_PLAYERS], MatchInitMapParams map_params) {
     // LCG seed

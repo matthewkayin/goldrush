@@ -62,6 +62,7 @@ static int script_get_camera_mode(lua_State* lua_state);
 
 // Objectives
 static int script_add_objective(lua_State* lua_state);
+static int script_set_objective_variable_counter(lua_State* lua_state);
 static int script_complete_objective(lua_State* lua_state);
 static int script_is_objective_complete(lua_State* lua_state);
 static int script_are_objectives_complete(lua_State* lua_state);
@@ -126,6 +127,7 @@ static const luaL_reg GOLD_FUNCS[] = {
 
     // Objectives
     { "add_objective", script_add_objective },
+    { "set_objective_variable_counter", script_set_objective_variable_counter },
     { "complete_objective", script_complete_objective },
     { "is_objective_complete", script_is_objective_complete },
     { "are_objectives_complete", script_are_objectives_complete },
@@ -1290,6 +1292,7 @@ static int script_get_camera_mode(lua_State* lua_state) {
 // 
 // Returns the index of the created objective.
 // @param params { description: string, entity_type: number|nil, counter_target: number|nil }
+// @return number
 static int script_add_objective(lua_State* lua_state) {
     const int arg_types[] = { LUA_TTABLE };
     script_validate_arguments(lua_state, arg_types, 1);
@@ -1329,6 +1332,10 @@ static int script_add_objective(lua_State* lua_state) {
     if (!lua_isnil(lua_state, -1)) {
         script_validate_type(lua_state, -1, "counter_target", LUA_TNUMBER);
         objective.counter_target = (uint32_t)lua_tonumber(lua_state, -1);
+
+        if (objective.counter_type == OBJECTIVE_COUNTER_TYPE_NONE) {
+            objective.counter_type = OBJECTIVE_COUNTER_TYPE_VARIABLE;
+        }
     }
     lua_pop(lua_state, 1);
 
@@ -1338,6 +1345,26 @@ static int script_add_objective(lua_State* lua_state) {
     lua_pushnumber(lua_state, (int)state->scenario_objectives.size() - 1);
 
     return 1;
+}
+
+// Sets the specified objectives variable counter
+// @param objective_index number 
+// @param counter_value number
+static int script_set_objective_variable_counter(lua_State* lua_state) {
+    const int arg_types[] = { LUA_TNUMBER, LUA_TNUMBER };
+    script_validate_arguments(lua_state, arg_types, 2);
+
+    uint32_t objective_index = (uint32_t)lua_tonumber(lua_state, 1);
+    uint32_t counter_value = (uint32_t)lua_tonumber(lua_state, 2);
+
+    MatchShellState* state = script_get_match_shell_state(lua_state);
+    if (state->scenario_objectives[objective_index].counter_type != OBJECTIVE_COUNTER_TYPE_VARIABLE) {
+        script_error(lua_state, "Cannot set counter value of objective %u. Its counter is not of type variable.", objective_index);
+    }
+
+    state->scenario_objectives[objective_index].counter_value = counter_value;
+
+    return 0;
 }
 
 // Marks the specified objective as complete.
@@ -1549,6 +1576,10 @@ void script_populate_table_with_entity_data(lua_State* lua_state, const Entity& 
     // Health
     lua_pushnumber(lua_state, entity.health);
     lua_setfield(lua_state, -2, "health");
+
+    // Gold held
+    lua_pushnumber(lua_state, entity.gold_held);
+    lua_setfield(lua_state, -2, "gold_held");
 }
 
 // Populates the entity table with info about the entity

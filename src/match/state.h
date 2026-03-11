@@ -86,6 +86,7 @@ const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
 const uint32_t UNIT_HEALTH_REGEN_DELAY = 600;
 
 const uint32_t MATCH_ENTITY_NOT_REMEMBERED = UINT32_MAX;
+const uint32_t CRATE_GOLD_PER_BAR = 100U;
 
 enum EntityMode {
     MODE_UNIT_IDLE,

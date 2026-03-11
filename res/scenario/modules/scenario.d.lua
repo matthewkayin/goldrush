@@ -50,28 +50,29 @@ scenario.entity_mode.UNIT_BLOCKED = 1
 
 scenario.ALERT_COLOR_PLAYER = 2
 scenario.entity_type = {}
-scenario.entity_type.BARRACKS = 19
-scenario.entity_type.SHERIFFS = 20
-scenario.entity_type.CANNON = 9
-scenario.entity_type.WAGON = 4
-scenario.entity_type.LANDMINE = 21
-scenario.entity_type.BALLOON = 11
-scenario.entity_type.WORKSHOP = 16
-scenario.entity_type.BANDIT = 3
-scenario.entity_type.SALOON = 14
-scenario.entity_type.PYRO = 7
-scenario.entity_type.SOLDIER = 8
-scenario.entity_type.BUNKER = 15
+scenario.entity_type.BARRACKS = 20
+scenario.entity_type.SHERIFFS = 21
+scenario.entity_type.CANNON = 10
+scenario.entity_type.WAGON = 5
+scenario.entity_type.LANDMINE = 22
+scenario.entity_type.BALLOON = 12
+scenario.entity_type.WORKSHOP = 17
+scenario.entity_type.BANDIT = 4
+scenario.entity_type.SALOON = 15
+scenario.entity_type.PYRO = 8
+scenario.entity_type.CRATE = 1
+scenario.entity_type.SOLDIER = 9
+scenario.entity_type.BUNKER = 16
 scenario.entity_type.GOLDMINE = 0
-scenario.entity_type.SAPPER = 6
-scenario.entity_type.COOP = 18
-scenario.entity_type.HOUSE = 13
-scenario.entity_type.JOCKEY = 5
-scenario.entity_type.COWBOY = 2
-scenario.entity_type.HALL = 12
-scenario.entity_type.DETECTIVE = 10
-scenario.entity_type.SMITH = 17
-scenario.entity_type.MINER = 1
+scenario.entity_type.SAPPER = 7
+scenario.entity_type.COOP = 19
+scenario.entity_type.HOUSE = 14
+scenario.entity_type.JOCKEY = 6
+scenario.entity_type.COWBOY = 3
+scenario.entity_type.HALL = 13
+scenario.entity_type.DETECTIVE = 11
+scenario.entity_type.SMITH = 18
+scenario.entity_type.MINER = 2
 
 scenario.CAMERA_MODE_FREE = 0
 scenario.target_type = {}
@@ -273,7 +274,13 @@ function scenario.get_camera_mode() end
 --- 
 --- Returns the index of the created objective.
 --- @param params { description: string, entity_type: number|nil, counter_target: number|nil }
+--- @return number
 function scenario.add_objective(params) end
+
+--- Sets the specified objectives variable counter
+--- @param objective_index number 
+--- @param counter_value number
+function scenario.set_objective_variable_counter(objective_index, counter_value) end
 
 --- Marks the specified objective as complete.
 --- @param objective_index number
