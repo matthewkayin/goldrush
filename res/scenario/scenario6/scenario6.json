@@ -33979,6 +33979,15 @@
 				"x": 73,
 				"y": 98
 			}
+		},
+		{
+			"type": "House",
+			"player_id": 1,
+			"gold_held": 0,
+			"cell": {
+				"x": 119,
+				"y": 124
+			}
 		}
 	],
 	"squads": [
