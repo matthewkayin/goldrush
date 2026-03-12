@@ -383,7 +383,11 @@ MatchShellState* match_shell_init_from_scenario(const Scenario* scenario, const 
                 squad_average_position += scenario->entities[entity_index].cell;
             }
 
-            GOLD_ASSERT(!squad_entity_list.empty());
+            if (squad_entity_list.empty()) {
+                log_error("Squad %s entity list is empty.", squad.name);
+                delete state;
+                return NULL;
+            }
             ivec2 squad_target_cell = squad_average_position / squad_entity_list.size();
 
             if (squad.type == BOT_SQUAD_TYPE_PATROL) {

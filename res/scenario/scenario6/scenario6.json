@@ -32863,13 +32863,6 @@
 			}
 		},
 		{
-			"hframe": 3,
-			"cell": {
-				"x": 20,
-				"y": 19
-			}
-		},
-		{
 			"hframe": 0,
 			"cell": {
 				"x": 4,
@@ -32895,6 +32888,13 @@
 			"cell": {
 				"x": 75,
 				"y": 24
+			}
+		},
+		{
+			"hframe": 3,
+			"cell": {
+				"x": 17,
+				"y": 25
 			}
 		},
 		{
@@ -33540,30 +33540,48 @@
 			}
 		},
 		{
-			"type": "Bunker",
+			"type": "Land Mine",
 			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 13,
-				"y": 92
+				"x": 17,
+				"y": 19
 			}
 		},
 		{
-			"type": "Cowboy",
+			"type": "Land Mine",
 			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 12,
-				"y": 92
+				"x": 7,
+				"y": 60
 			}
 		},
 		{
-			"type": "Cowboy",
+			"type": "Land Mine",
 			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 12,
-				"y": 93
+				"x": 18,
+				"y": 21
+			}
+		},
+		{
+			"type": "Land Mine",
+			"player_id": 1,
+			"gold_held": 0,
+			"cell": {
+				"x": 4,
+				"y": 60
+			}
+		},
+		{
+			"type": "Land Mine",
+			"player_id": 1,
+			"gold_held": 0,
+			"cell": {
+				"x": 8,
+				"y": 62
 			}
 		},
 		{
@@ -33577,29 +33595,11 @@
 		},
 		{
 			"type": "Cowboy",
-			"player_id": 1,
-			"gold_held": 0,
-			"cell": {
-				"x": 15,
-				"y": 93
-			}
-		},
-		{
-			"type": "Bandit",
 			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
 				"x": 11,
-				"y": 94
-			}
-		},
-		{
-			"type": "Bandit",
-			"player_id": 1,
-			"gold_held": 0,
-			"cell": {
-				"x": 16,
-				"y": 94
+				"y": 92
 			}
 		},
 		{
@@ -33648,21 +33648,21 @@
 			}
 		},
 		{
-			"type": "Bandit",
+			"type": "Land Mine",
 			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 109,
-				"y": 47
+				"x": 50,
+				"y": 26
 			}
 		},
 		{
-			"type": "Bandit",
+			"type": "Land Mine",
 			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 115,
-				"y": 46
+				"x": 54,
+				"y": 25
 			}
 		},
 		{
@@ -33711,21 +33711,21 @@
 			}
 		},
 		{
-			"type": "Bandit",
+			"type": "Land Mine",
 			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 7,
-				"y": 18
+				"x": 85,
+				"y": 26
 			}
 		},
 		{
-			"type": "Bandit",
+			"type": "Land Mine",
 			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 13,
-				"y": 17
+				"x": 88,
+				"y": 28
 			}
 		},
 		{
@@ -33936,84 +33936,48 @@
 			}
 		},
 		{
-			"type": "Land Mine",
+			"type": "Sapper",
 			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 4,
-				"y": 60
+				"x": 13,
+				"y": 91
 			}
 		},
 		{
-			"type": "Land Mine",
+			"type": "Bandit",
 			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 8,
-				"y": 62
+				"x": 10,
+				"y": 90
 			}
 		},
 		{
-			"type": "Land Mine",
+			"type": "Bandit",
 			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 7,
-				"y": 60
+				"x": 16,
+				"y": 90
 			}
 		},
 		{
-			"type": "Land Mine",
+			"type": "Bandit",
 			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 18,
-				"y": 21
+				"x": 71,
+				"y": 96
 			}
 		},
 		{
-			"type": "Land Mine",
+			"type": "Bandit",
 			"player_id": 1,
 			"gold_held": 0,
 			"cell": {
-				"x": 17,
-				"y": 19
-			}
-		},
-		{
-			"type": "Land Mine",
-			"player_id": 1,
-			"gold_held": 0,
-			"cell": {
-				"x": 88,
-				"y": 28
-			}
-		},
-		{
-			"type": "Land Mine",
-			"player_id": 1,
-			"gold_held": 0,
-			"cell": {
-				"x": 85,
-				"y": 26
-			}
-		},
-		{
-			"type": "Land Mine",
-			"player_id": 1,
-			"gold_held": 0,
-			"cell": {
-				"x": 54,
-				"y": 25
-			}
-		},
-		{
-			"type": "Land Mine",
-			"player_id": 1,
-			"gold_held": 0,
-			"cell": {
-				"x": 50,
-				"y": 26
+				"x": 73,
+				"y": 98
 			}
 		}
 	],
@@ -34051,15 +34015,6 @@
 			]
 		},
 		{
-			"name": "Squad 4",
-			"player_id": 1,
-			"type": "Defend",
-			"entities": [
-				35,
-				36
-			]
-		},
-		{
 			"name": "Squad 5",
 			"player_id": 1,
 			"type": "Defend",
@@ -34083,20 +34038,11 @@
 			"player_id": 1,
 			"type": "Defend",
 			"entities": [
-				23,
-				24,
-				25,
-				27,
-				26
-			]
-		},
-		{
-			"name": "Squad 8",
-			"player_id": 1,
-			"type": "Defend",
-			"entities": [
+				29,
+				67,
 				28,
-				29
+				68,
+				69
 			]
 		},
 		{
@@ -34115,20 +34061,20 @@
 			"player_id": 1,
 			"type": "Defend",
 			"entities": [
-				37,
 				39,
 				38,
+				41,
 				40,
-				41
+				37
 			]
 		},
 		{
-			"name": "Squad 11",
+			"name": "Squad 9",
 			"player_id": 1,
 			"type": "Defend",
 			"entities": [
-				42,
-				43
+				70,
+				71
 			]
 		}
 	],
