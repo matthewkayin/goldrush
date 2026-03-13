@@ -1087,14 +1087,6 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_TAILWIND, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_DEFAULT,
-        .sheet = {
-            .path = "icon_button/tailwind.png",
-            .hframes = 3,
-            .vframes = 1
-        }
-    }},
     { SPRITE_BUTTON_ICON_IRON_SIGHTS, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {

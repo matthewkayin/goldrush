@@ -1647,13 +1647,6 @@ uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot, Entity
         return UPGRADE_SERRATED_KNIVES;
     }
 
-    if (bitflag_check(bot.config.allowed_upgrades, UPGRADE_TAILWIND) &&
-            bot.desired_army_ratio[ENTITY_BALLOON] != 0 && 
-            unreserved_and_in_progress_entity_count[ENTITY_WORKSHOP] != 0 &&
-            match_player_upgrade_is_available(state, bot.player_id, UPGRADE_TAILWIND)) {
-        return UPGRADE_TAILWIND;
-    }
-
     return 0;
 }
 
@@ -3752,7 +3745,6 @@ EntityType bot_get_building_which_researches(uint32_t upgrade) {
         case UPGRADE_PRIVATE_EYE:
             return ENTITY_SHERIFFS;
         case UPGRADE_LANDMINES:
-        case UPGRADE_TAILWIND:
             return ENTITY_WORKSHOP;
         default:
             GOLD_ASSERT(false);

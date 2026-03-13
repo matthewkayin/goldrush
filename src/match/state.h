@@ -432,7 +432,6 @@ void entity_update(MatchState& state, uint32_t entity_index);
 
 SpriteName entity_get_sprite(const MatchState& state, const Entity& entity);
 SpriteName entity_get_icon(const MatchState& state, EntityType type, uint8_t player_id);
-fixed entity_get_speed(const MatchState& state, const Entity& entity);
 bool entity_has_detection(const MatchState& state, const Entity& entity);
 uint32_t entity_get_energy_regen_duration(const MatchState& state, const Entity& entity);
 int entity_get_armor(const MatchState& state, const Entity& entity);

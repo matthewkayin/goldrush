@@ -1211,7 +1211,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
     // End if entity should die
 
     bool update_finished = false;
-    fixed movement_left = entity_get_speed(state, entity); 
+    fixed movement_left = entity_data.unit_data.speed;
     if (entity.bleed_timer != 0) {
         movement_left = movement_left * BLEED_SPEED_PERCENTAGE;
     }
@@ -2323,16 +2323,6 @@ SpriteName entity_get_icon(const MatchState& state, EntityType type, uint8_t pla
         return SPRITE_BUTTON_ICON_WAR_WAGON;
     }
     return entity_get_data(type).icon;
-}
-
-fixed entity_get_speed(const MatchState& state, const Entity& entity) {
-    if (!entity_is_unit(entity.type)) {
-        return fixed::from_raw(0);
-    }
-    if (entity.type == ENTITY_BALLOON && match_player_has_upgrade(state, entity.player_id, UPGRADE_TAILWIND)) {
-        return fixed::from_int_and_raw_decimal(0, 128);
-    }
-    return entity_get_data(entity.type).unit_data.speed;    
 }
 
 bool entity_has_detection(const MatchState& state, const Entity& entity) {

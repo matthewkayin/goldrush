@@ -45,13 +45,6 @@ static const std::unordered_map<uint32_t, UpgradeData> UPGRADE_DATA = {
         .gold_cost = 300,
         .research_duration = 60
     }},
-    { UPGRADE_TAILWIND, (UpgradeData) {
-        .name = "Tailwind",
-        .desc = "Increases balloon speed",
-        .icon = SPRITE_BUTTON_ICON_TAILWIND,
-        .gold_cost = 300,
-        .research_duration = 80
-    }},
     { UPGRADE_IRON_SIGHTS, (UpgradeData) {
         .name = "Iron Sights",
         .desc = "Increase cowboy range",

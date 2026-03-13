@@ -397,7 +397,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
         .unit_data {
             .population_cost = 1,
-            .speed = fixed::from_int_and_raw_decimal(0, 80),
+            .speed = fixed::from_int_and_raw_decimal(0, 120),
             .max_energy = 0,
 
             .attack_sound = SOUND_PISTOL_SILENCED,
