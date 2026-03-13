@@ -13,6 +13,7 @@
 #include "shell/desync.h"
 #include "profile/profile.h"
 #include "editor/editor.h"
+#include "test/test.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_ttf.h>
 #include <ctime>
@@ -67,6 +68,11 @@ int gold_main(int argc, char** argv) {
 #ifdef GOLD_DEBUG
     if (gold_get_argv(argc, argv, "--lua-doc", NULL)) {
         match_shell_script_generate_doc();
+        return 0;
+    }
+
+    if (gold_get_argv(argc, argv, "--tests", NULL)) {
+        test_run_all();
         return 0;
     }
 #endif
@@ -574,6 +580,7 @@ void game_set_mode_match(int lcg_seed, Noise* noise) {
 void game_set_mode_replay(const char* replay_path) {
     state.match_shell_state = replay_shell_init(replay_path);
     if (state.match_shell_state == nullptr) {
+        menu_set_mode(state.menu_state, MENU_MODE_REPLAYS);
         menu_show_status(state.menu_state, "Error opening replay file.");
         return;
     }

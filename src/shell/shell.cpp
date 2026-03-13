@@ -24,7 +24,6 @@ static const int DESYNC_MENU_WIDTH = 166;
 
 // Chat
 static const size_t CHAT_MAX_LENGTH = 64;
-static const uint32_t CHAT_MAX_LINES = 8;
 static const uint32_t CHAT_CURSOR_BLINK_DURATION = 30;
 
 // UI panel rects
@@ -424,7 +423,9 @@ static int match_shell_load_replay_checkpoints(void* state_ptr) {
 
     while (state->replay_loading_match_timer < match_shell_replay_end_of_tape(state)) {
         // Match update
-        match_shell_replay_begin_turn(state, state->replay_loading_match_state, state->replay_loading_match_timer);
+        if (state->replay_loading_match_timer % TURN_DURATION == 0) {
+            match_shell_replay_handle_entries_for_turn(state->replay_entries, state->replay_loading_match_state, nullptr, state->replay_loading_match_timer / TURN_DURATION);
+        }
         match_update(state->replay_loading_match_state);
         state->replay_loading_match_state.events.clear();
 
@@ -456,13 +457,9 @@ MatchShellState* replay_shell_init(const char* replay_path) {
     state->replay_ui = ui_init();
 
     // Read replay file
-    if (!replay_file_read(replay_path, state->match_state, state->replay_inputs, &state->replay_chatlog)) {
+    if (!replay_file_read(replay_path, state->match_state, &state->replay_entries)) {
         delete state;
         return nullptr;
-    }
-
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        log_debug("Player %u input count %u", player_id, state->replay_inputs[player_id].size());
     }
 
     state->replay_checkpoints.reserve(((match_shell_replay_end_of_tape(state) + 1) / REPLAY_CHECKPOINT_FREQ) + 1);
@@ -954,7 +951,7 @@ void match_shell_update(MatchShellState* state) {
     for (uint32_t chat_index = 0; chat_index < state->chat.size(); chat_index++) {
         state->chat[chat_index].timer--;
         if (state->chat[chat_index].timer == 0) {
-            state->chat.erase(state->chat.begin() + chat_index);
+            state->chat.remove_at_ordered(chat_index);
             chat_index--;
         }
     }
@@ -1024,17 +1021,27 @@ void match_shell_update(MatchShellState* state) {
         state->disconnect_timer = 0;
 
         // All inputs received. Begin next turn
+        replay_file_write_entry(state->replay_file, (ReplayEntry) { .type = REPLAY_ENTRY_NEW_TURN });
+
         // Handle input
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if (!state->match_state.players[player_id].active) {
-                replay_file_write_inputs(state->replay_file, player_id, NULL);
                 continue;
             }
 
-            replay_file_write_inputs(state->replay_file, player_id, &state->inputs[player_id].front());
-
             for (const MatchInput& input : state->inputs[player_id].front()) {
+                // Write input to replay file
+                if (input.type != MATCH_INPUT_NONE) {
+                    replay_file_write_entry(state->replay_file, (ReplayEntry) {
+                        .type = REPLAY_ENTRY_INPUT,
+                        .input = input
+                    });
+                }
+
+                // Handle input
                 match_handle_input(state->match_state, input);
+
+                // Log input
                 if (input.type != MATCH_INPUT_NONE) {
                     char debug_buffer[512];
                     char* out_ptr = debug_buffer;
@@ -1070,17 +1077,7 @@ void match_shell_update(MatchShellState* state) {
 
     // Replay begin turn
     if (state->match_timer % TURN_DURATION == 0 && state->replay_mode) {
-        match_shell_replay_begin_turn(state, state->match_state, state->match_timer);
-
-        // Chatlog
-        if (state->match_timer % TURN_DURATION == 0) {
-            uint32_t turn_index = state->match_timer / TURN_DURATION;
-            for (const ReplayChatMessage& message : state->replay_chatlog) {
-                if (message.turn == turn_index) {
-                    match_shell_add_chat_message(state, message.chat.prefix_font, message.chat.prefix, message.chat.message, message.chat.timer);
-                }
-            }
-        }
+        match_shell_replay_handle_entries_for_turn(state->replay_entries, state->match_state, &state->chat, state->match_timer / TURN_DURATION);
     }
 
     // Compute checksum
@@ -2639,23 +2636,23 @@ void match_shell_add_chat_message(MatchShellState* state, FontName prefix_font, 
     chat_message.timer = duration;
     strncpy(chat_message.prefix, prefix, SHELL_CHAT_PREFIX_BUFFER_SIZE);
     strncpy(chat_message.message, message, SHELL_CHAT_MESSAGE_BUFFER_SIZE);
-    if (state->chat.size() == CHAT_MAX_LINES) {
-        state->chat.erase(state->chat.begin());
-    }
     state->chat.push_back(chat_message);
 
-    if (!state->replay_mode) {
-        replay_file_write_chat(state->replay_file, (ReplayChatMessage) {
-            .turn = state->match_timer / TURN_DURATION,
-            .chat = chat_message
-        });
-    }
+    replay_file_write_entry(state->replay_file, (ReplayEntry) {
+        .type = REPLAY_ENTRY_CHAT,
+        .chat_message = chat_message
+    });
 }
 
 void match_shell_handle_player_disconnect(MatchShellState* state, uint8_t player_id) {
     char message[128];
     sprintf(message, "%s left the game.", network_get_player(player_id).name);
     match_shell_add_chat_message(state, FONT_HACK_WHITE, "", message, CHAT_MESSAGE_DURATION);
+
+    replay_file_write_entry(state->replay_file, (ReplayEntry) {
+        .type = REPLAY_ENTRY_DISCONNECT,
+        .disconnect_player_id = player_id
+    });
 
     // Show the victory banner to other players when this player leaves,
     // but only if the player was still active. If they are not active, it means they've 
@@ -2862,12 +2859,31 @@ bool match_shell_is_fire_on_screen(const MatchShellState* state) {
 
 // REPLAY
 
-void match_shell_replay_begin_turn(MatchShellState* state, MatchState& match_state, uint32_t match_timer) {
-    if (match_timer % TURN_DURATION == 0) {
-        uint32_t turn_index = match_timer / TURN_DURATION;
-        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            for (const MatchInput& input : state->replay_inputs[player_id][turn_index]) {
-                match_handle_input(match_state, input);
+void match_shell_replay_handle_entries_for_turn(const std::vector<std::vector<ReplayEntry>>& replay_entries, MatchState& match_state, CircularVector<ChatMessage, CHAT_MAX_LINES>* chat, uint32_t turn) {
+    for (size_t entry_index = 0; entry_index < replay_entries[turn].size(); entry_index++) {
+        const ReplayEntry& entry = replay_entries[turn][entry_index];
+
+        switch (entry.type) {
+            case REPLAY_ENTRY_INPUT: {
+                char buffer[1024];
+                match_input_print(buffer, entry.input);
+
+                match_handle_input(match_state, entry.input);
+                break;
+            }
+            case REPLAY_ENTRY_CHAT: {
+                if (chat != nullptr) {
+                    chat->push_back(entry.chat_message);
+                }
+                break;
+            }
+            case REPLAY_ENTRY_DISCONNECT: {
+                match_state.players[entry.disconnect_player_id].active = false;
+                break;
+            }
+            case REPLAY_ENTRY_NEW_TURN: {
+                GOLD_ASSERT(false);
+                break;
             }
         }
     }
@@ -2887,7 +2903,9 @@ void match_shell_replay_scrub(MatchShellState* state, uint32_t position) {
     }
 
     while (state->match_timer < position) {
-        match_shell_replay_begin_turn(state, state->match_state, state->match_timer);
+        if (state->match_timer % TURN_DURATION == 0) {
+            match_shell_replay_handle_entries_for_turn(state->replay_entries, state->match_state, &state->chat, state->match_timer / TURN_DURATION);
+        }
         match_update(state->match_state);
         state->match_state.events.clear();
         state->match_timer++;
@@ -2895,7 +2913,7 @@ void match_shell_replay_scrub(MatchShellState* state, uint32_t position) {
 }
 
 size_t match_shell_replay_end_of_tape(const MatchShellState* state) {
-    return (state->replay_inputs[0].size() * 4) - 1;
+    return (state->replay_entries.size() * 4) - 1;
 }
 
 // LEAVE MATCH

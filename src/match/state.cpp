@@ -1218,6 +1218,12 @@ void entity_update(MatchState& state, uint32_t entity_index) {
     while (!update_finished) {
         switch (entity.mode) {
             case MODE_UNIT_IDLE: {
+                // Do nothing if player is inactive
+                if (!state.players[entity.player_id].active) {
+                    update_finished = true;
+                    break;
+                }
+
                 // Do nothing if unit is garrisoned
                 if (entity.garrison_id != ID_NULL) {
                     const Entity& carrier = state.entities.get_by_id(entity.garrison_id);
@@ -1469,6 +1475,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                                 Entity& mine = state.entities[mine_index];
                                 if (mine.type != ENTITY_LANDMINE || mine.health == 0 || mine.mode != MODE_BUILDING_FINISHED || 
                                         state.players[mine.player_id].team == state.players[entity.player_id].team ||
+                                        !state.players[mine.player_id].active ||
                                         std::abs(entity.cell.x - mine.cell.x) > 1 || std::abs(entity.cell.y - mine.cell.y) > 1) {
                                     continue;
                                 }
@@ -1477,6 +1484,13 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                                 mine.mode = MODE_MINE_PRIME;
                                 entity_set_flag(mine, ENTITY_FLAG_INVISIBLE, false);
                             }
+                        }
+                        // If player is inactive, set to idle
+                        if (!state.players[entity.player_id].active) {
+                            entity.target = target_none();
+                            entity_path_clear(state, entity);
+                            entity.mode = MODE_UNIT_IDLE;
+                            break;
                         }
                         if (entity.target.type == TARGET_ATTACK_CELL || entity.target.type == TARGET_PATROL) {
                             Target attack_target = entity_target_nearest_enemy(state, entity);
@@ -1615,9 +1629,10 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                         break;
                     }
                     case TARGET_BUILD_ASSIST: {
-                        if (entity_is_target_invalid(state, entity)) {
+                        if (entity_is_target_invalid(state, entity) || !state.players[entity.player_id].active) {
                             entity.target = target_none();
                             entity.mode = MODE_UNIT_IDLE;
+                            break;
                         }
 
                         Entity& builder = state.entities.get_by_id(entity.target.id);
@@ -1632,7 +1647,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                     case TARGET_REPAIR:
                     case TARGET_ENTITY:
                     case TARGET_ATTACK_ENTITY: {
-                        if (entity_is_target_invalid(state, entity)) {
+                        if (entity_is_target_invalid(state, entity) || !state.players[entity.player_id].active) {
                             entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
                             entity.target = target_none();
                             entity.mode = MODE_UNIT_IDLE;
@@ -2072,6 +2087,13 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                 break;
             }
             case MODE_BUILDING_FINISHED: {
+                // If player is inactive, do nothing
+                if (!state.players[entity.player_id].active) {
+                    entity.queue.clear();
+                    update_finished = true;
+                    break;
+                }
+
                 if (!entity.queue.empty() && entity.timer != 0) {
                     if (entity.timer == BUILDING_QUEUE_BLOCKED && !entity_building_is_supply_blocked(state, entity)) {
                         entity.timer = building_queue_item_duration(entity.queue[0]);

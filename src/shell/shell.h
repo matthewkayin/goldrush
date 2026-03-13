@@ -26,6 +26,7 @@ const uint32_t TURN_DURATION = 4;
 // Chat
 const uint32_t CHAT_MESSAGE_DURATION = 3U * 60U;
 const uint32_t CHAT_MESSAGE_HINT_DURATION = 5U * 60U;
+const uint32_t CHAT_MAX_LINES = 8U;
 
 // Alerts
 const uint32_t ALERT_DURATION = 90;
@@ -183,7 +184,8 @@ struct MatchShellState {
 
     // Chat
     std::string chat_message;
-    std::vector<ChatMessage> chat;
+    // TODO: use circular vector for this? CHAT_MAX_LINES
+    CircularVector<ChatMessage, CHAT_MAX_LINES> chat;
     bool chat_cursor_visible;
     uint32_t chat_cursor_blink_timer;
 
@@ -221,8 +223,7 @@ struct MatchShellState {
     bool replay_mode;
     UI replay_ui;
     std::vector<MatchState> replay_checkpoints;
-    std::vector<std::vector<MatchInput>> replay_inputs[MAX_PLAYERS];
-    std::vector<ReplayChatMessage> replay_chatlog;
+    std::vector<std::vector<ReplayEntry>> replay_entries;
 
     // Replay fog
     uint32_t replay_fog_index;
@@ -333,7 +334,7 @@ void match_shell_help_update(MatchShellState* state);
 bool match_shell_is_fire_on_screen(const MatchShellState* state);
 
 // Replay
-void match_shell_replay_begin_turn(MatchShellState* state, MatchState& match_state, uint32_t match_timer);
+void match_shell_replay_handle_entries_for_turn(const std::vector<std::vector<ReplayEntry>>& replay_entries, MatchState& match_state, CircularVector<ChatMessage, CHAT_MAX_LINES>* chat, uint32_t turn);
 void match_shell_replay_scrub(MatchShellState* state, uint32_t position);
 size_t match_shell_replay_end_of_tape(const MatchShellState* state);
 

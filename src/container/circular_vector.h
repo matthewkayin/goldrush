@@ -4,6 +4,7 @@
 #include "core/asserts.h"
 #include "core/logger.h"
 #include <cstdint>
+#include <cstring>
 
 template <typename T, uint32_t capacity>
 struct CircularVector {
@@ -53,6 +54,18 @@ struct CircularVector {
     void remove_at_unordered(uint32_t index) {
         GOLD_ASSERT(_size != 0 && index < _size);
         data[wrap_index(index)] = data[wrap_index(_size - 1)];
+        _size--;
+    }
+
+    void remove_at_ordered(uint32_t index) {
+        GOLD_ASSERT(_size != 0 && index < _size);
+
+        if (index < _size - 1) {
+            for (uint32_t other_index = index + 1; other_index < _size; other_index++) {
+                data[wrap_index(other_index - 1)] = data[wrap_index(other_index)];
+            }
+        }
+
         _size--;
     }
 

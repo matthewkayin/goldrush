@@ -8,12 +8,6 @@
 static const uint32_t REPLAY_FILE_SIGNATURE = 0x46591214;
 static const uint32_t REPLAY_FILE_VERSION = 0;
 
-// The header of each replay block is made up of the type (first four bits) followed by the player id (second four bits)
-static const uint8_t REPLAY_BLOCK_HEADER_TYPE_MASK = 0xF0;
-static const uint8_t REPLAY_BLOCK_HEADER_PLAYER_MASK = 0x0F;
-static const uint8_t REPLAY_BLOCK_TYPE_INPUTS = 0;
-static const uint8_t REPLAY_BLOCK_TYPE_CHAT = 1 << 4;
-
 #ifdef GOLD_DEBUG
 
 static char arg_replay_file[128];
@@ -71,49 +65,39 @@ void replay_file_close(FILE* file) {
     fclose(file);
 }
 
-void replay_file_write_inputs(FILE* file, uint8_t player_id, const std::vector<MatchInput>* inputs) {
-    ZoneScoped;
-
+void replay_file_write_entry(FILE* file, const ReplayEntry& entry) {
     if (file == NULL) {
         return;
     }
 
-    uint8_t block_header = REPLAY_BLOCK_TYPE_INPUTS + player_id;
-    fwrite(&block_header, 1, sizeof(uint8_t), file);
-    uint8_t out_buffer[NETWORK_INPUT_BUFFER_SIZE];
-    size_t out_buffer_length = 0;
+    fwrite(&entry.type, 1, sizeof(entry.type), file);
 
-    // This means the player was invalid / not in the game during this turn
-    if (inputs == NULL) {
-        fwrite(&out_buffer_length, 1, sizeof(size_t), file);
-        return;
-    }
+    switch (entry.type) {
+        case REPLAY_ENTRY_INPUT: {
+            uint8_t out_buffer[NETWORK_INPUT_BUFFER_SIZE];
+            size_t out_buffer_length = 0;
 
-    for (const MatchInput& input : *inputs) {
-        match_input_serialize(out_buffer, out_buffer_length, input);
+            match_input_serialize(out_buffer, out_buffer_length, entry.input);
+            fwrite(&out_buffer_length, 1, sizeof(size_t), file);
+            fwrite(out_buffer, 1, out_buffer_length, file);
+
+            break;
+        }
+        case REPLAY_ENTRY_CHAT: {
+            fwrite(&entry.chat_message, 1, sizeof(entry.chat_message), file);
+            break;
+        }
+        case REPLAY_ENTRY_DISCONNECT: {
+            fwrite(&entry.disconnect_player_id, 1, sizeof(entry.disconnect_player_id), file);
+            break;
+        }
+        case REPLAY_ENTRY_NEW_TURN: {
+            break;
+        }
     }
-    fwrite(&out_buffer_length, 1, sizeof(size_t), file);
-    fwrite(out_buffer, 1, out_buffer_length, file);
 }
 
-void replay_file_write_chat(FILE* file, const ReplayChatMessage& message) {
-    if (file == NULL) {
-        return;
-    }
-
-    // Header
-    uint8_t block_header = REPLAY_BLOCK_TYPE_CHAT;
-    fwrite(&block_header, 1, sizeof(uint8_t), file);
-
-    // Length
-    size_t block_length = sizeof(ReplayChatMessage);
-    fwrite(&block_length, 1, sizeof(size_t), file);
-
-    // Message
-    fwrite(&message, 1, sizeof(ReplayChatMessage), file);
-}
-
-bool replay_file_read(const char* path, MatchState& state, std::vector<std::vector<MatchInput>>* match_inputs, std::vector<ReplayChatMessage>* match_chatlog) {
+bool replay_file_read(const char* path, MatchState& state, std::vector<std::vector<ReplayEntry>>* replay_entries) {
     std::string replay_path = filesystem_get_data_path() + FILESYSTEM_REPLAY_FOLDER_NAME + path;
     FILE* file = fopen(replay_path.c_str(), "rb");
     if (file == NULL) {
@@ -162,68 +146,97 @@ bool replay_file_read(const char* path, MatchState& state, std::vector<std::vect
         }
     });
 
-    bool read_successful = true;
-    while (read_successful) {
-        // The first byte tells us the type of the next block
-        // For types 0-3, this is a set of turn inputs from the player_id 0-3
-        uint8_t block_header;
-        size_t bytes_read = fread(&block_header, 1, sizeof(uint8_t), file);
+    while (true) {
+        uint8_t entry_type;
+        size_t bytes_read = fread(&entry_type, 1, sizeof(uint8_t), file);
         if (bytes_read == 0) {
-            break;
+            goto success;
         }
-        uint8_t block_type = block_header & REPLAY_BLOCK_HEADER_TYPE_MASK;
-        uint8_t block_player = block_header & REPLAY_BLOCK_HEADER_PLAYER_MASK;
 
-        // The next type tells us the length of the next block
-        size_t block_length;
-        fread(&block_length, 1, sizeof(size_t), file);
+        switch (entry_type) {
+            case REPLAY_ENTRY_INPUT: {
+                size_t in_buffer_length;
+                uint8_t in_buffer[NETWORK_INPUT_BUFFER_SIZE];
 
-        switch (block_type) {
-            case REPLAY_BLOCK_TYPE_INPUTS: {
-                if (block_player >= MAX_PLAYERS) {
-                    log_error("Replay file corruption: Unrecognized player id %u in replay block of type inputs", block_player);
-                    read_successful = false;
-                    break;
+                bytes_read = fread(&in_buffer_length, 1, sizeof(size_t), file);
+                if (bytes_read != sizeof(size_t)) {
+                    log_error("Replay file bytes read mismatch. Read %u Expected %u", bytes_read, sizeof(size_t));
+                    goto fail;
+                }
+                bytes_read = fread(in_buffer, 1, in_buffer_length, file);
+                if (bytes_read != in_buffer_length) {
+                    log_error("Replay file bytes read mismatch. Read %u Expected %u", bytes_read, in_buffer_length);
+                    goto fail;
                 }
 
-                std::vector<MatchInput> inputs;
+                size_t in_buffer_head = 0;
+                MatchInput input = match_input_deserialize(in_buffer, in_buffer_head);
 
-                if (block_length == 0) {
-                    // There was no input from this user this turn
-                    // So just pass an empty input
-                    inputs.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
-                } else {
-                    // Read the rest of the block
-                    uint8_t in_buffer[NETWORK_INPUT_BUFFER_SIZE];
-                    fread(in_buffer, 1, block_length, file);
-                    // Deserialize input
-                    size_t in_buffer_head = 0;
-                    while (in_buffer_head < block_length) {
-                        inputs.push_back(match_input_deserialize(in_buffer, in_buffer_head));
-                    }
+                if (input.type != MATCH_INPUT_NONE) {
+                    char print_buffer[1024];
+                    match_input_print(print_buffer, input);
+                    log_debug("Replay entry turn %u input %s", (uint32_t)replay_entries->size() - 1U, print_buffer);
                 }
 
-                match_inputs[block_player].push_back(inputs);
+                replay_entries->back().push_back((ReplayEntry) {
+                    .type = REPLAY_ENTRY_INPUT,
+                    .input = input
+                });
+
                 break;
             }
-            case REPLAY_BLOCK_TYPE_CHAT: {
-                ReplayChatMessage message;
-                fread(&message, 1, sizeof(ReplayChatMessage), file);
+            case REPLAY_ENTRY_CHAT: {
+                ReplayEntry entry;
+                entry.type = REPLAY_ENTRY_CHAT;
 
-                match_chatlog->push_back(message);
+                bytes_read = fread(&entry.chat_message, 1, sizeof(entry.chat_message), file);
+                if (bytes_read != sizeof(entry.chat_message)) {
+                    log_error("Replay file bytes read mismatch. Read %u Expected %u", bytes_read, sizeof(entry.chat_message));
+                    goto fail;
+                }
 
+                log_debug("Replay entry turn %u chat message %s: %s", (uint32_t)replay_entries->size() - 1U, entry.chat_message.prefix, entry.chat_message.message);
+
+                replay_entries->back().push_back(entry);
+
+                break;
+            }
+            case REPLAY_ENTRY_DISCONNECT: {
+                ReplayEntry entry;
+                entry.type = REPLAY_ENTRY_DISCONNECT;
+
+                bytes_read = fread(&entry.disconnect_player_id, 1, sizeof(entry.disconnect_player_id), file);
+                if (bytes_read != sizeof(entry.disconnect_player_id)) {
+                    log_error("Replay file bytes read mismatch. Read %u Expected %u", bytes_read, sizeof(entry.disconnect_player_id));
+                    goto fail;
+                }
+
+                log_debug("Replay entry turn %u disconnect %u", (uint32_t)replay_entries->size() - 1U, entry.disconnect_player_id);
+
+                replay_entries->back().push_back(entry);
+
+                break;
+            }
+            case REPLAY_ENTRY_NEW_TURN: {
+                replay_entries->push_back(std::vector<ReplayEntry>());
                 break;
             }
             default: {
-                log_error("Replay file corruption: Unhandled block type %u", block_type);
-                read_successful = false;
-                break;
+                log_error("Replay file has unexpected entry type %u.", entry_type);
+                goto fail;
             }
         }
     }
 
+success:
     noise_free(noise);
     fclose(file);
 
-    return read_successful;
+    return true;
+
+fail:
+    noise_free(noise);
+    fclose(file);
+
+    return false;
 }
