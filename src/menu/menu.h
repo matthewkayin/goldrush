@@ -31,6 +31,7 @@ enum MenuMode {
     MENU_MODE_REPLAYS,
     MENU_MODE_REPLAY_RENAME,
     MENU_MODE_REPLAY_CONFIRM_CLEAR,
+    MENU_MODE_CAMPAIGN_CONNECTING,
     MENU_MODE_CAMPAIGN,
     MENU_MODE_EXIT,
     MENU_MODE_OPTIONS,
@@ -83,6 +84,7 @@ void menu_add_chat_message(MenuState* state, const char* message);
 size_t menu_get_lobbylist_page_count(size_t count);
 const char* menu_get_player_status_string(NetworkPlayerStatus status);
 const char* menu_get_selected_replay_filename(const MenuState* state);
+uint32_t menu_get_hovered_campaign_scenario();
 
 void menu_render(const MenuState* state);
 void menu_render_decoration(const MenuState* state, int index);

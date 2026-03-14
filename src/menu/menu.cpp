@@ -10,6 +10,28 @@
 #include "render/render.h"
 #include "util/util.h"
 
+struct ScenarioInfo {
+    const char* name;
+    const char* path;
+    int map_offset_x;
+    int map_offset_y;
+};
+
+static const ScenarioInfo CAMPAIGN_SCENARIOS[] = {
+    (ScenarioInfo) {
+        .name = "Scenario 1",
+        .path = "scenario1.json",
+        .map_offset_x = 128, 
+        .map_offset_y = 258
+    },
+    (ScenarioInfo) {
+        .name = "Scenario 2",
+        .path = "scenario2.json",
+        .map_offset_x = 100, 
+        .map_offset_y = 223
+    }
+};
+
 static const int WAGON_X_DEFAULT = 380;
 static const int WAGON_X_LOBBY = 480;
 static const int PARALLAX_TIMER_DURATION = 2;
@@ -70,6 +92,13 @@ static const Rect USERNAME_RECT = {
 #endif
 
 static const ivec2 CAMPAIGN_MAP_POSITION = ivec2(16, 8);
+static const int CAMPAIGN_MAP_WIDTH = 229;
+static const Rect CAMPAIGN_INFO_RECT = (Rect) {
+    .x = 16 + CAMPAIGN_MAP_WIDTH + 4,
+    .y = 8,
+    .w = SCREEN_WIDTH - (16 * 2) - 4 - CAMPAIGN_MAP_WIDTH,
+    .h = 128
+};
 
 static const int PLAYERLIST_COLUMN_X = PLAYERLIST_RECT.x + 16;
 static const int PLAYERLIST_COLUMN_Y = PLAYERLIST_RECT.y + 22;
@@ -143,7 +172,7 @@ void menu_handle_network_event(MenuState* state, NetworkEvent event) {
     switch (event.type) {
         case NETWORK_EVENT_LOBBY_CONNECTION_FAILED: {
             log_info("Menu received LOBBY_CONNECTION_FAILED.");
-            if (state->mode == MENU_MODE_SKIRMISH_CONNECTING) {
+            if (state->mode == MENU_MODE_SKIRMISH_CONNECTING || state->mode == MENU_MODE_CAMPAIGN_CONNECTING) {
                 menu_set_mode(state, MENU_MODE_SINGLEPLAYER);
             } else {
                 menu_set_mode(state, MENU_MODE_LOBBYLIST);
@@ -169,6 +198,8 @@ void menu_handle_network_event(MenuState* state, NetworkEvent event) {
             log_info("Menu received LOBBY_CONNECTED.");
             if (state->mode == MENU_MODE_SKIRMISH_CONNECTING) {
                 menu_set_mode(state, MENU_MODE_SKIRMISH_LOBBY);
+            } else if (state->mode == MENU_MODE_CAMPAIGN_CONNECTING) {
+                menu_set_mode(state, MENU_MODE_CAMPAIGN);
             } else {
                 menu_set_mode(state, MENU_MODE_LOBBY);
             }
@@ -317,7 +348,14 @@ void menu_update(MenuState* state) {
     } else if (state->mode == MENU_MODE_SINGLEPLAYER) {
         ui_begin_column(state->ui, ivec2(BUTTON_X, BUTTON_Y), 2);
             if (ui_button(state->ui, "Campaign")) {
-                menu_set_mode(state, MENU_MODE_CAMPAIGN);
+                if (network_get_status() != NETWORK_STATUS_OFFLINE) {
+                    menu_show_status(state, "Error setting up game. Please try again.");
+                    network_disconnect();
+                } else {
+                    network_set_backend(NETWORK_BACKEND_LAN);
+                    network_open_lobby("Campaign", NETWORK_LOBBY_PRIVACY_SINGLEPLAYER);
+                    menu_set_mode(state, MENU_MODE_CAMPAIGN_CONNECTING);
+                }
             }
             if (ui_button(state->ui, "Skirmish")) {
                 if (network_get_status() != NETWORK_STATUS_OFFLINE) {
@@ -702,7 +740,38 @@ void menu_update(MenuState* state) {
                 }
             }
         ui_end_container(state->ui);
-    } // End replaylist
+    } else if (state->mode == MENU_MODE_CAMPAIGN) {
+        // Scenario icons
+        uint32_t hovered_scenario_index = menu_get_hovered_campaign_scenario();
+        if (hovered_scenario_index != MENU_ITEM_NONE && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+            state->lobbylist_item_selected = hovered_scenario_index;
+        }
+
+        // Info panel
+        ui_frame_rect(state->ui, CAMPAIGN_INFO_RECT);
+
+        // Info rect header
+        ivec2 info_header_size = render_get_text_size(FONT_HACK_GOLD, "Campaign");
+        ui_element_position(state->ui, ivec2(CAMPAIGN_INFO_RECT.x + (CAMPAIGN_INFO_RECT.w / 2) - (info_header_size.x / 2), CAMPAIGN_INFO_RECT.y + 6));
+        ui_text(state->ui, FONT_HACK_GOLD, "Campaign");
+
+        if (state->lobbylist_item_selected != MENU_ITEM_NONE) {
+            const ScenarioInfo& scenario_info = CAMPAIGN_SCENARIOS[state->lobbylist_item_selected];
+
+            ui_begin_column(state->ui, ivec2(CAMPAIGN_INFO_RECT.x + 8, CAMPAIGN_INFO_RECT.y + 22), 4);
+                ui_text(state->ui, FONT_HACK_WHITE, scenario_info.name);
+            ui_end_container(state->ui);
+        }
+
+        ui_begin_row(state->ui, ivec2(CAMPAIGN_INFO_RECT.x + 8, CAMPAIGN_INFO_RECT.y + CAMPAIGN_INFO_RECT.h + 4), 4);
+            if (ui_button(state->ui, "Back")) {
+                network_disconnect();
+                menu_set_mode(state, MENU_MODE_SINGLEPLAYER);
+            }
+            if (state->lobbylist_item_selected != MENU_ITEM_NONE && ui_button(state->ui, "Play")) {
+            }
+        ui_end_container(state->ui);
+    }
 
     if (state->mode == MENU_MODE_OPTIONS) {
         options_menu_update(state->options_menu, state->ui);
@@ -825,7 +894,7 @@ void menu_set_mode(MenuState* state, MenuMode mode) {
     if (mode == MENU_MODE_LOBBYLIST) {
         state->lobby_search_query = "";
         network_search_lobbies(state->lobby_search_query.c_str());
-    } else if (mode == MENU_MODE_CONNECTING) {
+    } else if (mode == MENU_MODE_CONNECTING || mode == MENU_MODE_SKIRMISH_CONNECTING || mode == MENU_MODE_CAMPAIGN_CONNECTING) {
         state->connection_timeout = CONNECTION_TIMEOUT;
     } else if (mode == MENU_MODE_REPLAYS) {
         state->lobby_search_query = "";
@@ -933,6 +1002,27 @@ const char* menu_get_selected_replay_filename(const MenuState* state) {
     return state->replay_filenames[state->lobbylist_item_selected].c_str();
 }
 
+uint32_t menu_get_hovered_campaign_scenario() {
+    const SpriteInfo& scenario_orb_sprite_info = render_get_sprite_info(SPRITE_UI_CAMPAIGN_SCENARIO_ORB);
+    ivec2 mouse_position = input_get_mouse_position();
+
+    for (uint32_t scenario_index = 0; scenario_index < 2; scenario_index++) {
+        const ScenarioInfo& campaign_scenario = CAMPAIGN_SCENARIOS[scenario_index];
+
+        const Rect scenario_orb_rect = (Rect) {
+            .x = CAMPAIGN_MAP_POSITION.x + campaign_scenario.map_offset_x,
+            .y = CAMPAIGN_MAP_POSITION.y + campaign_scenario.map_offset_y,
+            .w = scenario_orb_sprite_info.frame_width,
+            .h = scenario_orb_sprite_info.frame_height
+        };
+        if (scenario_orb_rect.has_point(mouse_position)) {
+            return scenario_index;
+        }
+    }
+
+    return MENU_ITEM_NONE;
+}
+
 void menu_render(const MenuState* state) {
     // Sky background
     render_fill_rect({ .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT }, RENDER_COLOR_BLUE);
@@ -1027,6 +1117,15 @@ void menu_render(const MenuState* state) {
     // Render campaign map
     if (state->mode == MENU_MODE_CAMPAIGN) {
         render_sprite_frame(SPRITE_UI_CAMPAIGN_MAP, ivec2(0, 0), CAMPAIGN_MAP_POSITION, RENDER_SPRITE_NO_CULL, 0);
+
+        uint32_t hovered_scenario_index = menu_get_hovered_campaign_scenario();
+        for (uint32_t scenario_index = 0; scenario_index < 2; scenario_index++) {
+            const ScenarioInfo& scenario_info = CAMPAIGN_SCENARIOS[scenario_index];
+
+            ivec2 scenario_orb_position = CAMPAIGN_MAP_POSITION + ivec2(scenario_info.map_offset_x, scenario_info.map_offset_y);
+            bool is_hovered = scenario_index == hovered_scenario_index;
+            render_sprite_frame(SPRITE_UI_CAMPAIGN_SCENARIO_ORB, ivec2((int)is_hovered, 0), scenario_orb_position, RENDER_SPRITE_NO_CULL, 0);
+        }
     }
 
     ui_render(state->ui);
