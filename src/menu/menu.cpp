@@ -69,6 +69,8 @@ static const Rect USERNAME_RECT = {
 };
 #endif
 
+static const ivec2 CAMPAIGN_MAP_POSITION = ivec2(16, 8);
+
 static const int PLAYERLIST_COLUMN_X = PLAYERLIST_RECT.x + 16;
 static const int PLAYERLIST_COLUMN_Y = PLAYERLIST_RECT.y + 22;
 static const int PLAYERLIST_COLUMN_NAME_WIDTH = 200;
@@ -315,7 +317,7 @@ void menu_update(MenuState* state) {
     } else if (state->mode == MENU_MODE_SINGLEPLAYER) {
         ui_begin_column(state->ui, ivec2(BUTTON_X, BUTTON_Y), 2);
             if (ui_button(state->ui, "Campaign")) {
-                menu_show_status(state, "Coming soon!");
+                menu_set_mode(state, MENU_MODE_CAMPAIGN);
             }
             if (ui_button(state->ui, "Skirmish")) {
                 if (network_get_status() != NETWORK_STATUS_OFFLINE) {
@@ -1020,6 +1022,11 @@ void menu_render(const MenuState* state) {
         sprintf(version_text, "Version %s", APP_VERSION);
         ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, version_text);
         render_text(FONT_WESTERN8_OFFBLACK, version_text, ivec2(2, SCREEN_HEIGHT - text_size.y - 2));
+    }
+
+    // Render campaign map
+    if (state->mode == MENU_MODE_CAMPAIGN) {
+        render_sprite_frame(SPRITE_UI_CAMPAIGN_MAP, ivec2(0, 0), CAMPAIGN_MAP_POSITION, RENDER_SPRITE_NO_CULL, 0);
     }
 
     ui_render(state->ui);
