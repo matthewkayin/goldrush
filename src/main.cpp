@@ -378,6 +378,7 @@ int gold_main(int argc, char** argv) {
 
                     if (match_shell_is_in_leave_match_mode(state.match_shell_state) && state.match_shell_state->mode != MATCH_SHELL_MODE_EXIT_PROGRAM) {
                         MatchShellMode shell_mode = state.match_shell_state->mode;
+                        log_debug("Shell mode %u", shell_mode);
 
                         sound_stop_all();
                         match_shell_free(state.match_shell_state);
@@ -387,7 +388,7 @@ int gold_main(int argc, char** argv) {
                         } else {
                             state.mode = GAME_MODE_MENU;
 
-                            if (shell_mode == MATCH_SHELL_MODE_SCENARIO_VICTORY || shell_mode == MATCH_SHELL_MODE_SCENARIO_DEFEAT) {
+                            if (shell_mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_VICTORY || shell_mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_DEFEAT) {
                                 // TODO: save victory
                                 menu_set_mode(state.menu_state, MENU_MODE_CAMPAIGN);
                             } else {

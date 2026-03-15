@@ -62,6 +62,7 @@ enum MatchShellMode {
     MATCH_SHELL_MODE_MENU,
     MATCH_SHELL_MODE_MENU_SURRENDER,
     MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP,
+    MATCH_SHELL_MODE_MENU_SURRENDER_RESTART,
     MATCH_SHELL_MODE_MATCH_OVER_VICTORY,
     MATCH_SHELL_MODE_MATCH_OVER_DEFEAT,
     MATCH_SHELL_MODE_SCENARIO_VICTORY,
@@ -331,7 +332,7 @@ bool match_shell_has_pressed_idle_miner_button();
 
 // Menu
 bool match_shell_is_in_leave_match_mode(const MatchShellState* state);
-const char* match_shell_get_menu_header_text(const MatchShellState* state);
+void match_shell_begin_menu(MatchShellState* state, const char* header_text, uint32_t button_count);
 
 // Help
 void match_shell_help_update(MatchShellState* state);

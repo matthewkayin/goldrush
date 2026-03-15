@@ -606,122 +606,37 @@ void match_shell_update(MatchShellState* state) {
 
     // Menu
     ui_begin(state->ui);
-    if (match_shell_is_in_menu(state)) {
-        // This handles the case where the menu opens because they pressed F10
-        if (state->camera_mode == CAMERA_MODE_MINIMAP_DRAG) {
-            state->camera_mode = CAMERA_MODE_FREE;
-        }
-
-        const int menu_width = state->mode == MATCH_SHELL_MODE_DESYNC ? DESYNC_MENU_WIDTH : MENU_WIDTH;
-        const int menu_height = 
-            (state->mode == MATCH_SHELL_MODE_MENU ||
-            state->mode == MATCH_SHELL_MODE_MENU_SURRENDER ||
-            state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP) 
-                ? 168
-                : 144;
-        const int menu_y = 
-            (state->mode == MATCH_SHELL_MODE_MENU ||
-            state->mode == MATCH_SHELL_MODE_MENU_SURRENDER ||
-            state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP) 
-                ? 48
-                : 64;
-        static const Rect MENU_RECT = (Rect) {
-            .x = (SCREEN_WIDTH / 2) - (menu_width / 2), .y = menu_y,
-            .w = menu_width, .h = menu_height
-        };
+    const ivec2 button_size = ui_button_size("Return to Menu");
+    if (state->mode == MATCH_SHELL_MODE_MENU || state->mode == MATCH_SHELL_MODE_HELP) {
         state->ui.input_enabled = state->options_menu.mode == OPTIONS_MENU_CLOSED && state->mode != MATCH_SHELL_MODE_HELP;
-        ui_frame_rect(state->ui, MENU_RECT);
-
-        const char* header_text = match_shell_get_menu_header_text(state);
-        ivec2 text_size = render_get_text_size(FONT_WESTERN8_GOLD, header_text);
-        ivec2 text_pos = ivec2(MENU_RECT.x + (MENU_RECT.w / 2) - (text_size.x / 2), MENU_RECT.y + 10);
-        ui_element_position(state->ui, text_pos);
-        ui_text(state->ui, FONT_WESTERN8_GOLD, header_text);
-
-        if (state->mode == MATCH_SHELL_MODE_DESYNC) {
-            ivec2 text_column_position = ivec2(MENU_RECT.x + (MENU_RECT.w / 2), MENU_RECT.y + 32);
-            ui_begin_column(state->ui, text_column_position, 5);
-                ui_text(state->ui, FONT_HACK_WHITE, "Your game is out of", true);
-                ui_text(state->ui, FONT_HACK_WHITE, "sync with your opponents.", true);
-            ui_end_container(state->ui);
-        }
-
-        ivec2 column_position = ivec2(MENU_RECT.x + (MENU_RECT.w / 2), MENU_RECT.y + 32);
-        if (state->mode == MATCH_SHELL_MODE_DESYNC) {
-            column_position.y += 47;
-        } else if (state->mode != MATCH_SHELL_MODE_MENU) {
-            column_position.y += 11;
-        }
-        ui_begin_column(state->ui, column_position, 5);
-            ivec2 button_size = ui_button_size("Return to Menu");
-            if (state->mode == MATCH_SHELL_MODE_MENU) {
-                if (ui_button(state->ui, "Leave Match", button_size, true)) {
-                    if (match_shell_is_surrender_required_to_leave(state)) {
-                        state->mode = MATCH_SHELL_MODE_MENU_SURRENDER;
-                    } else {
-                        match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_MATCH);
-                    }
-                }
-                if (ui_button(state->ui, "Exit Program", button_size, true)) {
-                    if (match_shell_is_surrender_required_to_leave(state)) {
-                        state->mode = MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP;
-                    } else {
-                        match_shell_leave_match(state, MATCH_SHELL_MODE_EXIT_PROGRAM);
-                    }
-                }
-                if (ui_button(state->ui, "Options", button_size, true)) {
-                    state->options_menu = options_menu_open();
-                }
-                if (ui_button(state->ui, "Help", button_size, true)) {
-                    state->mode = MATCH_SHELL_MODE_HELP;
-                }
-                if (ui_button(state->ui, "Back", button_size, true)) {
-                    state->mode = MATCH_SHELL_MODE_NONE;
-                }
-            } else if (state->mode == MATCH_SHELL_MODE_MENU_SURRENDER || state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP) {
-                if (ui_button(state->ui, "Yes", button_size, true)) {
-                    match_shell_leave_match(
-                        state, state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP
-                            ? MATCH_SHELL_MODE_EXIT_PROGRAM
-                            : MATCH_SHELL_MODE_LEAVE_MATCH);
-                }
-                if (ui_button(state->ui, "Back", button_size, true)) {
-                    state->mode = MATCH_SHELL_MODE_MENU;
-                }
-            } else if (state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY || state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT) {
-                if (ui_button(state->ui, "Keep Playing", button_size, true)) {
-                    state->mode = MATCH_SHELL_MODE_NONE;
-                }
-                if (ui_button(state->ui, "Return to Menu", button_size, true)) {
+        const bool is_in_scenario = state->scenario_lua_state != NULL;
+        const uint32_t button_count = is_in_scenario ? 6 : 5;
+        match_shell_begin_menu(state, "Game Menu", button_count);
+            if (is_in_scenario && ui_button(state->ui, "Restart", button_size, true)) {
+                state->mode = MATCH_SHELL_MODE_MENU_SURRENDER_RESTART;
+            }
+            if (ui_button(state->ui, "Leave Match", button_size, true)) {
+                if (match_shell_is_surrender_required_to_leave(state)) {
+                    state->mode = MATCH_SHELL_MODE_MENU_SURRENDER;
+                } else {
                     match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_MATCH);
                 }
-                if (ui_button(state->ui, "Exit Program", button_size, true)) {
+            }
+            if (ui_button(state->ui, "Exit Program", button_size, true)) {
+                if (match_shell_is_surrender_required_to_leave(state)) {
+                    state->mode = MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP;
+                } else {
                     match_shell_leave_match(state, MATCH_SHELL_MODE_EXIT_PROGRAM);
                 }
-            } else if (state->mode == MATCH_SHELL_MODE_SCENARIO_VICTORY) {
-                if (ui_button(state->ui, "Return to Menu", button_size, true)) {
-                    match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_SCENARIO_VICTORY);
-                }
-                if (ui_button(state->ui, "Exit Program", button_size, true)) {
-                    match_shell_leave_match(state, MATCH_SHELL_MODE_EXIT_PROGRAM);
-                }
-            } else if (state->mode == MATCH_SHELL_MODE_SCENARIO_DEFEAT) {
-                if (ui_button(state->ui, "Restart", button_size, true)) {
-                    match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_SCENARIO_RESTART);
-                }
-                if (ui_button(state->ui, "Return to Menu", button_size, true)) {
-                    match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_SCENARIO_DEFEAT);
-                }
-                if (ui_button(state->ui, "Exit Program", button_size, true)) {
-                    match_shell_leave_match(state, MATCH_SHELL_MODE_EXIT_PROGRAM);
-                }
-            } else if (state->mode == MATCH_SHELL_MODE_DESYNC) {
-                if (ui_button(state->ui, "Leave Match", button_size, true)) {
-                    match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_MATCH);
-                }
-                if (ui_button(state->ui, "Exit Program", button_size, true)) {
-                    match_shell_leave_match(state, MATCH_SHELL_MODE_EXIT_PROGRAM);
-                }
+            }
+            if (ui_button(state->ui, "Options", button_size, true)) {
+                state->options_menu = options_menu_open();
+            }
+            if (ui_button(state->ui, "Help", button_size, true)) {
+                state->mode = MATCH_SHELL_MODE_HELP;
+            }
+            if (ui_button(state->ui, "Back", button_size, true)) {
+                state->mode = MATCH_SHELL_MODE_NONE;
             }
         ui_end_container(state->ui);
 
@@ -732,6 +647,95 @@ void match_shell_update(MatchShellState* state) {
         if (state->mode == MATCH_SHELL_MODE_HELP) {
             match_shell_help_update(state);
         }
+    } else if (state->mode == MATCH_SHELL_MODE_MENU_SURRENDER || 
+            state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP || 
+            state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_RESTART) {
+        const char* header_text = state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_RESTART
+            ? "Restart?"
+            : "Surrender?";
+        match_shell_begin_menu(state, header_text, 2);
+            if (ui_button(state->ui, "Yes", button_size, true)) {
+                MatchShellMode next_mode;
+                if (state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP) {
+                    next_mode = MATCH_SHELL_MODE_EXIT_PROGRAM;
+                } else if (state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_RESTART) {
+                    next_mode = MATCH_SHELL_MODE_LEAVE_SCENARIO_RESTART;
+                } else if (state->scenario_lua_state != NULL) {
+                    next_mode = MATCH_SHELL_MODE_LEAVE_SCENARIO_DEFEAT;
+                } else {
+                    next_mode = MATCH_SHELL_MODE_LEAVE_MATCH;
+                }
+                match_shell_leave_match( state, next_mode);
+            }
+            if (ui_button(state->ui, "Back", button_size, true)) {
+                state->mode = MATCH_SHELL_MODE_MENU;
+            }
+        ui_end_container(state->ui);
+    } else if (state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY || state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT) {
+        const char* header_text = state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY
+            ? "Victory!"
+            : "Defeat!";
+        match_shell_begin_menu(state, header_text, 2);
+            if (ui_button(state->ui, "Keep Playing", button_size, true)) {
+                state->mode = MATCH_SHELL_MODE_NONE;
+            }
+            if (ui_button(state->ui, "Return to Menu", button_size, true)) {
+                match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_MATCH);
+            }
+            if (ui_button(state->ui, "Exit Program", button_size, true)) {
+                match_shell_leave_match(state, MATCH_SHELL_MODE_EXIT_PROGRAM);
+            }
+        ui_end_container(state->ui);
+    } else if (state->mode == MATCH_SHELL_MODE_SCENARIO_VICTORY) {
+        match_shell_begin_menu(state, "Victory!", 1);
+            if (ui_button(state->ui, "Continue", button_size, true)) {
+                match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_SCENARIO_VICTORY);
+            }
+        ui_end_container(state->ui);
+    } else if (state->mode == MATCH_SHELL_MODE_SCENARIO_DEFEAT) {
+        match_shell_begin_menu(state, "Defeat!", 3);
+            if (ui_button(state->ui, "Restart", button_size, true)) {
+                match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_SCENARIO_RESTART);
+            }
+            if (ui_button(state->ui, "Return to Menu", button_size, true)) {
+                match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_SCENARIO_DEFEAT);
+            }
+            if (ui_button(state->ui, "Exit Program", button_size, true)) {
+                match_shell_leave_match(state, MATCH_SHELL_MODE_EXIT_PROGRAM);
+            }
+        ui_end_container(state->ui);
+    } else if (state->mode == MATCH_SHELL_MODE_DESYNC) {
+        const Rect MENU_RECT = (Rect) {
+            .x = (SCREEN_WIDTH / 2) - (DESYNC_MENU_WIDTH / 2),
+            .y = 64,
+            .w = DESYNC_MENU_WIDTH,
+            .h = 38 + (26 * 2)
+        };
+        ui_frame_rect(state->ui, MENU_RECT);
+
+        // Header
+        const char* header_text = "Desync Detected";
+        ivec2 text_size = render_get_text_size(FONT_WESTERN8_GOLD, header_text);
+        ivec2 text_pos = ivec2(MENU_RECT.x + (MENU_RECT.w / 2) - (text_size.x / 2), MENU_RECT.y + 10);
+        ui_element_position(state->ui, text_pos);
+        ui_text(state->ui, FONT_WESTERN8_GOLD, header_text);
+
+        // Desync message
+        ivec2 text_column_position = ivec2(MENU_RECT.x + (MENU_RECT.w / 2), MENU_RECT.y + 32);
+        ui_begin_column(state->ui, text_column_position, 5);
+            ui_text(state->ui, FONT_HACK_WHITE, "Your game is out of", true);
+            ui_text(state->ui, FONT_HACK_WHITE, "sync with your opponents.", true);
+        ui_end_container(state->ui);
+
+        ivec2 column_position = ivec2(MENU_RECT.x + (MENU_RECT.w / 2), MENU_RECT.y + 32 + 47);
+        ui_begin_column(state->ui, column_position, 5);
+            if (ui_button(state->ui, "Leave Match", button_size, true)) {
+                match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_MATCH);
+            }
+            if (ui_button(state->ui, "Exit Program", button_size, true)) {
+                match_shell_leave_match(state, MATCH_SHELL_MODE_EXIT_PROGRAM);
+            }
+        ui_end_container(state->ui);
     }
     
     // Replay UI
@@ -2308,6 +2312,7 @@ bool match_shell_is_in_menu(const MatchShellState* state) {
     return state->mode == MATCH_SHELL_MODE_MENU ||
             state->mode == MATCH_SHELL_MODE_MENU_SURRENDER ||
             state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP ||
+            state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_RESTART ||
             state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY ||
             state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT || 
             state->mode == MATCH_SHELL_MODE_SCENARIO_VICTORY ||
@@ -2818,24 +2823,27 @@ bool match_shell_is_in_leave_match_mode(const MatchShellState* state) {
         state->mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_RESTART;
 }
 
-const char* match_shell_get_menu_header_text(const MatchShellState* state) {
-    switch (state->mode) {
-        case MATCH_SHELL_MODE_MENU:
-            return "Game Menu";
-        case MATCH_SHELL_MODE_MENU_SURRENDER:
-        case MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP:
-            return "Surrender?";
-        case MATCH_SHELL_MODE_MATCH_OVER_VICTORY:
-        case MATCH_SHELL_MODE_SCENARIO_VICTORY:
-            return "Victory!";
-        case MATCH_SHELL_MODE_MATCH_OVER_DEFEAT:
-        case MATCH_SHELL_MODE_SCENARIO_DEFEAT:
-            return "Defeat!";
-        case MATCH_SHELL_MODE_DESYNC:
-            return "Desync Detected";
-        default:
-            return "";
+void match_shell_begin_menu(MatchShellState* state, const char* header_text, uint32_t button_count) {
+    // This handles the case where the menu opens because they pressed F10
+    if (state->camera_mode == CAMERA_MODE_MINIMAP_DRAG) {
+        state->camera_mode = CAMERA_MODE_FREE;
     }
+
+    const Rect MENU_RECT = (Rect) {
+        .x = (SCREEN_WIDTH / 2) - (MENU_WIDTH / 2),
+        .y = button_count < 3 ? 64 : 48,
+        .w = MENU_WIDTH,
+        .h = 38 + (26 * (int)button_count)
+    };
+    ui_frame_rect(state->ui, MENU_RECT);
+
+    ivec2 text_size = render_get_text_size(FONT_WESTERN8_GOLD, header_text);
+    ivec2 text_pos = ivec2(MENU_RECT.x + (MENU_RECT.w / 2) - (text_size.x / 2), MENU_RECT.y + 10);
+    ui_element_position(state->ui, text_pos);
+    ui_text(state->ui, FONT_WESTERN8_GOLD, header_text);
+
+    const ivec2 column_position = ivec2(MENU_RECT.x + (MENU_RECT.w / 2), MENU_RECT.y + 32);
+    ui_begin_column(state->ui, column_position, 5);
 }
 
 // FIRE
