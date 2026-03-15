@@ -57,7 +57,8 @@ static GameState state;
 bool gold_get_argv(int argc, char** argv, const char* key, const char** result);
 bool game_is_running();
 void game_set_mode_match(int lcg_seed, Noise* noise);
-void game_set_mode_replay(const char* replay_path);
+void game_set_mode_scenario();
+void game_set_mode_replay();
 
 #ifdef GOLD_DEBUG
 void game_test_update();
@@ -351,49 +352,13 @@ int gold_main(int argc, char** argv) {
 
                     // Load replay
                     if (state.menu_state->mode == MENU_MODE_LOAD_REPLAY) {
-                        game_set_mode_replay(menu_get_selected_replay_filename(state.menu_state));
+                        game_set_mode_replay();
                         break;
                     }
 
                     // Load scenario
                     if (state.menu_state->mode == MENU_MODE_LOAD_SCENARIO) {
-                        const std::string scenario_path = menu_get_selected_scenario_path(state.menu_state);
-                        std::string script_short_path;
-
-                        // Load scenario
-                        Scenario* scenario = scenario_open_file(scenario_path.c_str(), &script_short_path);
-                        if (scenario == NULL) {
-                            menu_set_mode(state.menu_state, MENU_MODE_CAMPAIGN);
-                            menu_show_status(state.menu_state, "Error loading campaign scenario.");
-                            break;
-                        }
-
-                        // Determine script path
-                        const std::string folder_path = filesystem_get_path_folder(scenario_path.c_str());
-                        const std::string script_path = folder_path + script_short_path;
-                        log_debug("Scenario path %s", scenario_path.c_str());
-                        log_debug("Script short path %s", script_short_path.c_str());
-                        log_debug("Script folder path %s", folder_path.c_str());
-                        log_debug("Script full path %s", script_path.c_str());
-
-                        // Init shell state
-                        state.match_shell_state = match_shell_init_from_scenario(scenario, script_path.c_str());
-                        if (state.match_shell_state == nullptr) {
-                            menu_set_mode(state.menu_state, MENU_MODE_CAMPAIGN);
-                            menu_show_status(state.menu_state, "Error loading campaign scenario.");
-                            break;
-                        }
-                        
-                        // Add network bots
-                        for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
-                            if (state.match_shell_state->match_state.players[player_id].active) {
-                                network_add_bot();
-                            }
-                        }
-
-                        // Free scenario
-                        scenario_free(scenario);
-                        state.mode = GAME_MODE_MATCH;
+                        game_set_mode_scenario();
                     }
 
                     break;
@@ -401,21 +366,36 @@ int gold_main(int argc, char** argv) {
                 case GAME_MODE_MATCH: {
                     match_shell_update(state.match_shell_state);
 
-                    if (state.match_shell_state->mode == MATCH_SHELL_MODE_LEAVE_MATCH) {
-                    #ifdef GOLD_DEBUG
-                        if (state.launch_mode == LAUNCH_MODE_EDITOR) {
-                            match_shell_free(state.match_shell_state);
-                            editor_end_playtest();
-                            state.mode = GAME_MODE_EDITOR;
-                            break;
-                        }
-                    #endif
+                    // Editor leave match
+                #ifdef GOLD_DEBUG
+                    if (state.launch_mode == LAUNCH_MODE_EDITOR && match_shell_is_in_leave_match_mode(state.match_shell_state)) {
+                        match_shell_free(state.match_shell_state);
+                        editor_end_playtest();
+                        state.mode = GAME_MODE_EDITOR;
+                        break;
+                    }
+                #endif
+
+                    if (match_shell_is_in_leave_match_mode(state.match_shell_state) && state.match_shell_state->mode != MATCH_SHELL_MODE_EXIT_PROGRAM) {
+                        MatchShellMode shell_mode = state.match_shell_state->mode;
 
                         sound_stop_all();
-                        state.menu_state = menu_init();
                         match_shell_free(state.match_shell_state);
-                        state.mode = GAME_MODE_MENU;
+
+                        if (shell_mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_RESTART) {
+                            game_set_mode_scenario();
+                        } else {
+                            state.mode = GAME_MODE_MENU;
+
+                            if (shell_mode == MATCH_SHELL_MODE_SCENARIO_VICTORY || shell_mode == MATCH_SHELL_MODE_SCENARIO_DEFEAT) {
+                                // TODO: save victory
+                                menu_set_mode(state.menu_state, MENU_MODE_CAMPAIGN);
+                            } else {
+                                menu_set_mode(state.menu_state, MENU_MODE_MAIN);
+                            }
+                        }
                     }
+
                     break;
                 }
             #ifdef GOLD_DEBUG
@@ -598,7 +578,6 @@ bool game_is_running() {
 
 void game_set_mode_match(int lcg_seed, Noise* noise) {
     state.match_shell_state = match_shell_init(lcg_seed, noise);
-    delete state.menu_state;
     state.mode = GAME_MODE_MATCH;
 
 #ifdef GOLD_DEBUG
@@ -617,14 +596,62 @@ void game_set_mode_match(int lcg_seed, Noise* noise) {
 #endif
 }
 
-void game_set_mode_replay(const char* replay_path) {
+void game_set_mode_scenario() {
+    if (network_get_status() != NETWORK_STATUS_OFFLINE) {
+        menu_set_mode(state.menu_state, MENU_MODE_CAMPAIGN);
+        menu_show_status(state.menu_state, "Error loading campaign scenario. Please try again.");
+        return;
+    }
+
+    network_set_backend(NETWORK_BACKEND_LAN);
+    network_open_lobby("Campaign", NETWORK_LOBBY_PRIVACY_SINGLEPLAYER);
+
+    const std::string scenario_path = menu_get_selected_scenario_path(state.menu_state);
+    std::string script_short_path;
+
+    // Load scenario
+    Scenario* scenario = scenario_open_file(scenario_path.c_str(), &script_short_path);
+    if (scenario == nullptr) {
+        network_disconnect();
+        menu_set_mode(state.menu_state, MENU_MODE_CAMPAIGN);
+        menu_show_status(state.menu_state, "Error loading campaign scenario.");
+        return;
+    }
+
+    // Determine script path
+    const std::string folder_path = filesystem_get_path_folder(scenario_path.c_str());
+    const std::string script_path = folder_path + script_short_path;
+
+    // Init shell state
+    state.match_shell_state = match_shell_init_from_scenario(scenario, script_path.c_str());
+    if (state.match_shell_state == nullptr) {
+        network_disconnect();
+        scenario_free(scenario);
+        menu_set_mode(state.menu_state, MENU_MODE_CAMPAIGN);
+        menu_show_status(state.menu_state, "Error loading campaign scenario.");
+        return;
+    }
+    
+    // Add network bots
+    for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
+        if (state.match_shell_state->match_state.players[player_id].active) {
+            network_add_bot();
+        }
+    }
+
+    // Free scenario
+    scenario_free(scenario);
+    state.mode = GAME_MODE_MATCH;
+}
+
+void game_set_mode_replay() {
+    const char* replay_path = menu_get_selected_replay_filename(state.menu_state);
     state.match_shell_state = replay_shell_init(replay_path);
     if (state.match_shell_state == nullptr) {
         menu_set_mode(state.menu_state, MENU_MODE_REPLAYS);
         menu_show_status(state.menu_state, "Error opening replay file.");
         return;
     }
-    delete state.menu_state;
     state.mode = GAME_MODE_MATCH;
 }
 

@@ -19,8 +19,8 @@ struct ScenarioInfo {
 
 static const ScenarioInfo CAMPAIGN_SCENARIOS[] = {
     (ScenarioInfo) {
-        .name = "Scenario 1",
-        .path = "scenario1/scenario1.json",
+        .name = "Test",
+        .path = "test/test.json",
         .map_offset_x = 128, 
         .map_offset_y = 258
     },
@@ -348,14 +348,7 @@ void menu_update(MenuState* state) {
     } else if (state->mode == MENU_MODE_SINGLEPLAYER) {
         ui_begin_column(state->ui, ivec2(BUTTON_X, BUTTON_Y), 2);
             if (ui_button(state->ui, "Campaign")) {
-                if (network_get_status() != NETWORK_STATUS_OFFLINE) {
-                    menu_show_status(state, "Error setting up game. Please try again.");
-                    network_disconnect();
-                } else {
-                    network_set_backend(NETWORK_BACKEND_LAN);
-                    network_open_lobby("Campaign", NETWORK_LOBBY_PRIVACY_SINGLEPLAYER);
-                    menu_set_mode(state, MENU_MODE_CAMPAIGN_CONNECTING);
-                }
+                menu_set_mode(state, MENU_MODE_CAMPAIGN);
             }
             if (ui_button(state->ui, "Skirmish")) {
                 if (network_get_status() != NETWORK_STATUS_OFFLINE) {
@@ -765,7 +758,6 @@ void menu_update(MenuState* state) {
 
         ui_begin_row(state->ui, ivec2(CAMPAIGN_INFO_RECT.x + 8, CAMPAIGN_INFO_RECT.y + CAMPAIGN_INFO_RECT.h + 4), 4);
             if (ui_button(state->ui, "Back")) {
-                network_disconnect();
                 menu_set_mode(state, MENU_MODE_SINGLEPLAYER);
             }
             if (state->lobbylist_item_selected != MENU_ITEM_NONE && ui_button(state->ui, "Play")) {

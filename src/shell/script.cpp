@@ -977,12 +977,12 @@ static int script_set_match_over_victory(lua_State* lua_state) {
     MatchShellState* state = script_get_match_shell_state(lua_state);
 
     // This validation is to prevent the player from losing and then winning
-    if (state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY || state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT) {
+    if (match_shell_is_in_leave_match_mode(state)) {
         log_warn("script set_match_over_victory(): the match is already over.");
         return 0;
     }
 
-    state->mode = MATCH_SHELL_MODE_MATCH_OVER_VICTORY;
+    state->mode = MATCH_SHELL_MODE_SCENARIO_VICTORY;
 
     return 0;
 }
@@ -994,12 +994,12 @@ static int script_set_match_over_defeat(lua_State* lua_state) {
     MatchShellState* state = script_get_match_shell_state(lua_state);
 
     // This validation is to prevent the player from winning and then losing
-    if (state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY || state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT) {
+    if (match_shell_is_in_leave_match_mode(state)) {
         log_warn("script set_match_over_defeat(): the match is already over.");
         return 0;
     }
 
-    state->mode = MATCH_SHELL_MODE_MATCH_OVER_DEFEAT;
+    state->mode = MATCH_SHELL_MODE_SCENARIO_DEFEAT;
 
     return 0;
 }

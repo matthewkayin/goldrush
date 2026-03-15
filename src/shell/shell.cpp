@@ -699,9 +699,6 @@ void match_shell_update(MatchShellState* state) {
                     match_shell_leave_match(state, MATCH_SHELL_MODE_EXIT_PROGRAM);
                 }
             } else if (state->mode == MATCH_SHELL_MODE_SCENARIO_VICTORY) {
-                if (ui_button(state->ui, "Next Mission", button_size, true)) {
-                    match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_SCENARIO_NEXT);
-                }
                 if (ui_button(state->ui, "Return to Menu", button_size, true)) {
                     match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_SCENARIO_VICTORY);
                 }
@@ -1531,7 +1528,10 @@ void match_shell_update(MatchShellState* state) {
         state->match_over_timer--;
         if (state->match_over_timer == 0) {
             if (state->match_over_is_victory) {
+                GOLD_ASSERT(state->scenario_lua_state == NULL);
                 state->mode = MATCH_SHELL_MODE_MATCH_OVER_VICTORY;
+            } else if (state->scenario_lua_state != NULL) {
+                state->mode = MATCH_SHELL_MODE_SCENARIO_DEFEAT;
             } else {
                 state->mode = MATCH_SHELL_MODE_MATCH_OVER_DEFEAT;
             }
@@ -2310,6 +2310,8 @@ bool match_shell_is_in_menu(const MatchShellState* state) {
             state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP ||
             state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY ||
             state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT || 
+            state->mode == MATCH_SHELL_MODE_SCENARIO_VICTORY ||
+            state->mode == MATCH_SHELL_MODE_SCENARIO_DEFEAT ||
             state->mode == MATCH_SHELL_MODE_DESYNC ||
             state->mode == MATCH_SHELL_MODE_HELP;
 }
@@ -2813,7 +2815,6 @@ bool match_shell_is_in_leave_match_mode(const MatchShellState* state) {
         state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM ||
         state->mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_VICTORY ||
         state->mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_DEFEAT ||
-        state->mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_NEXT ||
         state->mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_RESTART;
 }
 
