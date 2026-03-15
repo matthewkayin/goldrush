@@ -38,6 +38,7 @@ enum MenuMode {
     MENU_MODE_LOAD_MATCH_COUNTDOWN,
     MENU_MODE_LOAD_MATCH,
     MENU_MODE_LOAD_REPLAY,
+    MENU_MODE_LOAD_SCENARIO,
     MENU_MODE_COUNT
 };
 
@@ -85,6 +86,7 @@ size_t menu_get_lobbylist_page_count(size_t count);
 const char* menu_get_player_status_string(NetworkPlayerStatus status);
 const char* menu_get_selected_replay_filename(const MenuState* state);
 uint32_t menu_get_hovered_campaign_scenario();
+std::string menu_get_selected_scenario_path(const MenuState* state);
 
 void menu_render(const MenuState* state);
 void menu_render_decoration(const MenuState* state, int index);

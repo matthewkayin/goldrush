@@ -560,7 +560,7 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
 void match_shell_update(MatchShellState* state) {
     ZoneScoped;
     
-    if (state->mode == MATCH_SHELL_MODE_LEAVE_MATCH || state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM) {
+    if (match_shell_is_in_leave_match_mode(state)) {
         return;
     }
 
@@ -659,14 +659,14 @@ void match_shell_update(MatchShellState* state) {
                     if (match_shell_is_surrender_required_to_leave(state)) {
                         state->mode = MATCH_SHELL_MODE_MENU_SURRENDER;
                     } else {
-                        match_shell_leave_match(state, false);
+                        match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_MATCH);
                     }
                 }
                 if (ui_button(state->ui, "Exit Program", button_size, true)) {
                     if (match_shell_is_surrender_required_to_leave(state)) {
                         state->mode = MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP;
                     } else {
-                        match_shell_leave_match(state, true);
+                        match_shell_leave_match(state, MATCH_SHELL_MODE_EXIT_PROGRAM);
                     }
                 }
                 if (ui_button(state->ui, "Options", button_size, true)) {
@@ -680,7 +680,10 @@ void match_shell_update(MatchShellState* state) {
                 }
             } else if (state->mode == MATCH_SHELL_MODE_MENU_SURRENDER || state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP) {
                 if (ui_button(state->ui, "Yes", button_size, true)) {
-                    match_shell_leave_match(state, state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP);
+                    match_shell_leave_match(
+                        state, state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP
+                            ? MATCH_SHELL_MODE_EXIT_PROGRAM
+                            : MATCH_SHELL_MODE_LEAVE_MATCH);
                 }
                 if (ui_button(state->ui, "Back", button_size, true)) {
                     state->mode = MATCH_SHELL_MODE_MENU;
@@ -690,17 +693,37 @@ void match_shell_update(MatchShellState* state) {
                     state->mode = MATCH_SHELL_MODE_NONE;
                 }
                 if (ui_button(state->ui, "Return to Menu", button_size, true)) {
-                    match_shell_leave_match(state, false);
+                    match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_MATCH);
                 }
                 if (ui_button(state->ui, "Exit Program", button_size, true)) {
-                    match_shell_leave_match(state, true);
+                    match_shell_leave_match(state, MATCH_SHELL_MODE_EXIT_PROGRAM);
+                }
+            } else if (state->mode == MATCH_SHELL_MODE_SCENARIO_VICTORY) {
+                if (ui_button(state->ui, "Next Mission", button_size, true)) {
+                    match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_SCENARIO_NEXT);
+                }
+                if (ui_button(state->ui, "Return to Menu", button_size, true)) {
+                    match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_SCENARIO_VICTORY);
+                }
+                if (ui_button(state->ui, "Exit Program", button_size, true)) {
+                    match_shell_leave_match(state, MATCH_SHELL_MODE_EXIT_PROGRAM);
+                }
+            } else if (state->mode == MATCH_SHELL_MODE_SCENARIO_DEFEAT) {
+                if (ui_button(state->ui, "Restart", button_size, true)) {
+                    match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_SCENARIO_RESTART);
+                }
+                if (ui_button(state->ui, "Return to Menu", button_size, true)) {
+                    match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_SCENARIO_DEFEAT);
+                }
+                if (ui_button(state->ui, "Exit Program", button_size, true)) {
+                    match_shell_leave_match(state, MATCH_SHELL_MODE_EXIT_PROGRAM);
                 }
             } else if (state->mode == MATCH_SHELL_MODE_DESYNC) {
                 if (ui_button(state->ui, "Leave Match", button_size, true)) {
-                    match_shell_leave_match(state, false);
+                    match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_MATCH);
                 }
                 if (ui_button(state->ui, "Exit Program", button_size, true)) {
-                    match_shell_leave_match(state, true);
+                    match_shell_leave_match(state, MATCH_SHELL_MODE_EXIT_PROGRAM);
                 }
             }
         ui_end_container(state->ui);
@@ -962,8 +985,7 @@ void match_shell_update(MatchShellState* state) {
     }
     if (state->is_paused || 
             (match_shell_is_in_menu(state) && match_shell_is_in_single_player_game()) ||
-            state->mode == MATCH_SHELL_MODE_LEAVE_MATCH || 
-            state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM || 
+            match_shell_is_in_leave_match_mode(state) ||
             state->mode == MATCH_SHELL_MODE_DESYNC) {
         return;
     }
@@ -2786,6 +2808,15 @@ bool match_shell_has_pressed_idle_miner_button() {
 
 // MENU
 
+bool match_shell_is_in_leave_match_mode(const MatchShellState* state) {
+    return state->mode == MATCH_SHELL_MODE_LEAVE_MATCH ||
+        state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM ||
+        state->mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_VICTORY ||
+        state->mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_DEFEAT ||
+        state->mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_NEXT ||
+        state->mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_RESTART;
+}
+
 const char* match_shell_get_menu_header_text(const MatchShellState* state) {
     switch (state->mode) {
         case MATCH_SHELL_MODE_MENU:
@@ -2794,8 +2825,10 @@ const char* match_shell_get_menu_header_text(const MatchShellState* state) {
         case MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP:
             return "Surrender?";
         case MATCH_SHELL_MODE_MATCH_OVER_VICTORY:
+        case MATCH_SHELL_MODE_SCENARIO_VICTORY:
             return "Victory!";
         case MATCH_SHELL_MODE_MATCH_OVER_DEFEAT:
+        case MATCH_SHELL_MODE_SCENARIO_DEFEAT:
             return "Defeat!";
         case MATCH_SHELL_MODE_DESYNC:
             return "Desync Detected";
@@ -2950,7 +2983,7 @@ bool match_shell_is_surrender_required_to_leave(const MatchShellState* state) {
     return state->match_state.players[network_get_player_id()].active && match_shell_is_at_least_one_opponent_in_match(state);
 }
 
-void match_shell_leave_match(MatchShellState* state, bool exit_program) {
+void match_shell_leave_match(MatchShellState* state, MatchShellMode mode) {
     if (state->replay_mode) {
         SDL_LockMutex(state->replay_loading_early_exit_mutex);
         state->replay_loading_early_exit = true;
@@ -2964,10 +2997,12 @@ void match_shell_leave_match(MatchShellState* state, bool exit_program) {
         network_disconnect();
         replay_file_close(state->replay_file);
     }
+
     if (state->scenario_lua_state != NULL) {
         lua_close(state->scenario_lua_state);
     }
-    state->mode = exit_program ? MATCH_SHELL_MODE_EXIT_PROGRAM : MATCH_SHELL_MODE_LEAVE_MATCH;
+
+    state->mode = mode;
 }
 
 // DESYNC

@@ -64,7 +64,13 @@ enum MatchShellMode {
     MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP,
     MATCH_SHELL_MODE_MATCH_OVER_VICTORY,
     MATCH_SHELL_MODE_MATCH_OVER_DEFEAT,
+    MATCH_SHELL_MODE_SCENARIO_VICTORY,
+    MATCH_SHELL_MODE_SCENARIO_DEFEAT,
     MATCH_SHELL_MODE_LEAVE_MATCH,
+    MATCH_SHELL_MODE_LEAVE_SCENARIO_VICTORY,
+    MATCH_SHELL_MODE_LEAVE_SCENARIO_DEFEAT,
+    MATCH_SHELL_MODE_LEAVE_SCENARIO_RESTART,
+    MATCH_SHELL_MODE_LEAVE_SCENARIO_NEXT,
     MATCH_SHELL_MODE_EXIT_PROGRAM,
     MATCH_SHELL_MODE_DESYNC,
     MATCH_SHELL_MODE_HELP
@@ -325,6 +331,7 @@ Rect match_shell_get_idle_miner_button_rect();
 bool match_shell_has_pressed_idle_miner_button();
 
 // Menu
+bool match_shell_is_in_leave_match_mode(const MatchShellState* state);
 const char* match_shell_get_menu_header_text(const MatchShellState* state);
 
 // Help
@@ -342,7 +349,7 @@ size_t match_shell_replay_end_of_tape(const MatchShellState* state);
 bool match_shell_is_at_least_one_opponent_in_match(const MatchShellState* state);
 bool match_shell_is_in_single_player_game();
 bool match_shell_is_surrender_required_to_leave(const MatchShellState* state);
-void match_shell_leave_match(MatchShellState* state, bool exit_program);
+void match_shell_leave_match(MatchShellState* state, MatchShellMode mode);
 
 // Desync
 bool match_shell_has_next_checksums(const MatchShellState* state);

@@ -755,8 +755,8 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui/campaign_mission.png",
-            .hframes = 4,
-            .vframes = 1
+            .hframes = 3,
+            .vframes = 2
         }
     }},
     { SPRITE_BUTTON_ICON_ATTACK, (SpriteParams) {

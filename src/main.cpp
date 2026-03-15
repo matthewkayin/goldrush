@@ -355,6 +355,47 @@ int gold_main(int argc, char** argv) {
                         break;
                     }
 
+                    // Load scenario
+                    if (state.menu_state->mode == MENU_MODE_LOAD_SCENARIO) {
+                        const std::string scenario_path = menu_get_selected_scenario_path(state.menu_state);
+                        std::string script_short_path;
+
+                        // Load scenario
+                        Scenario* scenario = scenario_open_file(scenario_path.c_str(), &script_short_path);
+                        if (scenario == NULL) {
+                            menu_set_mode(state.menu_state, MENU_MODE_CAMPAIGN);
+                            menu_show_status(state.menu_state, "Error loading campaign scenario.");
+                            break;
+                        }
+
+                        // Determine script path
+                        const std::string folder_path = filesystem_get_path_folder(scenario_path.c_str());
+                        const std::string script_path = folder_path + script_short_path;
+                        log_debug("Scenario path %s", scenario_path.c_str());
+                        log_debug("Script short path %s", script_short_path.c_str());
+                        log_debug("Script folder path %s", folder_path.c_str());
+                        log_debug("Script full path %s", script_path.c_str());
+
+                        // Init shell state
+                        state.match_shell_state = match_shell_init_from_scenario(scenario, script_path.c_str());
+                        if (state.match_shell_state == nullptr) {
+                            menu_set_mode(state.menu_state, MENU_MODE_CAMPAIGN);
+                            menu_show_status(state.menu_state, "Error loading campaign scenario.");
+                            break;
+                        }
+                        
+                        // Add network bots
+                        for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
+                            if (state.match_shell_state->match_state.players[player_id].active) {
+                                network_add_bot();
+                            }
+                        }
+
+                        // Free scenario
+                        scenario_free(scenario);
+                        state.mode = GAME_MODE_MATCH;
+                    }
+
                     break;
                 }
                 case GAME_MODE_MATCH: {
@@ -394,10 +435,9 @@ int gold_main(int argc, char** argv) {
                         }
                         if (state.match_shell_state->mode != MATCH_SHELL_MODE_LEAVE_MATCH) {
                             for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
-                                if (!state.match_shell_state->match_state.players[player_id].active) {
-                                    continue;
+                                if (state.match_shell_state->match_state.players[player_id].active) {
+                                    network_add_bot();
                                 }
-                                network_add_bot();
                             }
                         }
                         state.mode = GAME_MODE_MATCH;
@@ -679,16 +719,13 @@ void game_test_update() {
                 break;
         }
     } else if (state.mode == GAME_MODE_MATCH) {
-        if (state.match_shell_state->mode == MATCH_SHELL_MODE_NOT_STARTED ||
-                state.match_shell_state->mode == MATCH_SHELL_MODE_LEAVE_MATCH ||
-                state.match_shell_state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM ||
-                state.match_shell_state->mode == MATCH_SHELL_MODE_DESYNC) {
+        if (match_shell_is_in_leave_match_mode(state.match_shell_state)) {
             return;
         }
 
         if (state.match_shell_state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY || 
                 state.match_shell_state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT) {
-            match_shell_leave_match(state.match_shell_state, false);
+            match_shell_leave_match(state.match_shell_state, MATCH_SHELL_MODE_LEAVE_MATCH);
         } else if (state.match_shell_state->match_timer % TURN_DURATION == 0 && 
                 state.match_shell_state->match_state.players[network_get_player_id()].active &&
                 state.match_shell_state->input_queue.empty()) {
@@ -702,7 +739,7 @@ void game_test_update() {
             // Check for surrender
             if (bot_should_surrender(state.match_shell_state->match_state, state.test_bot, state.match_shell_state->match_timer)) {
                 network_send_chat("gg");
-                match_shell_leave_match(state.match_shell_state, false);
+                match_shell_leave_match(state.match_shell_state, MATCH_SHELL_MODE_LEAVE_MATCH);
             }
         }
     }

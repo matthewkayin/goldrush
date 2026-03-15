@@ -402,7 +402,6 @@ Scenario* scenario_open_file(const char* json_path, std::string* script_short_pa
 
     Json* scenario_json = NULL;
     Scenario* scenario = NULL;
-    FILE* map_file = NULL;
 
     {
         scenario_json = json_read(json_path);
@@ -677,9 +676,6 @@ error:
     }
     if (scenario != NULL) {
         scenario_free(scenario);
-    }
-    if (map_file != NULL) {
-        fclose(map_file);
     }
 
     return NULL;

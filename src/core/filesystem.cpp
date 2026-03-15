@@ -47,7 +47,7 @@ std::string filesystem_get_path_folder(const char* path) {
 
     size_t last_slash_index = folder_path.size();
     for (size_t index = 0; index < folder_path.size(); index++) {
-        if (folder_path[index] == GOLD_PATH_SEPARATOR) {
+        if (folder_path[index] == '\\' || folder_path[index] == '/') {
             last_slash_index = index;
         }
     }

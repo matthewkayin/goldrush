@@ -20,13 +20,13 @@ struct ScenarioInfo {
 static const ScenarioInfo CAMPAIGN_SCENARIOS[] = {
     (ScenarioInfo) {
         .name = "Scenario 1",
-        .path = "scenario1.json",
+        .path = "scenario1/scenario1.json",
         .map_offset_x = 128, 
         .map_offset_y = 258
     },
     (ScenarioInfo) {
         .name = "Scenario 2",
-        .path = "scenario2.json",
+        .path = "scenario2/scenario2.json",
         .map_offset_x = 100, 
         .map_offset_y = 223
     }
@@ -769,6 +769,7 @@ void menu_update(MenuState* state) {
                 menu_set_mode(state, MENU_MODE_SINGLEPLAYER);
             }
             if (state->lobbylist_item_selected != MENU_ITEM_NONE && ui_button(state->ui, "Play")) {
+                menu_set_mode(state, MENU_MODE_LOAD_SCENARIO);
             }
         ui_end_container(state->ui);
     }
@@ -882,7 +883,7 @@ void menu_update(MenuState* state) {
 void menu_set_mode(MenuState* state, MenuMode mode) {
     state->status_timer = 0;
     state->lobbylist_page = 0;
-    if (mode != MENU_MODE_LOAD_REPLAY) {
+    if (mode != MENU_MODE_LOAD_REPLAY && mode != MENU_MODE_LOAD_SCENARIO) {
         state->lobbylist_item_selected = MENU_ITEM_NONE;
     }
 
@@ -1004,16 +1005,18 @@ const char* menu_get_selected_replay_filename(const MenuState* state) {
 
 uint32_t menu_get_hovered_campaign_scenario() {
     const SpriteInfo& scenario_orb_sprite_info = render_get_sprite_info(SPRITE_UI_CAMPAIGN_SCENARIO_ORB);
+    const int orb_hover_margin = 2;
+    const int orb_hover_size = scenario_orb_sprite_info.frame_width + (orb_hover_margin * 2);
     ivec2 mouse_position = input_get_mouse_position();
 
     for (uint32_t scenario_index = 0; scenario_index < 2; scenario_index++) {
         const ScenarioInfo& campaign_scenario = CAMPAIGN_SCENARIOS[scenario_index];
 
         const Rect scenario_orb_rect = (Rect) {
-            .x = CAMPAIGN_MAP_POSITION.x + campaign_scenario.map_offset_x,
-            .y = CAMPAIGN_MAP_POSITION.y + campaign_scenario.map_offset_y,
-            .w = scenario_orb_sprite_info.frame_width,
-            .h = scenario_orb_sprite_info.frame_height
+            .x = CAMPAIGN_MAP_POSITION.x + campaign_scenario.map_offset_x - orb_hover_margin,
+            .y = CAMPAIGN_MAP_POSITION.y + campaign_scenario.map_offset_y - orb_hover_margin,
+            .w = orb_hover_size,
+            .h = orb_hover_size
         };
         if (scenario_orb_rect.has_point(mouse_position)) {
             return scenario_index;
@@ -1021,6 +1024,10 @@ uint32_t menu_get_hovered_campaign_scenario() {
     }
 
     return MENU_ITEM_NONE;
+}
+
+std::string menu_get_selected_scenario_path(const MenuState* state) {
+    return filesystem_get_resource_path() + "scenario/" + CAMPAIGN_SCENARIOS[state->lobbylist_item_selected].path;
 }
 
 void menu_render(const MenuState* state) {
@@ -1123,8 +1130,13 @@ void menu_render(const MenuState* state) {
             const ScenarioInfo& scenario_info = CAMPAIGN_SCENARIOS[scenario_index];
 
             ivec2 scenario_orb_position = CAMPAIGN_MAP_POSITION + ivec2(scenario_info.map_offset_x, scenario_info.map_offset_y);
-            bool is_hovered = scenario_index == hovered_scenario_index;
-            render_sprite_frame(SPRITE_UI_CAMPAIGN_SCENARIO_ORB, ivec2((int)is_hovered, 0), scenario_orb_position, RENDER_SPRITE_NO_CULL, 0);
+            int hframe = 0;
+            if (scenario_index == hovered_scenario_index) {
+                hframe = 1;
+            } else if (state->lobbylist_item_selected == scenario_index) {
+                hframe = 2;
+            }
+            render_sprite_frame(SPRITE_UI_CAMPAIGN_SCENARIO_ORB, ivec2(hframe, 0), scenario_orb_position, RENDER_SPRITE_NO_CULL, 0);
         }
     }
 

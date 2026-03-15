@@ -427,7 +427,7 @@ void match_shell_script_call(MatchShellState* state, const char* func_name) {
         }
 
         log_error("%s", error_str);
-        match_shell_leave_match(state, false);
+        match_shell_leave_match(state, MATCH_SHELL_MODE_LEAVE_MATCH);
     }
     // Remove traceback from stack
     lua_pop(state->scenario_lua_state, 1);
