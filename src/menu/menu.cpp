@@ -115,7 +115,7 @@ static const uint32_t LOBBYLIST_PAGE_SIZE = 9;
 static const std::vector<std::string> PLAYER_COLOR_STRS = { "Blue", "Red", "Green", "Purple" };
 static const std::vector<std::string> LOBBY_TYPE_STRS = { "Public", "Invite Only" };
 
-static const uint32_t MATCH_LOAD_COUNTDOWN_DURATION = 5U * 60U;
+static const uint32_t MATCH_LOAD_COUNTDOWN_DURATION = 3U * 60U;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-parameter"
