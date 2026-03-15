@@ -14,6 +14,8 @@
 #define MENU_CHAT_MESSAGE_BUFFER_SIZE 60
 #define MENU_CHAT_MAX_MESSAGE_LENGTH (MENU_CHAT_MESSAGE_BUFFER_SIZE - 1)
 
+#define CAMPAIGN_SCENARIO_COUNT 2
+
 enum MenuMode {
     MENU_MODE_MAIN,
     MENU_MODE_SINGLEPLAYER,
@@ -53,6 +55,8 @@ struct MenuState {
     int parallax_cactus_offset;
     uint32_t match_load_countdown_timer;
 
+    uint32_t campaign_progress;
+
 #ifndef GOLD_STEAM
     std::string username;
 #endif
@@ -85,8 +89,12 @@ void menu_add_chat_message(MenuState* state, const char* message);
 size_t menu_get_lobbylist_page_count(size_t count);
 const char* menu_get_player_status_string(NetworkPlayerStatus status);
 const char* menu_get_selected_replay_filename(const MenuState* state);
-uint32_t menu_get_hovered_campaign_scenario();
+uint32_t menu_get_hovered_campaign_scenario(const MenuState* state);
 std::string menu_get_selected_scenario_path(const MenuState* state);
+
+void menu_load_campaign_progress(MenuState* state);
+void menu_save_campaign_progress(const MenuState* state);
+void menu_set_campaign_progress(MenuState* state, uint32_t value);
 
 void menu_render(const MenuState* state);
 void menu_render_decoration(const MenuState* state, int index);

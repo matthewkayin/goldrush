@@ -9,6 +9,7 @@
 #include "render/font.h"
 #include "render/render.h"
 #include "util/util.h"
+#include "util/json.h"
 
 struct ScenarioInfo {
     const char* name;
@@ -17,7 +18,7 @@ struct ScenarioInfo {
     int map_offset_y;
 };
 
-static const ScenarioInfo CAMPAIGN_SCENARIOS[] = {
+static const ScenarioInfo CAMPAIGN_SCENARIOS[CAMPAIGN_SCENARIO_COUNT] = {
     (ScenarioInfo) {
         .name = "Test",
         .path = "test/test.json",
@@ -154,6 +155,8 @@ MenuState* menu_init() {
     state->lobbylist_item_selected = MENU_ITEM_NONE;
     state->lobby_privacy = NETWORK_LOBBY_PRIVACY_PUBLIC;
     state->match_load_countdown_timer = 0;
+
+    menu_load_campaign_progress(state);
 
     state->mode = MENU_MODE_MAIN;
 #ifndef GOLD_STEAM
@@ -735,7 +738,7 @@ void menu_update(MenuState* state) {
         ui_end_container(state->ui);
     } else if (state->mode == MENU_MODE_CAMPAIGN) {
         // Scenario icons
-        uint32_t hovered_scenario_index = menu_get_hovered_campaign_scenario();
+        uint32_t hovered_scenario_index = menu_get_hovered_campaign_scenario(state);
         if (hovered_scenario_index != MENU_ITEM_NONE && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
             state->lobbylist_item_selected = hovered_scenario_index;
         }
@@ -995,13 +998,13 @@ const char* menu_get_selected_replay_filename(const MenuState* state) {
     return state->replay_filenames[state->lobbylist_item_selected].c_str();
 }
 
-uint32_t menu_get_hovered_campaign_scenario() {
+uint32_t menu_get_hovered_campaign_scenario(const MenuState* state) {
     const SpriteInfo& scenario_orb_sprite_info = render_get_sprite_info(SPRITE_UI_CAMPAIGN_SCENARIO_ORB);
     const int orb_hover_margin = 2;
     const int orb_hover_size = scenario_orb_sprite_info.frame_width + (orb_hover_margin * 2);
     ivec2 mouse_position = input_get_mouse_position();
 
-    for (uint32_t scenario_index = 0; scenario_index < 2; scenario_index++) {
+    for (uint32_t scenario_index = 0; scenario_index < state->campaign_progress + 1; scenario_index++) {
         const ScenarioInfo& campaign_scenario = CAMPAIGN_SCENARIOS[scenario_index];
 
         const Rect scenario_orb_rect = (Rect) {
@@ -1020,6 +1023,50 @@ uint32_t menu_get_hovered_campaign_scenario() {
 
 std::string menu_get_selected_scenario_path(const MenuState* state) {
     return filesystem_get_resource_path() + "scenario/" + CAMPAIGN_SCENARIOS[state->lobbylist_item_selected].path;
+}
+
+std::string menu_get_campaign_progress_path() {
+    return filesystem_get_data_path() + "campaign_progress.json";
+}
+
+void menu_load_campaign_progress(MenuState* state) {
+    const std::string campaign_progress_path = menu_get_campaign_progress_path();
+    Json* campaign_progress_json = json_read(campaign_progress_path.c_str());
+    if (campaign_progress_json == NULL) {
+        log_info("No campaign progress file found.");
+        menu_set_campaign_progress(state, 0);
+        return;
+    }
+
+    Json* value_json = json_object_get(campaign_progress_json, "campaign_progress");
+    if (value_json == NULL || value_json->type != JSON_TYPE_NUMBER) {
+        log_warn("Campaign progress file is invalid.");
+        menu_set_campaign_progress(state, 0);
+        return;
+    }
+
+    menu_set_campaign_progress(state, (uint32_t)value_json->number.value);
+}
+
+void menu_save_campaign_progress(const MenuState* state) {
+    Json* campaign_progress_json = json_object();
+    json_object_set_number(campaign_progress_json, "campaign_progress", state->campaign_progress);
+
+    const std::string campaign_progress_path = menu_get_campaign_progress_path();
+    if (!json_write(campaign_progress_json, campaign_progress_path.c_str())) {
+        log_error("Failed to save campaign progress.");
+        return;
+    }
+
+    log_info("Campaign progress saved.");
+}
+
+void menu_set_campaign_progress(MenuState* state, uint32_t value) {
+    if (value > CAMPAIGN_SCENARIO_COUNT) {
+        value = CAMPAIGN_SCENARIO_COUNT;
+    }
+
+    state->campaign_progress = value;
 }
 
 void menu_render(const MenuState* state) {
@@ -1117,8 +1164,8 @@ void menu_render(const MenuState* state) {
     if (state->mode == MENU_MODE_CAMPAIGN) {
         render_sprite_frame(SPRITE_UI_CAMPAIGN_MAP, ivec2(0, 0), CAMPAIGN_MAP_POSITION, RENDER_SPRITE_NO_CULL, 0);
 
-        uint32_t hovered_scenario_index = menu_get_hovered_campaign_scenario();
-        for (uint32_t scenario_index = 0; scenario_index < 2; scenario_index++) {
+        uint32_t hovered_scenario_index = menu_get_hovered_campaign_scenario(state);
+        for (uint32_t scenario_index = 0; scenario_index < state->campaign_progress + 1; scenario_index++) {
             const ScenarioInfo& scenario_info = CAMPAIGN_SCENARIOS[scenario_index];
 
             ivec2 scenario_orb_position = CAMPAIGN_MAP_POSITION + ivec2(scenario_info.map_offset_x, scenario_info.map_offset_y);

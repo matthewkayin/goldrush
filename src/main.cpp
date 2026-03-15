@@ -389,7 +389,13 @@ int gold_main(int argc, char** argv) {
                             state.mode = GAME_MODE_MENU;
 
                             if (shell_mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_VICTORY || shell_mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_DEFEAT) {
-                                // TODO: save victory
+                                // Save campaign progress
+                                if (shell_mode == MATCH_SHELL_MODE_LEAVE_SCENARIO_VICTORY && 
+                                        state.menu_state->campaign_progress == state.menu_state->lobbylist_item_selected) {
+                                    menu_set_campaign_progress(state.menu_state, state.menu_state->campaign_progress + 1);
+                                    menu_save_campaign_progress(state.menu_state);
+                                }
+
                                 menu_set_mode(state.menu_state, MENU_MODE_CAMPAIGN);
                             } else {
                                 menu_set_mode(state.menu_state, MENU_MODE_MAIN);
